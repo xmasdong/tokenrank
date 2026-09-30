@@ -1081,3 +1081,29 @@ test('我的页关闭排名：调用接口、更新开关状态并提示；失�
   fail = true; await p.toggleRanking({ detail: { value: true } });
   assert.equal(p.data.user.rank_hidden, true); assert.equal(toasts.at(-1), '网络错误');
 });
+
+test('群页按群隐藏排名：调用接口、更新开关并刷新本群榜单；失败时保持原状态', async () => {
+  const calls = []; const toasts = []; let fail = false, infos = 0;
+  const { p } = page('group', {
+    groupInfo: async () => { infos++; return { name: '群', members: 3, joined: true, owner_id: 1, my_hidden: calls.at(-1)?.[1] === true }; },
+    setGroupVisibility: async (id, hidden) => { calls.push([id, hidden]); if (fail) throw new Error('网络错误'); return { my_hidden: hidden }; },
+  }, { showToast: o => toasts.push(o.title) });
+  p.buildPoster = () => {}; p.onLoad({ g: 'g1', from: 'mine' }); await p.onShow();
+  assert.equal(p.data.myHidden, false);
+  await p.toggleGroupVisibility({ detail: { value: false } });
+  assert.deepEqual(calls[0], ['g1', true]); assert.equal(p.data.myHidden, true); assert.equal(toasts.at(-1), '已在本群隐藏'); assert.ok(infos >= 2);
+  fail = true; await p.toggleGroupVisibility({ detail: { value: true } });
+  assert.equal(p.data.myHidden, true); assert.equal(toasts.at(-1), '网络错误'); assert.equal(p.data.visibilitySaving, false);
+});
+
+test('首次复制接入命令先说明上传内容与开源；确认后复制并不再弹，选看源码复制仓库地址', async () => {
+  const modals = [], clips = [];
+  const { p } = page('connect', { getConnect: async () => ({ token: 'a'.repeat(32), connected: true, last_report_at: null }) },
+    { showModal: o => modals.push(o), setClipboardData: o => clips.push(o.data) });
+  p.onLoad({}); await p.onShow();
+  p.copyCommand(); assert.equal(modals.length, 1); assert.match(modals[0].content, /不会离开你的电脑/); assert.match(modals[0].content, /开源/); assert.equal(clips.length, 0);
+  modals[0].success({ cancel: true }); assert.equal(clips.at(-1), 'https://github.com/xmasdong/tokenrank');
+  p.copyCommand(); modals[1].success({ confirm: true }); assert.match(clips.at(-1), /install\.sh/);
+  p.copyCommand(); assert.equal(modals.length, 2); assert.match(clips.at(-1), /install\.sh/);
+  p.onHide();
+});

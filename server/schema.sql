@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS rank_group_members (
   group_id TEXT NOT NULL,
   user_id INTEGER NOT NULL,
   joined_at INTEGER NOT NULL,
+  hidden INTEGER NOT NULL DEFAULT 0,          -- 成员在本群隐藏自己的排名
   PRIMARY KEY (group_id, user_id)
 );
 CREATE INDEX IF NOT EXISTS idx_members_user ON rank_group_members(user_id);

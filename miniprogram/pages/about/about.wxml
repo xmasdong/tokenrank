@@ -35,7 +35,7 @@
     <view class="cmd" data-cmd="https://github.com/xmasdong/tokenrank" bindtap="copyCmd">github.com/xmasdong/tokenrank</view>
   </view>
   <view class="sec"><view class="sec-title display">上传什么</view>
-    <view class="p">不想被排名，可以在「我的」里关掉，关掉后用量只有自己能看到。</view>
+    <view class="p">不想被排名，可以在「我的」里关掉，关掉后用量只有自己能看到。只想在某个群里不显示，就在那个群的榜单页关掉“在本群显示我的排名”。</view>
     <view class="p">读取：统计库里的日期、计数、工具名和模型名。上传：按天汇总的数字和随机设备 ID，不含代码、对话、项目名或路径。</view>
     <view class="p">写入：~/.tokenrank 下的配置、进度和日志。后台服务 macOS 为 com.tokenrank.sync，Windows 为 TokenRankSync。</view>
     <view class="p">统计库结构不兼容时停止同步，不改动数据库。</view>

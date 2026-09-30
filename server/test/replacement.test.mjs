@@ -44,7 +44,7 @@ test('replacement stays invisible until complete; commit removes old days, devic
   f.db.exec(`INSERT INTO daily_totals SELECT user_id,'old-device',day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at FROM daily_totals WHERE user_id=1;
     INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(1,'2025-01-01',999,1);
     INSERT INTO rank_groups(id,name,owner_user_id,created_at) VALUES('group','保留群',1,1);
-    INSERT INTO rank_group_members VALUES('group',1,1);`);
+    INSERT INTO rank_group_members(group_id,user_id,joined_at) VALUES('group',1,1);`);
   const retained=f.rows(1);
   const first=await f.send(f.part(0,2,[day('2026-02-01',20)],2));assert.equal(first.status,200);assert.equal((await first.json()).committed,false);
   assert.deepEqual(f.rows(1),retained);

@@ -72,6 +72,7 @@
       </block>
     </block>
     <view class="board-meta" wx:if="{{joined === true && !loading && !error}}"><text>{{updated_fmt ? '榜单更新于 ' + updated_fmt : '等待首次上报'}}</text><text>含缓存 · 北京时间</text></view>
+    <view wx:if="{{joined === true && user}}" class="visibility-row"><text>在本群显示我的排名</text><switch checked="{{!myHidden}}" disabled="{{visibilitySaving}}" color="#B03A2E" bindchange="toggleGroupVisibility" /></view>
     <view class="board-tools">
       <button wx:if="{{joined === true && posterPath}}" class="text-action" bindtap="previewPoster">榜单图片</button>
       <button wx:elif="{{joined === true && posterError}}" class="text-action" bindtap="buildPoster">重新生成图片</button>
@@ -81,7 +82,7 @@
     <view wx:if="{{joined === true}}" class="share-note">转发到其他群会打开那个群的榜单。</view>
     <view wx:if="{{joined === true}}" class="share-dock">
       <view class="dock-summary" wx:if="{{me}}"><view class="dock-rank">我的排名 <text class="dock-rank-number num-font">#{{me.rank}}</text></view><view class="dock-value num-font">{{me.tokens_fmt}}<text class="dock-unit">tokens</text></view></view>
-      <view class="dock-summary" wx:else><view class="dock-rank">我的排名</view><view class="dock-empty">{{loading ? '加载中…' : error ? '暂时无法获取' : user && user.rank_hidden ? '已关闭排名' : hasReported ? '本周期未上榜' : '接入电脑后上榜'}}</view></view>
+      <view class="dock-summary" wx:else><view class="dock-rank">我的排名</view><view class="dock-empty">{{loading ? '加载中…' : error ? '暂时无法获取' : user && user.rank_hidden ? '已关闭排名' : myHidden ? '已在本群隐藏' : hasReported ? '本周期未上榜' : '接入电脑后上榜'}}</view></view>
       <button class="btn btn-seal dock-share" open-type="share">分享到微信群</button>
     </view>
   </block>

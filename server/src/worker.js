@@ -34,7 +34,8 @@ const DEFAULT_GROUP_NAME = '本群 Token 排名';
 const completeProfile = user => !!(sanitizeName(user?.nickname) && user?.avatar_path);
 const profileRequired = () => Response.json({ error: '请先保存微信头像和昵称，再参与群排名', code: 'PROFILE_REQUIRED' }, { status: 428 });
 // Profile completion is an onboarding step, not a filter on existing members' usage.
-const groupMembers = parameter => `SELECT user_id FROM rank_group_members WHERE group_id=${parameter}`;
+// Members who hid themselves in this group do not count in its rankings.
+const groupMembers = parameter => `SELECT user_id FROM rank_group_members WHERE group_id=${parameter} AND hidden=0`;
 
 // 反代场景下回源 Host 是 workers.dev，request.url 的 origin 不是用户可见域名；
 // 用 PUBLIC_BASE_URL 指定正式域名（生成接入命令等用户可见 URL 时优先用它）。
@@ -119,6 +120,7 @@ async function route(request, env, url, path) {
   if (method === 'POST' && path === '/api/groups/resolve') return withCors(await resolveGroup(request, env));
   if (method === 'POST' && path === '/api/groups/join') return withCors(await joinGroup(request, env));
   if (method === 'POST' && /^\/api\/groups\/[a-z0-9]+\/rename$/.test(path)) return withCors(await renameGroup(request, env, path));
+  if (method === 'POST' && /^\/api\/groups\/[a-z0-9]+\/visibility$/.test(path)) return withCors(await setGroupVisibility(request, env, path));
   if (method === 'GET' && path === '/api/groups/mine') return withCors(await myGroups(request, env));
   if (method === 'GET' && path.startsWith('/api/groups/')) return withCors(await groupInfo(request, env, path));
 
@@ -434,6 +436,18 @@ async function renameGroup(request, env, path) {
   return Response.json({ id, name });
 }
 
+/** 成员设置自己在本群是否显示排名；只影响本群榜单。 */
+async function setGroupVisibility(request, env, path) {
+  const user = await sessionUser(request, env);
+  if (!user) return jsonError(401, '请先登录');
+  const id = path.split('/')[3];
+  const body = await readJson(request);
+  if (typeof body?.hidden !== 'boolean') return jsonError(400, 'hidden 必须是布尔值');
+  const res = await env.DB.prepare('UPDATE rank_group_members SET hidden = ?1 WHERE group_id = ?2 AND user_id = ?3').bind(body.hidden ? 1 : 0, id, user.id).run();
+  if (!res.meta?.changes) return jsonError(403, '你还没有加入这个群');
+  return Response.json({ id, my_hidden: body.hidden });
+}
+
 async function joinGroup(request, env) {
   const user = await sessionUser(request, env);
   if (!user) return jsonError(401, '请先登录');
@@ -451,7 +465,7 @@ async function myGroups(request, env) {
   const user = await sessionUser(request, env);
   if (!user) return jsonError(401, '请先登录');
   const rows = await env.DB.prepare(`
-    SELECT g.id, g.name,
+    SELECT g.id, g.name, mm.hidden AS my_hidden,
            (SELECT COUNT(*) FROM rank_group_members m WHERE m.group_id = g.id) AS members
     FROM rank_groups g
     JOIN rank_group_members mm ON mm.group_id = g.id AND mm.user_id = ?1
@@ -466,15 +480,16 @@ async function groupInfo(request, env, path) {
   const group = await env.DB.prepare('SELECT id, name, owner_user_id, created_at FROM rank_groups WHERE id = ?1').bind(id).first();
   if (!group) return jsonError(404, '群不存在或已解散');
   const cnt = await env.DB.prepare('SELECT COUNT(*) AS c FROM rank_group_members WHERE group_id = ?1').bind(id).first();
-  let joined = null;
+  let joined = null, myHidden = false;
   if (user) {
-    const m = await env.DB.prepare('SELECT 1 AS x FROM rank_group_members WHERE group_id = ?1 AND user_id = ?2').bind(id, user.id).first();
+    const m = await env.DB.prepare('SELECT hidden FROM rank_group_members WHERE group_id = ?1 AND user_id = ?2').bind(id, user.id).first();
     joined = !!m;
+    myHidden = !!m?.hidden;
   }
   const named = group.name !== DEFAULT_GROUP_NAME;
   const canRename = !!user && (group.owner_user_id === user.id || (joined === true && !named));
   return Response.json({ id: group.id, name: group.name, members: cnt.c, created_at: group.created_at, joined,
-    owner_id: group.owner_user_id, named, can_rename: canRename });
+    owner_id: group.owner_user_id, named, can_rename: canRename, my_hidden: myHidden });
 }
 
 // ================= 榜单 =================
@@ -650,7 +665,7 @@ async function myRankings(request, env, url) {
     : ['0000-01-01', '9999-12-31'];
 
   const groupsTask = env.DB.prepare(`
-    SELECT g.id, g.name,
+    SELECT g.id, g.name, mm.hidden AS my_hidden,
            (SELECT COUNT(*) FROM rank_group_members m WHERE m.group_id = g.id) AS members
     FROM rank_groups g
     JOIN rank_group_members mm ON mm.group_id = g.id AND mm.user_id = ?1
@@ -675,7 +690,8 @@ async function myRankings(request, env, url) {
       ]);
       return { id: g.id, name: g.name, members: g.members,
         profile_required: !completeProfile(user),
-        my_rank: myTokens > 0 && !user.rank_hidden ? ahead.c + 1 : null, my_tokens: myTokens, rank_hidden: !!user.rank_hidden,
+        my_rank: myTokens > 0 && !user.rank_hidden && !g.my_hidden ? ahead.c + 1 : null, my_tokens: myTokens,
+        rank_hidden: !!user.rank_hidden, group_hidden: !!g.my_hidden,
         global_rank: gmap.get(user.id) ?? null, updated_at: up.ts };
     }));
     out.push(...chunk);

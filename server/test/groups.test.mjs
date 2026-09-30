@@ -292,8 +292,8 @@ test('多个群并行查询仍按创建时间排序，保留各群不同排名�
   seedDay(f, 2, beijingDay(), { tokens: 100, requests: 1 });
   for (let i = 0; i < 8; i++) {
     f.db.prepare('INSERT INTO rank_groups(id,name,owner_user_id,created_at) VALUES(?,?,?,?)').run(`many-${i}`, `群${i}`, 1, 100 + i);
-    if (i < 7) f.db.prepare('INSERT INTO rank_group_members VALUES(?,?,?)').run(`many-${i}`, 2, 100);
-    if (i % 2 === 0 || i === 7) f.db.prepare('INSERT INTO rank_group_members VALUES(?,?,?)').run(`many-${i}`, 1, 100);
+    if (i < 7) f.db.prepare('INSERT INTO rank_group_members(group_id,user_id,joined_at) VALUES(?,?,?)').run(`many-${i}`, 2, 100);
+    if (i % 2 === 0 || i === 7) f.db.prepare('INSERT INTO rank_group_members(group_id,user_id,joined_at) VALUES(?,?,?)').run(`many-${i}`, 1, 100);
   }
   const result = await f.request('/api/my/rankings?period=day', null, 2);
   assert.equal(result.status, 200);
@@ -382,7 +382,7 @@ async function largeGroup(t) {
     if (id > 3) f.db.prepare('INSERT INTO users(id,openid,created_at,updated_at) VALUES(?,?,?,?)').run(id, `user-${id}`, now, now);
     f.db.prepare('UPDATE users SET nickname=? WHERE id=?').run(`成员${id}`, id);
     f.db.prepare('UPDATE users SET avatar_path=? WHERE id=?').run(`00000000-0000-0000-0000-${String(id).padStart(12,'0')}.png`, id);
-    if (id > 1 && id <= 138) f.db.prepare('INSERT INTO rank_group_members VALUES(?,?,?)').run(group.id, id, now);
+    if (id > 1 && id <= 138) f.db.prepare('INSERT INTO rank_group_members(group_id,user_id,joined_at) VALUES(?,?,?)').run(group.id, id, now);
     if (id <= 123 || id === 139) seedUsage(f, id, 0, id === 1 ? 1 : id === 139 ? 999 : 100);
   }
   seedUsage(f, 124, -1, 200);
@@ -643,4 +643,26 @@ test('关闭排名：自己仍能看到全部用量，广场榜和群榜都不�
   assert.equal((await f.request('/api/profile/ranking', { hidden: 'yes' }, 2)).status, 400);
   await f.request('/api/profile/ranking', { hidden: false }, 2);
   assert.equal((await f.request(global, null, 0)).data.total, 124);
+});
+
+test('按群隐藏排名：只在该群榜单消失，其他群和广场照常；非成员不能设置；可恢复', async t => {
+  const f = await largeGroup(t);
+  const other = (await f.resolve('other-group', 2)).data;
+  const global = '/api/leaderboard?scope=global&period=day';
+  const otherPath = `/api/leaderboard?scope=group&id=${other.id}&period=day`;
+  const hide = await f.request(`/api/groups/${f.group.id}/visibility`, { hidden: true }, 2);
+  assert.equal(hide.status, 200);
+  assert.ok((await f.request(f.path)).data.entries.every(e => e.nickname !== '成员2'));
+  assert.equal((await f.request(f.path)).data.total, 122);
+  assert.ok((await f.request(otherPath, null, 2)).data.entries.some(e => e.nickname === '成员2'));
+  assert.ok((await f.request(global, null, 0)).data.total === 124);
+  assert.equal((await f.request(`/api/groups/${f.group.id}`, null, 2)).data.my_hidden, true);
+  const ranks = (await f.request('/api/my/rankings?period=day', null, 2)).data.groups;
+  const inLarge = ranks.find(g => g.id === f.group.id), inOther = ranks.find(g => g.id === other.id);
+  assert.equal(inLarge.my_rank, null); assert.equal(inLarge.group_hidden, true); assert.ok(inOther.my_rank >= 1);
+  f.db.prepare('INSERT INTO mp_sessions VALUES(?,?,?)').run('session-139', 139, Date.now() + 3600000);
+  assert.equal((await f.request(`/api/groups/${f.group.id}/visibility`, { hidden: true }, 139)).status, 403);
+  assert.equal((await f.request(`/api/groups/${f.group.id}/visibility`, { hidden: 1 }, 2)).status, 400);
+  await f.request(`/api/groups/${f.group.id}/visibility`, { hidden: false }, 2);
+  assert.equal((await f.request(f.path)).data.total, 123);
 });

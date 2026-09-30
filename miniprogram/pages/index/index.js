@@ -40,7 +40,7 @@ Page({
   },
   showGroups(result) {
     const myGroups = result.groups.map(g => ({ ...g,
-      my_rank_label: g.rank_hidden ? '未参与排名' : g.profile_required ? '待完善资料' : g.my_rank ? api.cnRank(g.my_rank).label : '未上榜',
+      my_rank_label: g.rank_hidden ? '未参与排名' : g.group_hidden ? '本群已隐藏' : g.profile_required ? '待完善资料' : g.my_rank ? api.cnRank(g.my_rank).label : '未上榜',
       tokens_fmt: api.fmtTokens(g.my_tokens),
       updated_fmt: g.updated_at ? api.fmtRelTime(g.updated_at) : '等待首次上报',
     }));

@@ -231,6 +231,8 @@ module.exports = {
   setProfile: (nickname) => mutate('/api/profile', { method: 'POST', data: { nickname } }),
   /** 关闭或恢复排名：只影响榜单展示，自己的用量照常可见 */
   setRanking: (hidden) => mutate('/api/profile/ranking', { method: 'POST', data: { hidden } }),
+  /** 只在某个群隐藏或显示自己的排名 */
+  setGroupVisibility: (id, hidden) => mutate(`/api/groups/${encodeURIComponent(id)}/visibility`, { method: 'POST', data: { hidden } }),
   uploadProfile,
 
   /** 接入码：GET 查看（不轮换）/ POST 重置（作废旧码） */

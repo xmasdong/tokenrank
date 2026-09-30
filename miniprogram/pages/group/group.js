@@ -14,7 +14,7 @@ Page({
     user: null, members: 0, entries: [], me: null, loading: true, error: '', missing: false,
     total: null, hasMore: false, nextOffset: null, snapshot: '', loadingMore: false, moreError: '',
     nickname: '', avatarUrl: '', avatarDraft: '', saving: false, profileError: '',
-    nicknameReady: false, nicknameFocus: false, privacyBusy: false, avatarNative: true, sourceName: '', draftName: '', named: true, canRename: false,
+    nicknameReady: false, nicknameFocus: false, privacyBusy: false, avatarNative: true, sourceName: '', draftName: '', named: true, canRename: false, myHidden: false, visibilitySaving: false,
     enterState: 'idle', enterError: '', joining: false, groupExists: false, owner_id: null, posterPath: '', shareCardPath: '', posterError: '',
     connState: 'pending', connText: '', hasReported: false, updated_fmt: '' },
   onLoad(options) {
@@ -137,7 +137,7 @@ Page({
   showInfo(user, info) {
     const owner = !!user && info.owner_id === user.user_id;
     this.setData({ user, name: info.name, members: info.members, joined: info.joined,
-      owner_id: info.owner_id, named: info.named !== false, canRename: info.can_rename ?? owner, ...flow.connection(user) });
+      owner_id: info.owner_id, myHidden: !!info.my_hidden, named: info.named !== false, canRename: info.can_rename ?? owner, ...flow.connection(user) });
   },
   showBoard(lb) {
     const changed = this._boardSnapshot !== lb;
@@ -232,6 +232,19 @@ Page({
     } finally { if (current()) this.setData({ loadingMore: false }); }
   },
   load() { return this.init({ force: true }); },
+  async toggleGroupVisibility(e) {
+    const hidden = !e.detail.value, id = this.data.id;
+    this.setData({ visibilitySaving: true });
+    try {
+      await api.setGroupVisibility(id, hidden);
+      if (!this._visible || this.data.id !== id) return;
+      this.setData({ myHidden: hidden });
+      wx.showToast({ title: hidden ? '已在本群隐藏' : '已在本群显示', icon: 'none' });
+      await this.init({ force: true });
+    } catch (err) {
+      if (this._visible) { this.setData({ myHidden: this.data.myHidden }); wx.showToast({ title: err.message || '设置失败，请重试', icon: 'none' }); }
+    } finally { if (this._visible) this.setData({ visibilitySaving: false }); }
+  },
   onDraftName(e) { this.setData({ draftName: e.detail.value }); },
   rename() {
     const named = this.data.named;

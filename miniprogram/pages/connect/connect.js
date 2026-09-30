@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const upstream = require('../../utils/upstream');
+const PRIVACY_ACK = 'privacy_notice_ack_v1';
 
 function buildCommand(os, origin, token) {
   if (!origin || !token) return '';
@@ -78,13 +79,28 @@ Page({
   copyDryRun() { wx.setClipboardData({ data: 'tokenrank rank push --full --dry-run', success: () => wx.showToast({ title: '已复制', icon: 'none' }) }); },
   toggleAi() { this.setData({ showAi: !this.data.showAi }); },
   copyUpstreamLink(e) { upstream.copyLink(e.currentTarget.dataset.key, wx); },
+  // First copy only (command or AI prompt): say plainly what is uploaded and that the code is open.
+  withPrivacyNotice(copy) {
+    if (wx.getStorageSync(PRIVACY_ACK)) return copy();
+    wx.showModal({
+      title: '接入前先说明',
+      content: '只上传每天的用量数字，和用了哪些工具、模型。\n代码、对话、项目名和文件路径都不会离开你的电脑。\n代码全部开源，接入后也可以在「我的」里关掉排名。',
+      confirmText: '继续复制', cancelText: '看源码',
+      success: res => {
+        if (res.confirm) { wx.setStorageSync(PRIVACY_ACK, 1); copy(); }
+        else if (res.cancel) this.copyRepo();
+      },
+    });
+  },
   copyCommand() {
-    if (this.data.command) wx.setClipboardData({ data: this.data.command,
-      success: () => wx.showToast({ title: '已复制，请发到电脑', icon: 'none' }) });
+    if (!this.data.command) return;
+    this.withPrivacyNotice(() => wx.setClipboardData({ data: this.data.command,
+      success: () => wx.showToast({ title: '已复制，请发到电脑', icon: 'none' }) }));
   },
   copyAiPrompt() {
-    if (this.data.aiPrompt) wx.setClipboardData({ data: this.data.aiPrompt,
-      success: () => wx.showToast({ title: '已复制，请发给电脑上的 AI', icon: 'none' }) });
+    if (!this.data.aiPrompt) return;
+    this.withPrivacyNotice(() => wx.setClipboardData({ data: this.data.aiPrompt,
+      success: () => wx.showToast({ title: '已复制，请发给电脑上的 AI', icon: 'none' }) }));
   },
   goBoard() {
     const id = this.data.sourceGroup;

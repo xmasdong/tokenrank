@@ -98,3 +98,5 @@
 .name-prompt-btn::after { border: none; }
 .name-input { margin-top: 28rpx; height: 48px; padding: 0 20rpx; box-sizing: border-box; border: 1rpx solid var(--hairline-strong); border-radius: 8rpx; background: var(--paper-lift); font-size: 28rpx; }
 .name-ph { color: var(--ink-fade); }
+
+.visibility-row { display: flex; align-items: center; justify-content: space-between; margin: 16rpx 32rpx 0; padding: 12rpx 0; font-size: 26rpx; color: var(--ink-soft); }

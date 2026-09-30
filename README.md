@@ -20,7 +20,7 @@ tokenrank rank push --full --dry-run
 
 同步器的全部代码在 [`client/sync`](client/sync)，没有第三方运行依赖，读取统计库时是只读模式。服务端存了什么可以看 [`server/schema.sql`](server/schema.sql)。
 
-不想被排名，可以在小程序「我的」里关掉“参与排名”。关掉后自己的用量照常能看，广场和所有群榜都不显示你，随时可以再打开。
+不想被排名，可以在小程序「我的」里关掉“参与排名”。关掉后自己的用量照常能看，广场和所有群榜都不显示你，随时可以再打开。只想在某个群里不显示，就在那个群的榜单页关掉“在本群显示我的排名”，其他群和广场不受影响。
 
 ## 怎么工作的
 
@@ -82,7 +82,7 @@ node --test client/test-sync/*.test.mjs server/test/*.test.mjs miniprogram/test/
 
 ## 部署
 
-1. 新建数据库用 `server/schema.sql`；已有数据库按顺序执行 `server/migrations/0001` 到 `0007`（都是非破坏性迁移）。
+1. 新建数据库用 `server/schema.sql`；已有数据库按顺序执行 `server/migrations/0001` 到 `0008`（都是非破坏性迁移）。
 2. `cd client && npm run pack:dist`，然后在 `server` 目录 `npx wrangler deploy`，安装包和脚本作为静态资源一起发布。
 3. 微信后台配置 request、uploadFile 合法域名；在「用户隐私保护指引」里声明“收集你的昵称、头像”和“选中的照片或视频信息”（头像选择的兜底）。
 4. 上传小程序，真机验收后提交审核。
