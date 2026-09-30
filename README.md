@@ -4,6 +4,12 @@
 
 整个项目开源，包括电脑端同步器、服务端和小程序：https://github.com/xmasdong/tokenrank
 
+<p align="center">
+  <img src="miniprogram/assets/mini-program-code.jpg" width="220" alt="Token 群排名小程序码">
+  <br>
+  <b>微信扫码，看看你一天用了多少 token</b>
+</p>
+
 ## 隐私
 
 电脑上只做一件事：读取本机统计库里按天汇总的数字，然后上传。

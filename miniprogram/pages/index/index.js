@@ -1,4 +1,5 @@
 const api = require('../../utils/api');
+const privacyNotice = require('../../utils/privacy-notice');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
 const connectPrompt = require('../../utils/connect-prompt');
@@ -6,7 +7,7 @@ const connectPrompt = require('../../utils/connect-prompt');
 Page({
   data: { periods: flow.PERIODS, period: 'day', user: null, myGroups: [],
     loading: true, error: '', connState: 'pending', connText: '', hasReported: false, usage: null, usageLoading: true, usageError: '' },
-  onShow() { wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); return this.load(); },
+  onShow() { privacyNotice.maybeShow(wx); wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); return this.load(); },
   onHide() { this._requestId = (this._requestId || 0) + 1; },
   onUnload() { this.onHide(); },
   async onPullDownRefresh() { try { await this.load({ force: true }); } finally { wx.stopPullDownRefresh(); } },

@@ -920,10 +920,10 @@ test('启动时监听新版本，下载完成后提示并应用更新', () => {
   const manager = { onUpdateReady: fn => { ready = fn; }, applyUpdate: () => applied++ };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), {
     App: v => app = v, wx: { getUpdateManager: () => manager, showModal: o => modal = o },
-    require: id => id === './utils/connect-prompt' ? { arm: () => armed++ } : require(id) });
+    require: id => id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : require(id) });
   app.onLaunch.call(app); ready(); assert.equal(modal.showCancel, false);
   modal.complete(); assert.equal(applied, 1);
-  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 2);
+  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 4);
 });
 
 test('已入群但从未接入电脑：每次进入小程序弹一次接入提示，确认后进入接入页', async () => {
@@ -1106,4 +1106,23 @@ test('首次复制接入命令先说明上传内容与开源；确认后复制�
   p.copyCommand(); modals[1].success({ confirm: true }); assert.match(clips.at(-1), /install\.sh/);
   p.copyCommand(); assert.equal(modals.length, 2); assert.match(clips.at(-1), /install\.sh/);
   p.onHide();
+});
+
+test('打开小程序就弹隐私与开源说明；只有点下次不提示才不再弹；与接入提醒依次弹出不冲突', async () => {
+  const notice = require(path.join(root, 'utils/privacy-notice.js'));
+  const prompt = require(path.join(root, 'utils/connect-prompt.js'));
+  require(path.join(root, 'utils/modal-queue.js'))._reset();
+  require(path.join(root, 'utils/connect-prompt.js'))._reset();
+  const store = new Map(); const shown = [];
+  const wx = { getStorageSync: k => store.get(k) || '', setStorageSync: (k, v) => store.set(k, v), showModal: o => shown.push(o) };
+  notice.arm(); assert.equal(notice.maybeShow(wx), true); assert.equal(shown.length, 1);
+  assert.match(shown[0].content, /不会离开你的电脑/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '下次不提示');
+  assert.equal(notice.maybeShow(wx), false);
+  prompt.arm(); prompt.maybePrompt(wx, { user: { user_id: 1 }, hasReported: false, joined: true }, () => {});
+  assert.equal(shown.length, 1);
+  shown[0].success({ confirm: true }); shown[0].complete({ confirm: true });
+  assert.equal(shown.length, 2); assert.equal(shown[1].title, '还没有接入电脑'); shown[1].complete({});
+  notice.arm(); notice.maybeShow(wx); assert.equal(shown.length, 3);
+  shown[2].success({ cancel: true }); shown[2].complete({ cancel: true });
+  notice.arm(); assert.equal(notice.maybeShow(wx), false); assert.equal(shown.length, 3);
 });

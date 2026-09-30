@@ -1,8 +1,9 @@
 const connectPrompt = require('./utils/connect-prompt');
+const privacyNotice = require('./utils/privacy-notice');
 
 App({
   onLaunch() { this.checkUpdate(); },
-  onShow() { connectPrompt.arm(); },
+  onShow() { privacyNotice.arm(); connectPrompt.arm(); },
   // Old cached builds keep running until the next cold start; apply a
   // downloaded release immediately so fixes reach every user.
   checkUpdate() {
