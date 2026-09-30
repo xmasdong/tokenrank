@@ -1116,7 +1116,7 @@ test('打开小程序就弹隐私与开源说明；只有点下次不提示才�
   const store = new Map(); const shown = [];
   const wx = { getStorageSync: k => store.get(k) || '', setStorageSync: (k, v) => store.set(k, v), showModal: o => shown.push(o) };
   notice.arm(); assert.equal(notice.maybeShow(wx), true); assert.equal(shown.length, 1);
-  assert.match(shown[0].content, /不会离开你的电脑/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '下次不提示');
+  assert.match(shown[0].content, /不会离开你的电脑/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '不再提示');
   assert.equal(notice.maybeShow(wx), false);
   prompt.arm(); prompt.maybePrompt(wx, { user: { user_id: 1 }, hasReported: false, joined: true }, () => {});
   assert.equal(shown.length, 1);
@@ -1125,4 +1125,14 @@ test('打开小程序就弹隐私与开源说明；只有点下次不提示才�
   notice.arm(); notice.maybeShow(wx); assert.equal(shown.length, 3);
   shown[2].success({ cancel: true }); shown[2].complete({ cancel: true });
   notice.arm(); assert.equal(notice.maybeShow(wx), false); assert.equal(shown.length, 3);
+});
+
+test('所有弹窗按钮文字不超过 4 个字（微信 showModal 超长会直接不弹）', () => {
+  const files = ['app.js', ...fs.readdirSync(path.join(root, 'pages')).map(d => `pages/${d}/${d}.js`), ...fs.readdirSync(path.join(root, 'utils')).map(f => `utils/${f}`)];
+  const long = [];
+  for (const f of files) {
+    const text = fs.readFileSync(path.join(root, f), 'utf8');
+    for (const m of text.matchAll(/(confirmText|cancelText):\s*'([^']*)'/g)) if ([...m[2]].length > 4) long.push(`${f} ${m[1]} ${m[2]}`);
+  }
+  assert.deepEqual(long, []);
 });
