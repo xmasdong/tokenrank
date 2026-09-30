@@ -1101,7 +1101,7 @@ test('首次复制接入命令先说明上传内容与开源；确认后复制�
   const { p } = page('connect', { getConnect: async () => ({ token: 'a'.repeat(32), connected: true, last_report_at: null }) },
     { showModal: o => modals.push(o), setClipboardData: o => clips.push(o.data) });
   p.onLoad({}); await p.onShow();
-  p.copyCommand(); assert.equal(modals.length, 1); assert.match(modals[0].content, /不会离开你的电脑/); assert.match(modals[0].content, /开源/); assert.equal(clips.length, 0);
+  p.copyCommand(); assert.equal(modals.length, 1); assert.match(modals[0].content, /不会收集上传/); assert.match(modals[0].content, /开源/); assert.equal(clips.length, 0);
   modals[0].success({ cancel: true }); assert.equal(clips.at(-1), 'https://github.com/xmasdong/tokenrank');
   p.copyCommand(); modals[1].success({ confirm: true }); assert.match(clips.at(-1), /install\.sh/);
   p.copyCommand(); assert.equal(modals.length, 2); assert.match(clips.at(-1), /install\.sh/);
@@ -1116,7 +1116,7 @@ test('打开小程序就弹隐私与开源说明；只有点下次不提示才�
   const store = new Map(); const shown = [];
   const wx = { getStorageSync: k => store.get(k) || '', setStorageSync: (k, v) => store.set(k, v), showModal: o => shown.push(o) };
   notice.arm(); assert.equal(notice.maybeShow(wx), true); assert.equal(shown.length, 1);
-  assert.match(shown[0].content, /不会离开你的电脑/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '不再提示');
+  assert.match(shown[0].content, /不会收集上传/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '不再提示');
   assert.equal(notice.maybeShow(wx), false);
   prompt.arm(); prompt.maybePrompt(wx, { user: { user_id: 1 }, hasReported: false, joined: true }, () => {});
   assert.equal(shown.length, 1);
