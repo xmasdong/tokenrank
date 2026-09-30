@@ -1,0 +1,12 @@
+.account-page { padding: 56rpx 32rpx calc(64rpx + env(safe-area-inset-bottom)); }
+.eyebrow { color: var(--ink-fade); font-size: 24rpx; margin-bottom: 18rpx; }
+.page-title { font-size: 48rpx; font-weight: 600; }
+.intro { margin: 24rpx 0 40rpx; font-size: 30rpx; line-height: 1.7; }
+.deletion-list { border-top: 1rpx solid var(--hairline); }
+.deletion-item { padding: 28rpx 0; border-bottom: 1rpx solid var(--hairline); }
+.item-title { font-size: 30rpx; font-weight: 600; margin-bottom: 10rpx; }
+.detail, .scope-note { color: var(--ink-fade); font-size: 26rpx; line-height: 1.8; }
+.scope-note { margin: 32rpx 0 44rpx; }
+.delete-button { width: 100%; }
+.status-mark { color: var(--seal); font-size: 64rpx; margin: 32rpx 0; }
+.btn { margin-top: 40rpx; }

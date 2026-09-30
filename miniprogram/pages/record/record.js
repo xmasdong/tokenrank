@@ -26,8 +26,8 @@ Page({
     }catch(err){if(requestId===this._requestId)this.setData({loading:false,error:err.message});}
   },
   avatarError(){this.setData({avatarFailed:true});},
-  goMine(){wx.switchTab({url:'/pages/profile/profile'});},
-  goGroup(){wx.navigateTo({url:'/pages/group/group?enter=1'});},
+  goMine(){if(api.accountState()){wx.navigateTo({url:'/pages/account/account'});return;}wx.switchTab({url:'/pages/profile/profile'});},
+  goGroup(){wx.navigateTo({url:api.accountState()?'/pages/account/account':'/pages/group/group?enter=1'});},
   onShareAppMessage(){
     const record=this.data.record;
     return record ? {title:shareTitle(record.user,record.usage),path:'/pages/record/record?id='+this.data.id}

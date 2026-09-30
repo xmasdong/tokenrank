@@ -45,5 +45,5 @@ export async function avatarResponse(env, path) {
   // D1 may return a BLOB as a number array; SQLite fixtures use Uint8Array.
   const bytes = Array.isArray(row.content) ? new Uint8Array(row.content) : row.content;
   return new Response(bytes, { headers: { 'content-type': row.mime_type,
-    'cache-control': 'public, max-age=86400', 'x-content-type-options': 'nosniff' } });
+    'cache-control': 'no-store', 'x-content-type-options': 'nosniff' } });
 }

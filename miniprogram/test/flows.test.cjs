@@ -22,6 +22,7 @@ function page(name, overrides = {}, wxOverrides = {}) {
     BASE_URL: 'https://rank.test', fmtTokens: n => String(n), fmtRelTime: () => '刚刚', cnRank: n => ({ label: String(n) }), initialOf: n => [...String(n || '?')][0],
     ensureLogin: async () => ({ user_id: 1, nickname: '测试', avatar_url: 'https://rank.test/avatar.png', connected: true, last_report_at: null }),
     ensureSession: async () => {}, sessionFresh: async () => false, peekMe: () => null, peekUsage: () => null, peekRankings: () => null,
+    accountState: () => '',
     peekGroup: () => null, peekLeaderboard: () => null,
     relogin: async () => ({}), resolveGroup: async () => ({ id: 'actual-group', name: '本群', joined:true }),
     groupInfo: async () => ({ name: '本群', members: 1, joined: true, owner_id: 1 }),
@@ -920,7 +921,7 @@ test('启动时监听新版本，下载完成后提示并应用更新', () => {
   const manager = { onUpdateReady: fn => { ready = fn; }, applyUpdate: () => applied++ };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), {
     App: v => app = v, wx: { getUpdateManager: () => manager, showModal: o => modal = o },
-    require: id => id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : require(id) });
+    require: id => id === './utils/api' ? { accountState: () => '' } : id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : require(id) });
   app.onLaunch.call(app); ready(); assert.equal(modal.showCancel, false);
   modal.complete(); assert.equal(applied, 1);
   app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 4);

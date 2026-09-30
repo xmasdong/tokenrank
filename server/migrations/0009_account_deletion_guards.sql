@@ -1,0 +1,132 @@
+-- Prevent in-flight requests from recreating data after account deletion.
+-- Legacy tables have no foreign keys. These guards apply at the write boundary,
+-- including INSERT ... ON CONFLICT and batches; no tombstone or user identifier is retained.
+CREATE TRIGGER IF NOT EXISTS user_avatars_account_insert
+BEFORE INSERT ON user_avatars
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS user_avatars_account_update
+BEFORE UPDATE ON user_avatars
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS mp_sessions_account_insert
+BEFORE INSERT ON mp_sessions
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS mp_sessions_account_update
+BEFORE UPDATE ON mp_sessions
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS connect_tokens_account_insert
+BEFORE INSERT ON connect_tokens
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS connect_tokens_account_update
+BEFORE UPDATE ON connect_tokens
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_group_members_account_insert
+BEFORE INSERT ON rank_group_members
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_group_members_account_update
+BEFORE UPDATE ON rank_group_members
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS daily_stats_account_insert
+BEFORE INSERT ON daily_stats
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS daily_stats_account_update
+BEFORE UPDATE ON daily_stats
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_shares_account_insert
+BEFORE INSERT ON usage_shares
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_shares_account_update
+BEFORE UPDATE ON usage_shares
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS daily_totals_account_insert
+BEFORE INSERT ON daily_totals
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS daily_totals_account_update
+BEFORE UPDATE ON daily_totals
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_sync_state_account_insert
+BEFORE INSERT ON usage_sync_state
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_sync_state_account_update
+BEFORE UPDATE ON usage_sync_state
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_replacements_account_insert
+BEFORE INSERT ON usage_replacements
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_replacements_account_update
+BEFORE UPDATE ON usage_replacements
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_replacement_chunks_account_insert
+BEFORE INSERT ON usage_replacement_chunks
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_replacement_chunks_account_update
+BEFORE UPDATE ON usage_replacement_chunks
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_rebuild_guard_account_insert
+BEFORE INSERT ON usage_rebuild_guard
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS usage_rebuild_guard_account_update
+BEFORE UPDATE ON usage_rebuild_guard
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_groups_account_insert
+BEFORE INSERT ON rank_groups
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_groups_account_update
+BEFORE UPDATE ON rank_groups
+WHEN NOT EXISTS (SELECT 1 FROM users WHERE id=NEW.owner_user_id)
+BEGIN SELECT RAISE(ABORT, 'ACCOUNT_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_group_members_group_insert
+BEFORE INSERT ON rank_group_members
+WHEN NOT EXISTS (SELECT 1 FROM rank_groups WHERE id=NEW.group_id)
+BEGIN SELECT RAISE(ABORT, 'GROUP_NOT_FOUND'); END;
+
+CREATE TRIGGER IF NOT EXISTS rank_group_members_group_update
+BEFORE UPDATE ON rank_group_members
+WHEN NOT EXISTS (SELECT 1 FROM rank_groups WHERE id=NEW.group_id)
+BEGIN SELECT RAISE(ABORT, 'GROUP_NOT_FOUND'); END;

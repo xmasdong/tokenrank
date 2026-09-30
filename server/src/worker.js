@@ -7,6 +7,7 @@ import { usageWindow, buildUsage, buildActivity } from './usage.js';
 import { shareCode } from './wx-code.js';
 import { readShare, createShare } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
+import { deleteAccount } from './account.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -45,7 +46,7 @@ function userOrigin(env, request) {
 
 const CORS = {
   'access-control-allow-origin': '*',
-  'access-control-allow-methods': 'GET,POST,OPTIONS',
+  'access-control-allow-methods': 'GET,POST,DELETE,OPTIONS',
   'access-control-allow-headers': 'authorization,content-type',
   'cache-control': 'no-store',
 };
@@ -58,6 +59,9 @@ export default {
     try {
       return await route(request, env, url, path) ?? jsonError(404, 'not found');
     } catch (err) {
+      // Database guards also reject requests authenticated just before deletion.
+      if (err?.message?.includes('ACCOUNT_NOT_FOUND')) return Response.json({ error: '账号已注销，请重新登录', code: 'ACCOUNT_DELETED' }, { status: 410, headers: CORS });
+      if (err?.message?.includes('GROUP_NOT_FOUND')) return new Response(JSON.stringify({ error: '群榜已变化，请重新进入' }), { status: 409, headers: { ...CORS, 'content-type': 'application/json' } });
       console.error('unhandled:', err?.message);
       return jsonError(500, 'internal error');
     }
@@ -105,6 +109,14 @@ async function route(request, env, url, path) {
     return withCors(Response.json({ ok: true }));
   }
   if (method === 'GET' && path === '/api/me') return withCors(await me(request, env));
+  if (method === 'DELETE' && path === '/api/account') {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '登录已失效，请重新登录后核对账号状态'));
+    const body = await readJson(request);
+    if (body?.confirm !== 'DELETE_ACCOUNT') return withCors(jsonError(400, '请确认注销账号'));
+    await deleteAccount(env, user.id);
+    return withCors(Response.json({ deleted: true }));
+  }
   if (method === 'POST' && path === '/api/profile') return withCors(await setProfile(request, env));
   if (method === 'POST' && path === '/api/profile/ranking') return withCors(await setRanking(request, env));
   if (method === 'GET' && path.startsWith('/avatars/')) return withCors(await avatarResponse(env, path.slice('/avatars/'.length)));
@@ -163,6 +175,8 @@ async function wxSession(request, env) {
 
   const now = Date.now();
   const existing = await env.DB.prepare('SELECT id FROM users WHERE openid = ?1').bind(openid).first();
+  // A stale session on another phone must not silently recreate a deleted account.
+  if (!existing && body.existing_only === true) return Response.json({ error: '账号已注销，请重新登录', code: 'ACCOUNT_DELETED' }, { status: 410 });
   let userId;
   if (existing) {
     userId = existing.id;
@@ -196,6 +210,7 @@ async function publicUser(env, userId, origin = '') {
   const u = await env.DB.prepare(`SELECT u.id, u.nickname, u.avatar_path, u.rank_hidden,
     c.user_id AS connected_user_id, c.last_report_at FROM users u
     LEFT JOIN connect_tokens c ON c.user_id=u.id WHERE u.id=?1`).bind(userId).first();
+  if (!u) throw new Error('ACCOUNT_NOT_FOUND');
   return {
     user_id: u.id,
     nickname: u.nickname,
@@ -299,6 +314,7 @@ async function report(request, env) {
   if (!conn) return jsonError(401, 'invalid connect token');
   // Accounts disabled in the admin database keep their data but can no longer upload.
   const owner = await env.DB.prepare('SELECT disabled_at FROM users WHERE id = ?1').bind(conn.user_id).first();
+  if (!owner) return jsonError(401, 'invalid connect token');
   if (owner?.disabled_at) return jsonError(403, '账号已停用');
   const now = Date.now();
   if (conn.last_report_at && now - conn.last_report_at < REPORT_MIN_INTERVAL_MS) {
@@ -425,13 +441,14 @@ async function renameGroup(request, env, path) {
   const g = await env.DB.prepare('SELECT owner_user_id, name FROM rank_groups WHERE id = ?1').bind(id).first();
   if (!g) return jsonError(404, '群不存在或已解散');
   if (g.owner_user_id === user.id) {
-    await env.DB.prepare('UPDATE rank_groups SET name = ?1 WHERE id = ?2').bind(name, id).run();
+    const result = await env.DB.prepare('UPDATE rank_groups SET name = ?1 WHERE id = ?2 AND owner_user_id=?3 AND EXISTS(SELECT 1 FROM users WHERE id=?3)').bind(name, id, user.id).run();
+    if (!result.meta?.changes) return jsonError(409, '群榜权限已变化，请重新进入');
     return Response.json({ id, name });
   }
   const member = await env.DB.prepare('SELECT 1 AS x FROM rank_group_members WHERE group_id = ?1 AND user_id = ?2').bind(id, user.id).first();
   if (!member || g.name !== DEFAULT_GROUP_NAME) return jsonError(403, '群榜已有名字，只有发起者可以修改');
   // 条件更新：两名成员同时起名时只有第一个生效。
-  const res = await env.DB.prepare('UPDATE rank_groups SET name = ?1 WHERE id = ?2 AND name = ?3').bind(name, id, DEFAULT_GROUP_NAME).run();
+  const res = await env.DB.prepare('UPDATE rank_groups SET name = ?1 WHERE id = ?2 AND name = ?3 AND EXISTS(SELECT 1 FROM rank_group_members WHERE group_id=?2 AND user_id=?4)').bind(name, id, DEFAULT_GROUP_NAME, user.id).run();
   if (!res.meta?.changes) return jsonError(409, '群榜刚被其他成员起好名字');
   return Response.json({ id, name });
 }

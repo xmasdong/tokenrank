@@ -69,4 +69,5 @@ Page({
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },
+  goAccount() { wx.navigateTo({ url: '/pages/account/account' }); },
 });

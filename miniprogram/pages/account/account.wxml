@@ -1,0 +1,24 @@
+<view class="page account-page">
+  <block wx:if="{{state === 'deleted'}}">
+    <view class="status-mark">✓</view>
+    <view class="page-title">账号已注销</view>
+    <view class="intro">云端账号数据已删除，电脑接入码已失效。</view>
+    <view class="detail">电脑上的原始日志和统计文件仍然保留。再次使用需要重新登录，并重新接入电脑。</view>
+    <button class="btn btn-ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="loginAgain">重新登录</button>
+  </block>
+  <block wx:else>
+    <view class="eyebrow">账号与数据</view>
+    <view class="page-title">注销账号</view>
+    <view class="intro">以下云端数据将永久删除，无法恢复。</view>
+    <view class="deletion-list">
+      <view class="deletion-item"><view class="item-title">个人资料</view><view class="detail">微信账号关联、头像、昵称和登录凭证</view></view>
+      <view class="deletion-item"><view class="item-title">全部用量</view><view class="detail">所有日期和设备的用量、同步记录及尚未完成的回传数据</view></view>
+      <view class="deletion-item"><view class="item-title">分享与群排名</view><view class="detail">个人分享链接失效，退出全部群榜。多人群榜保留，发起权限转交给最早加入的其他成员；只有你的群榜一并删除。</view></view>
+      <view class="deletion-item"><view class="item-title">电脑接入</view><view class="detail">所有接入码立即失效，电脑将无法继续回传。</view></view>
+    </view>
+    <view class="scope-note">电脑上的原始日志和统计文件不会删除。已经保存或转发的分享图片无法撤回。</view>
+    <button wx:if="{{!loginNeeded}}" class="btn btn-seal delete-button" loading="{{busy}}" disabled="{{busy || confirming}}" bindtap="confirmDeletion">{{state === 'pending' ? '重试确认注销' : '注销账号并删除数据'}}</button>
+    <button wx:else class="btn btn-ghost" loading="{{busy}}" disabled="{{busy}}" bindtap="loginAgain">重新登录核对</button>
+  </block>
+  <view wx:if="{{error}}" class="error-note" role="alert">{{error}}</view>
+</view>

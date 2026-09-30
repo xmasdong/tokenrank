@@ -43,3 +43,4 @@
 
 .ranking-row { display: flex; align-items: center; justify-content: space-between; }
 .ranking-row .section-title { margin-bottom: 0; }
+.account-delete { color: var(--ink-fade); margin-top: 32rpx; }
