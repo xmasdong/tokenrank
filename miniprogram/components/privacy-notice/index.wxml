@@ -3,7 +3,7 @@
     <view class="pn-title">关于隐私和开源</view>
     <view class="pn-p">只上传每天的用量数字，和用了哪些工具、模型。</view>
     <view class="pn-p">代码、对话、项目名和文件路径都不会收集上传。</view>
-    <view class="pn-p">小程序、服务端和电脑端程序全部开源：</view>
+    <view class="pn-p">本项目已经全部开源，包含采集端、服务端，以及完整的小程序：</view>
     <view class="pn-repo" bindtap="copyRepo">
       <text class="pn-url">{{repo}}</text>
       <text class="pn-copy">复制</text>
