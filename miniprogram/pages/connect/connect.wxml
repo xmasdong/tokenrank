@@ -1,0 +1,44 @@
+<import src="../../templates/upstream.wxml" />
+<view class="page">
+  <view class="head"><view class="title display">接入电脑</view><view class="sub">复制命令，在电脑终端运行。</view></view>
+  <view class="os-row"><text class="os-label">电脑系统</text><view class="os-toggle"><button class="os-opt {{os === 'mac' ? 'os-active' : ''}}" data-os="mac" bindtap="switchOs" aria-label="选择 macOS">macOS</button><button class="os-opt {{os === 'win' ? 'os-active' : ''}}" data-os="win" bindtap="switchOs" aria-label="选择 Windows">Windows</button></view></view>
+  <view wx:if="{{loading}}" class="command-state">正在获取命令…</view>
+  <view wx:elif="{{!command}}" class="command-state"><view class="error-note">{{error || '没有获取到命令，请重试。'}}</view><button class="btn btn-ghost wide" bindtap="load" loading="{{checking}}" disabled="{{checking || rotating}}">重新获取命令</button></view>
+  <block wx:else>
+    <view class="cmd-box"><text class="cmd" user-select>{{command}}</text></view>
+    <button class="btn btn-ink wide" bindtap="copyCommand" disabled="{{rotating}}">复制命令</button>
+    <view class="note">命令里有你的接入码，不要发给别人。</view>
+    <view class="privacy">
+      <view class="privacy-line">只上传每天的用量数字，和用了哪些工具、模型。</view>
+      <view class="privacy-line">代码、对话内容、项目名和文件路径都不会离开你的电脑。</view>
+      <view class="privacy-line">想先看看会传什么，可以在电脑上运行下面这条，只预览不上传：</view>
+      <view class="privacy-cmd" data-cmd="tokenrank rank push --full --dry-run" bindtap="copyDryRun">tokenrank rank push --full --dry-run</view>
+      <view class="privacy-line">代码全部开源，可以自己看：</view>
+      <view class="privacy-cmd" bindtap="copyRepo">github.com/xmasdong/tokenrank</view>
+      <view class="privacy-line privacy-strong">只想看自己的用量也行，接入后可以在「我的」里关掉排名。</view>
+    </view>
+  </block>
+  <view class="steps" wx:if="{{!hasReported}}">
+    <view class="step"><text class="step-no display">一</text><view class="step-body">{{os === 'mac' ? '在电脑打开「终端」，粘贴并运行。' : '在电脑打开 PowerShell，粘贴并运行。'}}需要 Node.js 22.13+。</view></view>
+    <view class="step"><text class="step-no display">二</text><view class="step-body">脚本会安装或升级 token-watcher，并设置后台同步。</view></view>
+    <view class="step"><text class="step-no display">三</text><view class="step-body">同步完成后回到这里查看。</view></view>
+  </view>
+  <view class="sync-section" wx:if="{{command}}">
+    <view class="section-title display">同步状态</view>
+    <view wx:if="{{error}}" class="error-note">{{error}}</view>
+    <view wx:else class="status status-{{connState}}"><text class="dot"></text><text>{{hasReported ? connText : '等待首次同步'}}</text></view>
+    <view class="pending-note" wx:if="{{!hasReported && !error}}">运行命令后，这里会自动刷新状态。</view>
+    <button class="btn btn-seal wide return-button" wx:if="{{hasReported && !error}}" bindtap="goBoard">{{sourceGroup ? '查看本群排名' : '查看我的用量'}}</button>
+    <button class="btn btn-ghost wide check-button" loading="{{checking}}" disabled="{{checking || rotating}}" bindtap="checkNow">检查同步状态</button>
+  </view>
+  <block wx:if="{{command}}">
+    <view class="ai-card"><view class="ai-title display">用 AI 安装</view><view class="ai-desc">把提示词发给电脑上的 Claude Code、Codex 等工具，由它执行安装。</view><button class="btn btn-ghost" bindtap="toggleAi">{{showAi ? '收起提示词' : '查看提示词'}}</button><block wx:if="{{showAi}}"><text class="audit" user-select>{{aiPrompt}}</text><button class="btn btn-ink ai-btn" bindtap="copyAiPrompt" disabled="{{!aiPrompt || rotating}}">复制提示词</button></block></view>
+    <view class="note">只上传按天汇总的用量，不含代码和对话。</view>
+  </block>
+  <view class="upstream-intro"><template is="upstream-project" data="{{upstream}}" /></view>
+  <block wx:if="{{command}}">
+    <view class="about-link" bindtap="goAbout">使用说明</view>
+    <view class="advanced"><view class="sub">更换凭证</view><button class="btn btn-ghost-danger" bindtap="rotate" loading="{{rotating}}" disabled="{{!rawToken || rotating}}">重置接入码</button><view class="sub">旧接入码会失效，已接入的电脑需要重新运行命令。</view></view>
+    <view class="board-link" wx:if="{{sourceGroup}}" bindtap="goBoard">先回到本群</view>
+  </block>
+</view>

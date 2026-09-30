@@ -1,0 +1,125 @@
+@import "../../styles/upstream.wxss";
+.page { padding-bottom: 80rpx; }
+.upstream-intro { margin-top: 24rpx; }
+.connect-first { padding-bottom: 32rpx; }
+.connect-first .btn { width: 100%; min-height: 48px; box-sizing: border-box; padding: 20rpx 24rpx; line-height: 1.5; font-size: 28rpx; margin-top: 24rpx; }
+
+.head { padding: 44rpx 32rpx 28rpx; }
+.title { font-size: 44rpx; font-weight: 900; letter-spacing: 2rpx; margin-bottom: 14rpx; }
+.sub { font-size: 25rpx; color: var(--ink-fade); line-height: 1.8; }
+
+.sec { padding: 8rpx 32rpx 16rpx; }
+.sec-title {
+  font-size: 32rpx;
+  font-weight: 700;
+  letter-spacing: 2rpx;
+  padding: 30rpx 0 8rpx;
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+}
+.sec-title::before {
+  content: '';
+  width: 12rpx;
+  height: 30rpx;
+  background: var(--seal);
+  border-radius: 2rpx;
+}
+
+.p { font-size: 26rpx; color: var(--ink-soft); line-height: 1.9; margin: 12rpx 0; }
+
+/* 代码块：墨底鎏金 */
+.code, .cmd {
+  background: var(--ink);
+  border-radius: 10rpx;
+  padding: 22rpx 26rpx;
+  margin: 14rpx 0;
+  color: #D9B45B;
+  font-family: Menlo, Consolas, monospace;
+  font-size: 24rpx;
+  line-height: 1.7;
+  word-break: break-all;
+  position: relative;
+}
+.code-tip {
+  position: absolute;
+  right: 20rpx;
+  top: 50%;
+  transform: translateY(-50%);
+  font-family: -apple-system, "PingFang SC", sans-serif;
+  font-size: 20rpx;
+  color: #8A8271;
+  background: rgba(247, 244, 236, 0.08);
+  border-radius: 6rpx;
+  padding: 6rpx 12rpx;
+}
+
+/* 客户端系统切换 */
+.os-row { display: flex; align-items: center; gap: 20rpx; padding: 26rpx 32rpx 6rpx; }
+.os-label { font-size: 25rpx; color: var(--ink-fade); letter-spacing: 2rpx; }
+.os-toggle { display: flex; gap: 12rpx; margin-left: auto; }
+.os-opt {
+  font-size: 25rpx; color: var(--ink-soft);
+  border: 1rpx solid var(--hairline-strong);
+  border-radius: 999rpx; padding: 8rpx 28rpx;
+  letter-spacing: 1rpx;
+}
+.os-active { background: var(--seal); border-color: var(--seal); color: var(--paper); font-weight: 600; }
+
+/* 有序列表：文字 + 整行命令块 */
+.step { display: flex; gap: 16rpx; margin: 18rpx 0; }
+.step-body { flex: 1; min-width: 0; font-size: 26rpx; color: var(--ink-soft); line-height: 1.8; }
+.step-body .cmd { margin: 12rpx 0 4rpx; }
+
+.li-no {
+  flex: none;
+  width: 40rpx;
+  height: 40rpx;
+  margin-top: 4rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--seal);
+  color: var(--paper);
+  border-radius: 4rpx;
+  font-family: -apple-system, "PingFang SC", sans-serif;
+  font-weight: 700;
+  font-size: 24rpx;
+}
+/* 整行命令块：可换行、可点按复制 */
+.cmd {
+  display: block;
+  user-select: text;
+  -webkit-user-select: text;
+}
+.note { font-size: 23rpx; color: var(--ink-fade); line-height: 1.7; margin-top: 10rpx; }
+
+/* 数据字典 */
+.dict { margin: 16rpx 0 8rpx; border-top: 1rpx solid var(--hairline); }
+.dict-row { display: flex; justify-content: space-between; align-items: center; padding: 20rpx 0 6rpx; }
+.dict-k { font-size: 27rpx; font-weight: 600; }
+.dict-v { flex: none; font-size: 21rpx; border-radius: 6rpx; padding: 6rpx 14rpx; letter-spacing: 1rpx; }
+.dict-v.up { color: var(--paper); background: var(--gold); }
+.dict-v.local { color: var(--paper); background: var(--ink-fade); }
+.dict-v.never { color: var(--paper); background: var(--seal); }
+.dict-sub { font-size: 23rpx; color: var(--ink-fade); line-height: 1.7; padding-bottom: 14rpx; border-bottom: 1rpx solid var(--hairline); }
+
+/* 审计提示词 */
+.audit {
+  background: #EFEADC;
+  border: 1rpx solid var(--hairline);
+  border-radius: 10rpx;
+  padding: 24rpx 26rpx;
+  font-size: 23rpx;
+  color: var(--ink-soft);
+  line-height: 1.8;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 480rpx;
+  overflow: hidden;
+}
+.audit-btn { margin-top: 20rpx; }
+
+.legal { text-align: center; font-size: 21rpx; color: #B5AD98; letter-spacing: 2rpx; text-indent: 2rpx; margin: 40rpx 0 20rpx; }
+
+.cmd-label { margin: 20rpx 0 8rpx; font-size: 24rpx; color: var(--ink-fade); }

@@ -1,0 +1,45 @@
+@import "../../styles/profile-editor.wxss";
+.page { padding: 44rpx 32rpx 80rpx; }
+.page-title { font-size: 44rpx; font-weight: 900; }
+.account-section { margin-top: 36rpx; padding: 28rpx; background: var(--paper-lift); border: 1rpx solid var(--hairline); border-radius: 10rpx; }
+.section-title { font-size: 32rpx; font-weight: 700; margin-bottom: 20rpx; }
+.sync-text { font-size: 26rpx; color: var(--ink-soft); line-height: 1.7; margin-bottom: 24rpx; }
+.note { font-size: 23rpx; color: var(--ink-fade); line-height: 1.7; margin-top: 20rpx; }
+.menu-item { display: flex; justify-content: space-between; gap: 20rpx; padding: 32rpx 4rpx; border-bottom: 1rpx solid var(--hairline); font-size: 28rpx; }
+.error-note { margin: 24rpx 0; color: var(--seal); font-size: 26rpx; }
+.eyebrow { font-size: 20rpx; color: var(--gold); letter-spacing: 4rpx; }
+.page-head { display: flex; align-items: center; justify-content: space-between; margin-top: 16rpx; }
+.page-title { font-size: 54rpx; letter-spacing: 2rpx; }
+.intro { color: var(--ink-fade); font-size: 26rpx; margin-top: 14rpx; }
+.period-tabs { margin-top: 20rpx; padding: 0; }
+.loading-state { padding: 54rpx 0; }.loading-number { height: 108rpx; width: 60%; }
+.usage-hero { padding: 38rpx 0 32rpx; }
+.hero-label { color: var(--ink-soft); font-size: 25rpx; letter-spacing: 2rpx; }
+.hero-number { font-size: 104rpx; font-weight: 700; line-height: 1.25; margin-top: 12rpx; color: var(--ink); }
+.hero-unit { font-size: 38rpx; font-weight: 600; margin-left: 10rpx; color: var(--gold); }
+.exact { font-size: 24rpx; color: var(--ink-soft); }
+.range { font-size: 22rpx; color: var(--ink-fade); margin-top: 14rpx; }
+.metrics { display: flex; margin: 32rpx 0 0; padding: 26rpx 0 8rpx; border-top: 1rpx solid var(--hairline); }
+.metric { flex: 1; min-width: 0; }.metric-secondary { padding-left: 36rpx; border-left: 1rpx solid var(--hairline); }
+.metric-value { font-size: 40rpx; font-weight: 700; }.metric-unit { font-size: 23rpx; font-weight: 400; color: var(--ink-fade); }
+.metric-label { font-size: 24rpx; color: var(--ink-fade); margin-top: 8rpx; }
+.first-report { font-size: 26rpx; color: var(--ink-soft); }.first-report .btn { margin-top: 24rpx; }
+.usage-hero .share-button { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 48px; box-sizing: border-box; margin: 28rpx 0 0; padding: 18rpx 24rpx; line-height: 1.4; }
+.section { padding: 32rpx 0; border-top: 1rpx solid var(--hairline); }
+.section-head { display: flex; justify-content: space-between; align-items: baseline; }
+.section-head .section-title { margin: 0; }.section-meta { font-size: 23rpx; color: var(--ink-fade); }
+.chart-caption { display: flex; justify-content: space-between; gap: 12rpx; color: var(--ink-fade); font-size: 22rpx; margin: 26rpx 0; }
+.chart { height: 190rpx; display: flex; align-items: flex-end; gap: 0; border-bottom: 1rpx solid var(--hairline-strong); }
+.bar-slot { flex: 1; height: 100%; display: flex; align-items: flex-end; justify-content: center; padding: 0 10rpx; box-sizing: border-box; }
+.bar { width: 100%; max-width: 44rpx; background: var(--gold); opacity: .35; min-height: 2rpx; border-radius: 3rpx 3rpx 0 0; }.bar-zero { background: var(--hairline-strong); }.bar-selected .bar { background: var(--gold); opacity: 1; }
+.axis { display: flex; justify-content: space-between; font-size: 21rpx; color: var(--ink-fade); padding-top: 12rpx; }
+.breakdown-label { font-size: 24rpx; color: var(--ink-fade); margin: 28rpx 0 20rpx; }.model-label { margin-top: 36rpx; }
+.detail-row { margin-top: 22rpx; }.detail-head { display: flex; justify-content: space-between; gap: 16rpx; align-items: baseline; }
+.detail-name { font-size: 26rpx; min-width: 0; overflow-wrap: anywhere; }.detail-number { font-size: 23rpx; color: var(--ink-soft); flex: none; }
+.track { height: 5rpx; background: var(--hairline); margin-top: 12rpx; }.fill { height: 100%; background: var(--gold); }.tool-fill { background: var(--ink-soft); }
+.text-button { background: transparent; color: var(--seal); font-size: 26rpx; margin-top: 16rpx; }.text-button::after { border: none; }
+.cache-row { display: flex; justify-content: space-between; font-size: 23rpx; color: var(--ink-soft); gap: 12rpx; margin-top: 24rpx; }
+
+
+.ranking-row { display: flex; align-items: center; justify-content: space-between; }
+.ranking-row .section-title { margin-bottom: 0; }

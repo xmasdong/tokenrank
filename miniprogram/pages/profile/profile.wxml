@@ -1,0 +1,56 @@
+<import src="../../templates/profile-editor.wxml" />
+<view class="page">
+  <view class="page-head"><view class="page-title display">我的用量</view></view>
+  <view class="tabs period-tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+  <view wx:if="{{loading || usageLoading}}" class="loading-state"><view class="sk loading-number"></view><view class="note">加载中…</view></view>
+  <view wx:elif="{{error || usageError}}" class="error-note">{{error || usageError}}<button class="btn btn-ghost" bindtap="load">重新加载</button></view>
+  <block wx:elif="{{usage}}">
+    <view class="usage-hero">
+      <view class="hero-label">{{usage.periodLabel}} · {{usage.basisLabel}}</view>
+      <view class="hero-number num-font">{{usage.value}}<text class="hero-unit">{{usage.unit}}</text></view>
+      <view class="exact num-font">{{usage.exact}} tokens</view>
+      <view class="range">{{usage.range}} · {{usage.timezoneLabel}}<text wx:if="{{usage.syncText}}"> · 同步于 {{usage.syncText}}</text></view>
+      <button class="btn btn-ink share-button" wx:if="{{usage.has_history}}" bindtap="goShare">生成分享卡片</button>
+      <view class="metrics"><view class="metric"><view class="metric-value num-font">{{usage.requestsText}}</view><view class="metric-label">调用次数</view></view><view wx:if="{{period !== 'day'}}" class="metric metric-secondary"><view class="metric-value num-font">{{usage.summary.active_days}}<text class="metric-unit"> 天</text></view><view class="metric-label">活跃天数</view></view></view>
+      <view wx:if="{{!usage.has_history && !hasReported}}" class="first-report"><view>还没有接入电脑。</view><button class="btn btn-seal" bindtap="goConnect">接入电脑</button></view>
+      <view wx:if="{{usage.has_history && !usage.summary.tokens}}" class="note">这个周期没有用量。</view>
+    </view>
+    <view class="section trend-section">
+      <view class="section-head"><text class="section-title display">用量走势</text><text class="section-meta">最近 {{usage.trend_days}} 天</text></view>
+      <view class="chart-caption">{{selectedDay ? selectedDay.day + ' · ' + selectedDay.exact + ' tokens' : '点柱条查看当天数值'}}<text wx:if="{{!selectedDay}}">峰值 {{usage.peakText}}</text></view>
+      <view class="chart"><view wx:for="{{usage.daily}}" wx:key="day" class="bar-slot {{(selectedDay ? selectedDay.day === item.day : index === usage.daily.length - 1) ? 'bar-selected' : ''}}" data-index="{{index}}" bindtap="selectDay"><view class="bar {{item.tokens ? '' : 'bar-zero'}}" style="height:{{item.height}}%;"></view></view></view>
+      <view class="axis"><text>{{usage.daily[0].label}}</text><text>{{usage.daily[usage.daily.length - 1].label}}</text></view>
+    </view>
+    <view class="section">
+      <view class="section-head"><text class="section-title display">工具与模型</text><text class="section-meta">{{usage.periodLabel}}</text></view>
+      <view class="note" wx:if="{{!usage.summary.tokens}}">这个周期没有明细</view>
+      <block wx:else>
+        <view class="breakdown-label">使用工具</view>
+        <view wx:for="{{usage.tools}}" wx:key="name" class="detail-row" wx:if="{{expanded || 5 > index}}"><view class="detail-head"><text class="detail-name">{{item.name}}</text><text class="detail-number">{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;" class="fill tool-fill"></view></view></view>
+        <view class="breakdown-label model-label">使用模型</view>
+        <view wx:for="{{usage.models}}" wx:key="name" class="detail-row" wx:if="{{expanded || 5 > index}}"><view class="detail-head"><text class="detail-name">{{item.name}}</text><text class="detail-number">{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;" class="fill"></view></view></view>
+        <button wx:if="{{usage.models.length > 5 || usage.tools.length > 5}}" class="text-button" bindtap="toggleDetails">{{expanded ? '收起' : '展开全部'}}</button>
+        <view class="note">无法分类的用量计入“其他 / 未分类”。</view>
+      </block>
+      <view class="cache-row"><text>输入（不含缓存）</text><text>{{usage.inputText}} tokens</text></view>
+      <view class="cache-row"><text>输出</text><text>{{usage.outputText}} tokens</text></view>
+      <view class="cache-row"><text>缓存读取</text><text>{{usage.cacheReadText}} tokens</text></view>
+      <view class="cache-row"><text>缓存写入</text><text>{{usage.cacheWriteText}} tokens</text></view>
+      <view class="note">{{usage.basisNote}}按{{usage.timezoneLabel}}自然日统计。</view>
+    </view>
+  </block>
+  <view class="account-section">
+    <view class="section-title display">电脑接入</view><view class="sync-text">{{connText || '登录后查看接入状态'}}</view>
+    <button class="btn btn-ghost" bindtap="goConnect">{{hasReported ? '接入设置' : '接入电脑'}}</button>
+  </view>
+  <view class="account-section">
+    <view class="ranking-row"><view class="section-title display">参与排名</view><switch checked="{{!(user && user.rank_hidden)}}" disabled="{{!user || rankingSaving}}" color="#B03A2E" bindchange="toggleRanking" /></view>
+    <view class="sync-text">{{user && user.rank_hidden ? '已关闭：你的用量只有自己能看到，广场和群榜都不显示你。' : '关掉后，你的用量只有自己能看到，广场和群榜都不显示你。'}}</view>
+  </view>
+  <view class="account-section">
+    <view class="section-title display">头像和昵称</view>
+    <template is="profile-editor" data="{{user, nickname, avatarUrl, saving, nicknameReady, nicknameFocus, privacyBusy, avatarNative, profileError}}" />
+  </view>
+  <view class="menu-item" bindtap="goGroups"><text>我的群榜</text><text>→</text></view>
+  <view class="menu-item" bindtap="goAbout"><text>使用说明</text><text>→</text></view>
+</view>

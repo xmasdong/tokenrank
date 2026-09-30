@@ -1,0 +1,42 @@
+{
+  "name": "tokenrank-client",
+  "version": "0.2.8",
+  "description": "Read-only TokenRank sync adapter for an independently installed token-watcher",
+  "keywords": [
+    "token",
+    "usage",
+    "dashboard",
+    "quota",
+    "cost",
+    "llm",
+    "ai-agent",
+    "claude-code",
+    "codex",
+    "observability",
+    "cli",
+    "macos"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "bin": {
+    "tokenrank": "bin/tokenrank.js"
+  },
+  "main": "sync/index.js",
+  "scripts": {
+    "test": "node --test test-sync/*.test.mjs",
+    "test:legacy": "node --disable-warning=ExperimentalWarning test/run.mjs",
+    "pack:dist": "sh scripts/pack-dist.sh"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {},
+  "files": [
+    "bin/tokenrank.js",
+    "bin/tokenwatcher.js",
+    "sync/",
+    "README.md",
+    "LICENSE"
+  ],
+  "exports": "./sync/index.js"
+}

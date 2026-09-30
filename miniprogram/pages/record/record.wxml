@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="eyebrow">TOKEN 群排名</view>
+  <view wx:if="{{loading}}" class="state">正在加载用量…</view>
+  <view wx:elif="{{error}}" class="state"><view>{{error}}</view><button class="btn btn-ghost" bindtap="load">重试</button></view>
+  <block wx:else>
+    <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">截至 {{record.usage.to}}</view></view></view>
+    
+    <view class="total"><view>{{story.label}}用量</view><view class="number num-font">{{story.value}}<text class="number-unit">{{story.unit}}</text></view><view class="exact num-font">{{exact}} tokens</view></view>
+    <view class="metrics"><view class="metric"><view class="metric-label">全站排名</view><view class="metric-value">{{story.rankText}}</view><view class="metric-note">{{story.rankNote}}</view></view><view class="metric"><view class="metric-label">{{story.streakLabel}}</view><view class="metric-value">{{story.streakValue}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.streakNote}}</view></view><view class="metric"><view class="metric-label">累计活跃</view><view class="metric-value">{{story.days}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.firstDay ? '自 ' + story.firstDay + ' 起' : '暂无活跃记录'}}</view></view></view>
+    <view class="partner"><view class="muted">最常用工具</view><view class="partner-name">{{story.top.name || '暂无工具明细'}}<text class="partner-percent" wx:if="{{story.top}}">{{story.top.percent}}%</text></view></view>
+    <view class="note"><view>{{record.usage.from}} — {{record.usage.to}} · {{story.timezoneLabel}}自然日</view><view>{{story.basisLabel}}。数据为分享时的记录。</view></view>
+    <view wx:if="{{fromGroup}}" class="group-invite"><view class="group-title">本群排名</view><button class="btn btn-ghost" bindtap="goGroup">查看本群排名</button></view>
+  </block>
+</view>
+
+<view class="bottom-action"><button class="btn btn-ink" bindtap="goMine">去看我的用量</button></view>

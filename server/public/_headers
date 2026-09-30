@@ -1,0 +1,12 @@
+# PowerShell decodes the downloaded command as UTF-8 text.
+/update.ps1
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-store
+/update.sh
+  Content-Type: text/plain; charset=utf-8
+  Cache-Control: no-store
+/releases/:version/update.ps1
+  Content-Type: text/plain; charset=utf-8
+/diagnose-update.mjs
+  Content-Type: text/javascript; charset=utf-8
+  Cache-Control: no-store

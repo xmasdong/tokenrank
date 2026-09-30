@@ -1,0 +1,40 @@
+{
+  "pages": [
+    "pages/index/index",
+    "pages/square/square",
+    "pages/group/group",
+    "pages/connect/connect",
+    "pages/profile/profile",
+    "pages/share/share",
+    "pages/about/about",
+    "pages/record/record"
+  ],
+  "window": {
+    "navigationBarTitleText": "Token 群排名",
+    "navigationBarBackgroundColor": "#F7F4EC",
+    "navigationBarTextStyle": "black",
+    "backgroundColor": "#F7F4EC"
+  },
+  "tabBar": {
+    "color": "#8A8271",
+    "selectedColor": "#B03A2E",
+    "backgroundColor": "#FBF8F1",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/index/index",
+        "text": "群榜"
+      },
+      {
+        "pagePath": "pages/square/square",
+        "text": "广场"
+      },
+      {
+        "pagePath": "pages/profile/profile",
+        "text": "我的"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json"
+}

@@ -1,0 +1,37 @@
+# 复制为 wrangler.toml 并填入你的资源 id：cp wrangler.toml.example wrangler.toml
+# 部署步骤见 ../README.md「服务端部署」。
+
+name = "tokenrank-api"
+main = "src/worker.js"
+compatibility_date = "2026-09-01"
+
+# ── 备案域名接入（二选一）─────────────────────────────
+# 方式 A（推荐）：Worker Custom Domain —— 域名 DNS 托管在 Cloudflare 时，
+# 取消注释并填你的子域（如 rank-api.example.com），wrangler deploy 会自动
+# 建 DNS + 证书，无需额外反代：
+# routes = [
+#   { pattern = "rank-api.example.com", custom_domain = true }
+# ]
+# 方式 B：域名在国内服务器/CDN 上，用 nginx 反代到 workers.dev 地址，
+# 或 CDN 回源 —— 不需要动本文件，但多一跳延迟。
+
+[[d1_databases]]
+binding = "DB"
+database_name = "tokenrank"
+# npx wrangler d1 create tokenrank 后把输出里的 database_id 填进来
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[vars]
+# 若用国内 CDN/服务器反代到 workers.dev（回源 Host 是 workers.dev），
+# 必须配置此项，否则接入命令等会显示 workers.dev 域名：
+# PUBLIC_BASE_URL = "https://tokenrank.xmasdong.cn"
+WX_APPID = "wx0000000000000000"
+# 小程序码默认打开正式版。仅体验环境可改为 trial / develop；由服务端固定，客户端不能覆盖。
+# WX_CODE_ENV_VERSION = "release"
+# ⚠️ 联调开关：未配置 WX_APPSECRET 时，允许 code 直接作为 openid 登录（任何人可冒充）。
+# 生产环境必须：wrangler secret put WX_APPSECRET 并把下面这行删掉。
+ALLOW_DEV_LOGIN = "1"
+
+# 生产环境额外执行（密钥不入库不入 git）：
+#   npx wrangler secret put WX_APPSECRET
+# 并删除上面的 ALLOW_DEV_LOGIN

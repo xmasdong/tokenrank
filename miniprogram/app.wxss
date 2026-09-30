@@ -1,0 +1,120 @@
+/**
+ * 新中式 · 宣纸墨金 —— 全局设计令牌与共享样式
+ * 纸 #F7F4EC / 墨 #2A2723 / 淡墨 #6E675C / 印章红 #B03A2E / 鎏金 #9C7C2C
+ */
+page {
+  --paper: #F7F4EC;
+  --paper-lift: #FBF8F1;
+  --ink: #2A2723;
+  --ink-soft: #55503F;
+  --ink-fade: #8A8271;
+  --seal: #B03A2E;
+  --seal-deep: #933024;
+  --gold: #9C7C2C;
+  --warn: #B8860B;
+  --gold-bright: #C9A227;
+  --hairline: #DCD4C0;
+  --hairline-strong: #C9BFA6;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+}
+
+/* 标题展示字：无衬线粗体（不使用任何中文衬线体） */
+.display {
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-weight: 700;
+}
+/* 数字统一字体：与分享海报一致，等宽数字便于上下对齐 */
+.num-font {
+  font-family: "DIN Alternate", "Avenir Next", "Helvetica Neue", Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+}
+
+/* 印章方章：红底白字，排名徽记与品牌记号 */
+.seal {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48rpx;
+  height: 48rpx;
+  background: var(--seal);
+  color: var(--paper);
+  border-radius: 6rpx;
+  font-family: -apple-system, "PingFang SC", "Helvetica Neue", sans-serif;
+  font-weight: 700;
+  font-size: 28rpx;
+  line-height: 1;
+}
+.seal.num-font { font-family: "DIN Alternate", "Avenir Next", "Helvetica Neue", Roboto, sans-serif; }
+
+/* 周期切换：全站统一左对齐，选中项墨色加印章红下划线 */
+.tabs { display: flex; gap: 48rpx; padding: 0 32rpx; border-bottom: 1rpx solid var(--hairline); }
+.tab { display: flex; align-items: center; min-height: 44px; padding: 0 4rpx; box-sizing: border-box; font-size: 28rpx; color: var(--ink-fade); border-bottom: 4rpx solid transparent; margin-bottom: -1rpx; }
+.tab-active { color: var(--ink); font-weight: 600; border-bottom-color: var(--seal); }
+
+/* 同步状态：金点正常，印章红点待处理；不引入其他色相 */
+.status-line { display: flex; align-items: center; gap: 12rpx; font-size: 24rpx; color: var(--ink-soft); line-height: 1.6; }
+.status-dot { width: 12rpx; height: 12rpx; flex: none; border-radius: 50%; background: var(--gold); }
+.status-pending .status-dot, .status-stale .status-dot { background: var(--seal); }
+
+/* 榜单头像：无头像时显示昵称首字，保证名字对齐 */
+.rank-avatar-ph { display: flex; align-items: center; justify-content: center; background: var(--hairline); color: var(--ink-soft); font-size: 24rpx; font-weight: 600; }
+
+/* 双细线（文武线）：章节分隔 */
+.double-rule {
+  border-top: 1rpx solid var(--hairline-strong);
+  border-bottom: 1rpx solid var(--hairline);
+  height: 6rpx;
+  margin: 0 32rpx;
+}
+
+/* 按钮：统一用 flex 居中，不依赖 line-height；不加字距，避免末字右侧留白让文字偏左 */
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  min-height: 48px;
+  padding: 0 32rpx;
+  border-radius: 8rpx;
+  font-size: 30rpx;
+  line-height: 1.4;
+  text-align: center;
+  letter-spacing: 0;
+}
+.btn::after { border: none; }
+.btn-ink {
+  background: var(--ink);
+  color: var(--paper);
+  font-weight: 600;
+}
+.btn-seal {
+  background: var(--seal);
+  color: var(--paper);
+  font-weight: 600;
+}
+.btn-seal:active { background: var(--seal-deep); }
+.btn-ghost {
+  background: transparent;
+  color: var(--ink);
+  border: 1rpx solid var(--hairline-strong);
+}
+.btn-ghost-danger {
+  background: transparent;
+  color: var(--seal);
+  border: 1rpx solid #E0C3BD;
+}
+
+/* 骨架屏 */
+.sk {
+  background: linear-gradient(90deg, #EFEADC 0%, #E7E1D0 50%, #EFEADC 100%);
+  border-radius: 6rpx;
+  animation: sk-breathe 1.4s ease-in-out infinite;
+}
+@keyframes sk-breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+
+.rank-avatar { width: 60rpx; height: 60rpx; border-radius: 50%; flex: none; }

@@ -1,0 +1,38 @@
+# System and dependencies
+.DS_Store
+node_modules/
+.wrangler/
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.tgz
+
+# Upstream clone and PR worktree (see https://github.com/luwill/token-watcher)
+token-watcher/
+.worktrees/
+
+# Private: operations log, other users' data, reverse-engineering notes of a third-party closed-source client
+artifacts/
+ANALYSIS.md
+FEASIBILITY.md
+
+# Real deployment config; copy server/wrangler.toml.example instead
+server/wrangler.toml
+server/.dev.vars*
+miniprogram/project.private.config.json
+
+# Early full fork of token-watcher, no longer part of the runtime (client/sync is the adapter)
+client/src/
+client/web/
+client/test/
+client/cloud/
+client/docs/
+client/menubar/
+client/packaging/
+client/IMPLEMENTATION_PLAN.md
+client/CONTRIBUTING.md
+client/README.zh-CN.md
+
+# Local build output served by the Worker; rebuilt by `npm run pack:dist`
+server/public/dl/

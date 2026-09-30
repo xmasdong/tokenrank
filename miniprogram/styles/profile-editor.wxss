@@ -1,0 +1,21 @@
+.ph { color: var(--ink-fade); }
+.profile-editor .avatar-picker { display: flex; align-items: center; gap: 24rpx; width: 100%; min-height: 72px; box-sizing: border-box; padding: 8px 0; margin: 26rpx 0 12rpx; border-radius: 12rpx; background: transparent; color: var(--ink); font-weight: 400; text-align: left; line-height: 1.5; }
+.profile-editor .avatar-picker::after { border: none; }
+.profile-editor .avatar-picker-active { background: var(--paper); }
+.avatar-image, .avatar-placeholder { display: block; flex: none; width: 56px; height: 56px; box-sizing: border-box; border: 1rpx solid var(--hairline-strong); border-radius: 50%; }
+.avatar-placeholder { line-height: 56px; font-size: 40rpx; color: var(--gold); }
+.avatar-placeholder { text-align: center; }
+.avatar-copy { flex: 1; min-width: 0; }
+.avatar-label { font-size: 28rpx; }.avatar-hint { font-size: 23rpx; color: var(--ink-fade); margin-top: 10rpx; }
+.avatar-arrow { flex: none; color: var(--ink-fade); font-size: 36rpx; }
+.nickname-field { margin: 28rpx 0; border-bottom: 1rpx solid var(--hairline-strong); }
+.field-label { font-size: 23rpx; color: var(--ink-fade); }
+.nickname-field .nickname-input, .nickname-field .nickname-activate { width: 100%; height: 48px; min-height: 48px; box-sizing: border-box; padding: 0; margin: 0; border-radius: 0; background: transparent; color: var(--ink); font-size: 30rpx; line-height: 1.5; text-align: left; }
+.nickname-field .nickname-activate { display: flex; align-items: center; gap: 16rpx; font-weight: 400; }
+.nickname-field .nickname-activate::after { border: none; }
+.nickname-value { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nickname-edit { flex: none; color: var(--ink-fade); font-size: 24rpx; }
+.account-section .profile-save { width: 100%; min-height: 48px; box-sizing: border-box; margin: 0; padding: 18rpx 24rpx; line-height: 1.5; }
+
+.profile-error { margin-top: 20rpx; color: var(--seal); font-size: 24rpx; line-height: 1.6; }
+.profile-editor .profile-save { width: 100%; min-height: 48px; padding: 18rpx 20rpx; box-sizing: border-box; line-height: 1.5; font-size: 28rpx; }

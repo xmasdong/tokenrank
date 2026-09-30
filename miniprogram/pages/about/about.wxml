@@ -1,0 +1,59 @@
+<import src="../../templates/upstream.wxml" />
+<view class="page">
+  <view class="head"><view class="title display">使用说明</view><view class="sub">接入、更新、统计口径和卸载</view></view>
+  <view class="double-rule"></view>
+  <view class="sec connect-first"><view class="sec-title display">接入电脑</view>
+    <view class="p">在电脑终端运行你的接入命令。</view>
+    <button class="btn btn-ink" bindtap="goConnect">获取接入命令</button>
+    <view class="note">需要 Node.js 22.13+。脚本会安装 token-watcher，已有版本低于 1.8.2 时先升级并重新计算。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">更新统计</view>
+    <view class="p">用量明显不对、很久没同步，或提示版本过低时运行。不需要接入码。</view>
+    <block wx:for="{{updateCmds}}" wx:key="key">
+      <view class="cmd-label">{{item.label}}</view>
+      <view class="cmd" data-cmd="{{item.cmd}}" bindtap="copyCmd">{{item.cmd}}</view>
+    </block>
+    <view class="p">会升级 token-watcher 和同步器，备份后按本机日志重新计算，上传完成后替换云端数据。点命令即可复制。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">群榜规则</view>
+    <view class="p">每个微信群只有一张榜。从群里的卡片打开，确认后加入。改榜名不影响绑定。</view>
+  </view>
+  <view class="sec upstream-intro"><template is="upstream-project" data="{{upstream}}" /></view>
+  <view class="sec"><view class="sec-title display">采集与同步</view>
+    <view class="p">token-watcher 负责采集，同步器只读它的统计库。首次上传全部历史，之后每 5 分钟同步一次。token-watcher 低于 1.8.2 时会重复计数，同步器会暂停上传。</view>
+    <view class="p">升级用上面「更新统计」的命令。旧版 TokenRank 程序会备份后停用，已有的 token-watcher 后台保持原配置。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">头像与昵称</view>
+    <view class="p">加入群榜前需要设置头像和昵称，之后可在「我的」修改。没设置的成员照常显示在榜上。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">统计口径</view>
+    <view class="p">总用量取 token-watcher 的 total_tokens，含缓存；输入、输出、缓存读写分开显示。按北京时间自然日统计。不等于厂商账单。</view>
+    <view class="p">每天保留用量前 8 的工具和模型，其余计入未分类。重新同步会覆盖同一天的旧值。一个账号只显示最近接入的一台电脑，多台不相加。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">开源</view>
+    <view class="p">小程序、服务端和电脑端同步器的代码全部开源（MIT），可以自己核对上传了什么。</view>
+    <view class="cmd" data-cmd="https://github.com/xmasdong/tokenrank" bindtap="copyCmd">github.com/xmasdong/tokenrank</view>
+  </view>
+  <view class="sec"><view class="sec-title display">上传什么</view>
+    <view class="p">不想被排名，可以在「我的」里关掉，关掉后用量只有自己能看到。</view>
+    <view class="p">读取：统计库里的日期、计数、工具名和模型名。上传：按天汇总的数字和随机设备 ID，不含代码、对话、项目名或路径。</view>
+    <view class="p">写入：~/.tokenrank 下的配置、进度和日志。后台服务 macOS 为 com.tokenrank.sync，Windows 为 TokenRankSync。</view>
+    <view class="p">统计库结构不兼容时停止同步，不改动数据库。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">查看与暂停</view>
+    <view class="cmd" data-cmd="tokenrank rank status" bindtap="copyCmd">tokenrank rank status</view>
+    <view class="cmd" data-cmd="tokenrank rank push --full --dry-run" bindtap="copyCmd">tokenrank rank push --full --dry-run</view>
+    <view class="p">预览命令不发送数据。找不到 tokenrank 命令时，用安装时输出的完整路径。</view>
+    <view class="cmd" data-cmd="tokenrank rank off" bindtap="copyCmd">tokenrank rank off</view>
+    <view class="p">断开后停止上传，重新运行接入命令可恢复。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">卸载</view>
+    <view class="cmd" data-cmd="tokenrank uninstall --purge-data" bindtap="copyCmd">tokenrank uninstall --purge-data</view>
+    <view class="p">移除后台服务和 TokenRank 配置。token-watcher 程序、统计库和云端历史保留。</view>
+    <view class="p">~/.tokenrank/app 下的程序、日志和备份需要手动删除。</view>
+  </view>
+  <view class="sec"><view class="sec-title display">用 AI 核对</view>
+    <view class="p">把提示词发给电脑上的 AI，检查读取、上传、后台和卸载行为。</view>
+    <button class="btn btn-ghost" bindtap="copyAudit">复制提示词</button>
+  </view>
+</view>

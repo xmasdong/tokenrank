@@ -1,0 +1,23 @@
+<view class="page">
+  <view class="masthead"><view class="seal seal-lg display">榜</view><view class="mast-text"><view class="mast-title display">广场榜</view><view class="mast-sub">全站用量</view></view></view>
+  <view class="double-rule"></view>
+  <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+  <view class="upd-line" wx:if="{{!loading && updated_fmt}}"><text>单位 tokens</text><text>更新于 {{updated_fmt}}</text></view>
+  <view wx:if="{{loading}}" class="hint">加载中…</view>
+  <view wx:elif="{{error}}" class="hint"><view class="hint-sub">{{error}}</view><button class="btn btn-ghost retry" bindtap="load">重新加载</button></view>
+  <view wx:elif="{{!entries.length}}" class="hint"><view class="hint-title display">本周期暂无用量</view><view class="hint-sub">可以切换到其他周期。</view><view class="hint-link" bindtap="goConnect">接入电脑</view></view>
+  <block wx:else>
+    <view class="row {{item.rank === 1 ? 'row-first' : ''}}" wx:for="{{entries}}" wx:key="rank">
+      <view class="num-font {{item.rk.top3 ? 'seal' : 'rk-plain'}}">{{item.rk.label}}</view>
+      <image wx:if="{{item.avatar_url}}" class="rank-avatar" src="{{item.avatar_url}}" mode="aspectFill" /><view wx:else class="rank-avatar rank-avatar-ph">{{item.initial}}</view><view class="mid"><view class="name">{{item.nickname}}</view><view class="sub">{{item.top_model || '—'}} · {{item.requests}} 次</view></view>
+      <view class="num num-font {{item.rank === 1 ? 'num-gold' : ''}}"><view class="n">{{item.tokens_fmt}}</view></view>
+    </view>
+    <view class="pagination">
+      <view wx:if="{{moreError}}" class="pagination-error">{{moreError}}</view>
+      <button wx:if="{{hasMore}}" class="load-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loadingMore}}">{{loadingMore ? '正在加载…' : moreError ? '重新加载' : '加载更多'}}<text wx:if="{{!loadingMore}}"> · {{entries.length}} / {{total}}</text></button>
+      <view wx:elif="{{total !== null}}" class="pagination-end">共 {{total}} 人</view>
+    </view>
+  </block>
+  <view class="legal">含缓存总用量 · 北京时间 00:00 换日</view>
+</view>
+<view class="me-bar" wx:if="{{me && !loading && !error}}"><view class="me-left"><text class="me-label">我的全站排名</text><text class="me-rank num-font">{{me.rk.label}}</text></view><view class="me-num num-font">{{me.tokens_fmt}}<text class="me-unit"> tokens</text></view></view>

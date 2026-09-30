@@ -1,0 +1,17 @@
+<template name="upstream-project">
+  <view class="upstream-project">
+    <view class="upstream-heading display">原版开源项目</view>
+    <view class="upstream-name">{{upstream.name}}</view>
+    <view class="upstream-meta">{{upstream.attribution}}</view>
+    <view class="upstream-description">{{upstream.description}}</view>
+    <view class="upstream-description">{{upstream.features}}</view>
+    <view wx:for="{{upstream.links}}" wx:key="key" class="upstream-link">
+      <view class="upstream-link-head"><text>{{item.label}}</text><button class="upstream-copy" data-key="{{item.key}}" bindtap="copyUpstreamLink" aria-label="{{'复制' + item.label + '地址'}}">复制地址</button></view>
+      <text class="upstream-url" user-select>{{item.url}}</text>
+    </view>
+    <view class="upstream-description upstream-relationship">{{upstream.relationship}}</view>
+    <view class="upstream-link-head"><text>电脑本地面板</text><button class="upstream-copy" data-key="dashboard" bindtap="copyUpstreamLink">复制地址</button></view>
+    <text class="upstream-url" user-select>{{upstream.dashboard}}</text>
+    <view class="upstream-meta">在运行 token-watcher 的电脑上用浏览器打开。</view>
+  </view>
+</template>

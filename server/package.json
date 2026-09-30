@@ -1,0 +1,17 @@
+{
+  "name": "tokenrank-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Token 群排名 API — Cloudflare Worker + D1 + R2",
+  "scripts": {
+    "test": "node --test \"test/*.test.mjs\"",
+    "dev": "wrangler dev --port 8788",
+    "deploy": "wrangler deploy",
+    "init-db": "wrangler d1 execute tokenrank --remote --file=schema.sql",
+    "init-db:local": "wrangler d1 execute tokenrank --local --file=schema.sql"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

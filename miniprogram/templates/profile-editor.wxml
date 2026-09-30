@@ -1,0 +1,20 @@
+<template name="profile-editor">
+  <view class="profile-editor">
+    <form bindsubmit="save">
+      <button class="avatar-picker" open-type="{{nicknameReady && avatarNative !== false ? 'chooseAvatar' : ''}}" bindchooseavatar="onChooseAvatar" bindtap="onAvatarTap" disabled="{{saving || !user}}" hover-class="avatar-picker-active" aria-label="选择头像">
+        <image wx:if="{{avatarUrl}}" class="avatar-image" src="{{avatarUrl}}" mode="aspectFill" />
+        <view wx:else class="avatar-placeholder display">我</view>
+        <view class="avatar-copy"><view class="avatar-label">头像</view><view class="avatar-hint">点击从微信选择</view></view>
+        <text class="avatar-arrow" aria-hidden="true">›</text>
+      </button>
+      <view class="nickname-field">
+        <view class="field-label">昵称</view>
+        <input wx:if="{{nicknameReady}}" class="nickname-input" name="nickname" type="nickname" value="{{nickname}}" maxlength="32" placeholder="使用微信昵称，或填写昵称" placeholder-class="ph" bindinput="onNicknameInput" bindblur="onNicknameInput" disabled="{{saving}}" focus="{{nicknameFocus}}" aria-label="昵称" />
+        <button wx:else class="nickname-activate" bindtap="enableNickname" loading="{{privacyBusy}}" disabled="{{saving || privacyBusy || !user}}" aria-label="启用微信昵称"><text class="nickname-value">{{nickname || '使用微信昵称'}}</text><text class="nickname-edit">{{nickname ? '修改' : '选择'}}</text></button>
+      </view>
+      <button class="btn {{required ? 'btn-seal' : 'btn-ghost'}} profile-save" form-type="submit" loading="{{saving}}" disabled="{{saving || !user}}">{{saving ? '正在保存…' : required ? '保存并继续' : '保存'}}</button>
+    </form>
+    <view wx:if="{{profileError}}" class="profile-error">{{profileError}}</view>
+    <view class="note">昵称 1–16 个字，保存后生效</view>
+  </view>
+</template>
