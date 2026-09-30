@@ -1,5 +1,4 @@
 const api = require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const usage = require('../../utils/usage');
 const { drawUsagePoster } = require('../../utils/usage-poster');
 const { loadCodeImage } = require('../../utils/share-code');
@@ -14,7 +13,7 @@ Page({
     const theme = wx.getStorageSync('usage_card_theme') === 'ink' ? 'ink' : 'paper';
     this.setData({ period, theme, periodLabel: usage.PERIODS.find(p => p.key === period).label });
   },
-  onShow() { privacyNotice.maybeShow(wx);
+  onShow() {
     this._visible = true;
     if (this._revoked) return;
     if (!this._snapshot) return this.load();

@@ -1108,23 +1108,29 @@ test('首次复制接入命令先说明上传内容与开源；确认后复制�
   p.onHide();
 });
 
-test('打开小程序就弹隐私与开源说明；只有点下次不提示才不再弹；与接入提醒依次弹出不冲突', async () => {
-  const notice = require(path.join(root, 'utils/privacy-notice.js'));
-  const prompt = require(path.join(root, 'utils/connect-prompt.js'));
+test('打开小程序就弹自定义隐私与开源说明，可复制仓库地址；接入提醒等它关闭后再弹；不再提示后不弹', async () => {
   require(path.join(root, 'utils/modal-queue.js'))._reset();
   require(path.join(root, 'utils/connect-prompt.js'))._reset();
-  const store = new Map(); const shown = [];
-  const wx = { getStorageSync: k => store.get(k) || '', setStorageSync: (k, v) => store.set(k, v), showModal: o => shown.push(o) };
-  notice.arm(); assert.equal(notice.maybeShow(wx), true); assert.equal(shown.length, 1);
-  assert.match(shown[0].content, /不会收集上传/); assert.match(shown[0].content, /github\.com\/xmasdong\/tokenrank/); assert.equal(shown[0].cancelText, '不再提示');
-  assert.equal(notice.maybeShow(wx), false);
+  const notice = require(path.join(root, 'utils/privacy-notice.js'));
+  const prompt = require(path.join(root, 'utils/connect-prompt.js'));
+  const store = new Map(), modals = [], clips = [], toasts = [];
+  const wx = { getStorageSync: k => store.get(k) || '', setStorageSync: (k, v) => store.set(k, v), showModal: o => modals.push(o),
+    setClipboardData: o => { clips.push(o.data); o.success && o.success(); }, showToast: o => toasts.push(o.title) };
+  let def; vm.runInNewContext(fs.readFileSync(path.join(root, 'components/privacy-notice/index.js'), 'utf8'),
+    { Component: d => def = d, wx, require: id => require(path.join(root, 'components/privacy-notice', id)) });
+  const c = { ...def, ...def.methods, data: { ...def.data }, setData(p) { Object.assign(this.data, p); } };
+  const wxml = fs.readFileSync(path.join(root, 'components/privacy-notice/index.wxml'), 'utf8');
+  assert.match(wxml, /不会收集上传/); assert.match(wxml, /不再提示/); assert.equal(c.data.repo, 'github.com/xmasdong/tokenrank');
+  notice.arm(); def.pageLifetimes.show.call(c); assert.equal(c.data.visible, true);
+  def.pageLifetimes.show.call(c); // same launch: not claimed twice
+  c.copyRepo(); assert.equal(clips.at(-1), 'https://github.com/xmasdong/tokenrank'); assert.match(toasts.at(-1), /已复制/);
   prompt.arm(); prompt.maybePrompt(wx, { user: { user_id: 1 }, hasReported: false, joined: true }, () => {});
-  assert.equal(shown.length, 1);
-  shown[0].success({ confirm: true }); shown[0].complete({ confirm: true });
-  assert.equal(shown.length, 2); assert.equal(shown[1].title, '还没有接入电脑'); shown[1].complete({});
-  notice.arm(); notice.maybeShow(wx); assert.equal(shown.length, 3);
-  shown[2].success({ cancel: true }); shown[2].complete({ cancel: true });
-  notice.arm(); assert.equal(notice.maybeShow(wx), false); assert.equal(shown.length, 3);
+  assert.equal(modals.length, 0);
+  c.close({ currentTarget: { dataset: { never: '0' } } }); assert.equal(c.data.visible, false);
+  assert.equal(modals.length, 1); assert.equal(modals[0].title, '还没有接入电脑'); modals[0].complete({});
+  notice.arm(); def.pageLifetimes.show.call(c); assert.equal(c.data.visible, true);
+  c.close({ currentTarget: { dataset: { never: '1' } } });
+  notice.arm(); def.pageLifetimes.show.call(c); assert.equal(c.data.visible, false);
 });
 
 test('所有弹窗按钮文字不超过 4 个字（微信 showModal 超长会直接不弹）', () => {

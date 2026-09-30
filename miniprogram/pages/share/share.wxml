@@ -20,3 +20,4 @@
 </view>
 <view wx:if="{{!loading && !error && hasHistory}}" class="actions"><button class="btn btn-ghost" bindtap="savePoster" loading="{{saving}}" disabled="{{!posterPath || generating || saving || revoking}}">保存图片</button><button class="btn btn-ink" open-type="share" disabled="{{!coverPath || generating || revoking}}">转发</button></view>
 <canvas type="2d" id="usageCanvas" class="export-canvas"></canvas>
+<privacy-notice />

@@ -1,10 +1,9 @@
 const api = require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const flow = require('../../utils/flow');
 Page({
   data: { periods: flow.PERIODS, period: 'day', entries: [], me: null, loading: true, error: '', updated_fmt: '',
     total: null, hasMore: false, nextOffset: null, snapshot: '', loadingMore: false, moreError: '' },
-  onShow() { privacyNotice.maybeShow(wx); this._visible = true; return this.load(); },
+  onShow() { this._visible = true; return this.load(); },
   onHide() { this._visible = false; this._requestId = (this._requestId || 0) + 1; this.setData({ loadingMore: false }); },
   onReachBottom() { if (!this.data.moreError) return this.loadMore(); },
   onUnload() { this.onHide(); },

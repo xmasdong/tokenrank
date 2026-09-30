@@ -1,5 +1,4 @@
 const api=require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const {story,shareTitle}=require('../../utils/share-story');
 const {integer}=require('../../utils/usage');
 const flow=require('../../utils/flow');
@@ -13,7 +12,7 @@ Page({
     const mode=options.mode||({a:'achievement',s:'streak',t:'tool'}[code[2]])||'achievement';
     this.setData({id:/^[0-9a-f]{24}$/.test(id)?id:'',mode:['achievement','streak','tool'].includes(mode)?mode:'achievement'});
   },
-  onShow(){ privacyNotice.maybeShow(wx);this.setData({fromGroup:flow.enteredFromGroup()});return this.load();},
+  onShow(){this.setData({fromGroup:flow.enteredFromGroup()});return this.load();},
   onHide(){this._requestId=(this._requestId||0)+1;},
   onUnload(){this.onHide();},
   async load(){

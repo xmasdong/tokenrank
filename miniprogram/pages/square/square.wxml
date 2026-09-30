@@ -21,3 +21,4 @@
   <view class="legal">含缓存总用量 · 北京时间 00:00 换日</view>
 </view>
 <view class="me-bar" wx:if="{{me && !loading && !error}}"><view class="me-left"><text class="me-label">我的全站排名</text><text class="me-rank num-font">{{me.rk.label}}</text></view><view class="me-num num-font">{{me.tokens_fmt}}<text class="me-unit"> tokens</text></view></view>
+<privacy-notice />

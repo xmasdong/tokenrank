@@ -1,0 +1,10 @@
+.pn-mask { position: fixed; z-index: 1000; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; padding: 0 48rpx; background: rgba(20, 18, 16, 0.5); }
+.pn-card { width: 100%; box-sizing: border-box; padding: 44rpx 40rpx 36rpx; border-radius: 24rpx; background: var(--paper-lift, #FBF8F1); color: var(--ink, #2A2723); }
+.pn-title { font-size: 36rpx; font-weight: 700; margin-bottom: 24rpx; }
+.pn-p { font-size: 28rpx; line-height: 1.7; color: var(--ink, #2A2723); }
+.pn-soft { margin-top: 16rpx; color: var(--ink-soft, #55503F); font-size: 26rpx; }
+.pn-repo { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: 12rpx 0 4rpx; padding: 18rpx 22rpx; border-radius: 12rpx; background: var(--paper, #F7F4EC); border: 1rpx solid var(--hairline, #DCD4C0); }
+.pn-url { flex: 1; min-width: 0; font-family: Menlo, Consolas, monospace; font-size: 25rpx; word-break: break-all; }
+.pn-copy { flex: none; color: var(--seal, #B03A2E); font-size: 26rpx; font-weight: 600; }
+.pn-actions { display: flex; gap: 20rpx; margin-top: 32rpx; }
+.pn-actions .pn-btn { flex: 1; width: auto; margin: 0; min-height: 44px; font-size: 28rpx; }

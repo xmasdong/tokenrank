@@ -54,3 +54,4 @@
   <view class="menu-item" bindtap="goGroups"><text>我的群榜</text><text>→</text></view>
   <view class="menu-item" bindtap="goAbout"><text>使用说明</text><text>→</text></view>
 </view>
+<privacy-notice />

@@ -42,3 +42,4 @@
     <view class="board-link" wx:if="{{sourceGroup}}" bindtap="goBoard">先回到本群</view>
   </block>
 </view>
+<privacy-notice />

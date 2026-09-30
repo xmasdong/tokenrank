@@ -1,0 +1,17 @@
+<view wx:if="{{visible}}" class="pn-mask" catchtouchmove="noop">
+  <view class="pn-card">
+    <view class="pn-title">关于隐私和开源</view>
+    <view class="pn-p">只上传每天的用量数字，和用了哪些工具、模型。</view>
+    <view class="pn-p">代码、对话、项目名和文件路径都不会收集上传。</view>
+    <view class="pn-p">小程序、服务端和电脑端程序全部开源：</view>
+    <view class="pn-repo" bindtap="copyRepo">
+      <text class="pn-url">{{repo}}</text>
+      <text class="pn-copy">复制</text>
+    </view>
+    <view class="pn-p pn-soft">不想上榜，可以在「我的」里关掉排名。</view>
+    <view class="pn-actions">
+      <button class="btn btn-ghost pn-btn" data-never="1" bindtap="close">不再提示</button>
+      <button class="btn btn-seal pn-btn" data-never="0" bindtap="close">知道了</button>
+    </view>
+  </view>
+</view>

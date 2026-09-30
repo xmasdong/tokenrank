@@ -1,5 +1,4 @@
 const api = require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
 const { profileEditor } = require('../../utils/profile-editor');
@@ -9,7 +8,7 @@ Page({
     periods: usage.PERIODS, period: 'day', usage: null, usageLoading: true, usageError: '',
     expanded: false, selectedDay: null, nicknameReady: false, nicknameFocus: false, privacyBusy: false, avatarNative: true,
     connState: 'pending', connText: '', hasReported: false },
-  onShow() { privacyNotice.maybeShow(wx); this._unloaded = false; this.checkNicknamePrivacy(); return this.load(); },
+  onShow() { this._unloaded = false; this.checkNicknamePrivacy(); return this.load(); },
   async toggleRanking(e) {
     const hidden = !e.detail.value;
     this.setData({ rankingSaving: true });

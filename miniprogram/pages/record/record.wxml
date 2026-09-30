@@ -14,3 +14,4 @@
 </view>
 
 <view class="bottom-action"><button class="btn btn-ink" bindtap="goMine">去看我的用量</button></view>
+<privacy-notice />

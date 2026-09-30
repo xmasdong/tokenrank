@@ -1,5 +1,4 @@
 const api = require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const flow = require('../../utils/flow');
 const connectPrompt = require('../../utils/connect-prompt');
 const { loadCodeImage } = require('../../utils/share-code');
@@ -25,7 +24,7 @@ Page({
     const missing = !id && options.enter !== '1' && options.create !== '1';
     this.setData({ id, missing, sourceName: flow.sourceName(options), enterState: this._needsResolve ? 'idle' : 'ready' });
   },
-  onShow() { privacyNotice.maybeShow(wx);
+  onShow() {
     wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true });
     this._visible = true;
     this._unloaded = false;

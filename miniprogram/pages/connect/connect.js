@@ -1,5 +1,4 @@
 const api = require('../../utils/api');
-const privacyNotice = require('../../utils/privacy-notice');
 const flow = require('../../utils/flow');
 const upstream = require('../../utils/upstream');
 const PRIVACY_ACK = 'privacy_notice_ack_v1';
@@ -30,7 +29,7 @@ Page({
     os: wx.getStorageSync('client_os') || 'mac', aiPrompt: '', showAi: false,
     connState: 'pending', connText: '', hasReported: false, sourceGroup: '' },
   onLoad(options) { this.setData({ sourceGroup: options.g || '' }); },
-  onShow() { privacyNotice.maybeShow(wx);
+  onShow() {
     this._visible = true;
     const os = wx.getStorageSync('client_os') || this.data.os;
     const command = buildCommand(os, api.BASE_URL, this.data.rawToken);

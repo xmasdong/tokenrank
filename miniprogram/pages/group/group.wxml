@@ -88,3 +88,4 @@
   </block>
 </view>
 <canvas type="2d" id="poster" class="poster-canvas"></canvas>
+<privacy-notice />

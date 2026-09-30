@@ -36,5 +36,8 @@
     ]
   },
   "style": "v2",
-  "sitemapLocation": "sitemap.json"
+  "sitemapLocation": "sitemap.json",
+  "usingComponents": {
+    "privacy-notice": "/components/privacy-notice/index"
+  }
 }
