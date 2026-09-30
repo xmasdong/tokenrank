@@ -155,13 +155,13 @@ test('shell installer stages package, keeps original service/data, installs isol
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
   const snapshot=readFileSync(f.path+'-wal');
-  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.8.tar.gz'),TEST_SERVICES:join(f.root,'services.log')};
+  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.9.tar.gz'),TEST_SERVICES:join(f.root,'services.log')};
   await exec('sh',[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token],{env});
   assert.equal(reports,1);assert.equal(readConfig(own).token,f.config.token);
   assert.equal(readFileSync(original,'utf8'),'original-service');assert.deepEqual(readFileSync(f.path+'-wal'),snapshot);
   assert.ok(readdirSync(own).some(x=>x.startsWith('app-backup-')));
   assert.match(readFileSync(env.TEST_SERVICES,'utf8'),/com.tokenrank.sync/);assert.doesNotMatch(readFileSync(env.TEST_SERVICES,'utf8'),/com.tokenwatcher/);
-  const result=await exec(join(home,'.local/bin/tokenrank'),['--version'],{env});assert.equal(result.stdout.trim(),'0.2.8');
+  const result=await exec(join(home,'.local/bin/tokenrank'),['--version'],{env});assert.equal(result.stdout.trim(),'0.2.9');
   assert.equal(existsSync(join(own,'app/src')),false);assert.equal(existsSync(join(own,'app/web')),false);
 });
 
@@ -183,7 +183,7 @@ if(cmd==='scan'){const folder=join(homedir(),'.tokenmeter');mkdirSync(folder,{re
     reports++;res.end(JSON.stringify({ok:true,accepted:JSON.parse(body).days.length}));});});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
-  const env={...process.env,HOME:home,PATH:bin+':/usr/bin:/bin',TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.8.tar.gz'),TEST_TEMPLATE:template,TEST_ORIGINAL_ACTIONS:join(f.root,'actions.log')};
+  const env={...process.env,HOME:home,PATH:bin+':/usr/bin:/bin',TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.9.tar.gz'),TEST_TEMPLATE:template,TEST_ORIGINAL_ACTIONS:join(f.root,'actions.log')};
   const args=[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token];
   await exec('sh',args,{env});const db=join(home,'.tokenmeter/tokenmeter.db'),snapshot=readFileSync(db);
   await exec('sh',args,{env});
@@ -215,8 +215,52 @@ test('shell install over a pre-fix original uploads nothing and points to the up
   let reports=0;const server=createServer((req,res)=>{reports++;res.setHeader('content-type','application/json');res.end('{}');});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
-  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.8.tar.gz')};
+  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.9.tar.gz')};
   const out=await exec('sh',[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token],{env});
   assert.equal(reports,0);assert.match(out.stdout,/低于修复重复统计的 1\.8\.2/);assert.match(out.stdout,/update\.sh \| sh/);
   assert.match(readConfig(join(home,'.tokenrank')).last_error,/低于 1\.8\.2/);
+});
+
+test('reconnect after account deletion uploads retained history in full, resumes interrupted batches, and keeps same-account checkpoints', async t => {
+  const { createServer } = await import('node:http');
+  const { execFile } = await import('node:child_process');
+  const { promisify } = await import('node:util');
+  const exec = promisify(execFile), f = fixture(t, 401), home = join(f.root, 'reconnect-home');
+  mkdirSync(home);
+  const dir = join(home, '.tokenrank'), newToken = 'b'.repeat(32), sent = [];
+  let failLast = true;
+  const server = createServer((req, res) => {
+    let text = ''; req.on('data', chunk => text += chunk);
+    req.on('end', () => {
+      res.setHeader('content-type', 'application/json');
+      if (req.url !== '/report') { res.writeHead(409); res.end('{}'); return; }
+      const body = JSON.parse(text); sent.push(body);
+      if (!body.full || req.headers.authorization !== 'Bearer ' + newToken || body.replace) {
+        res.writeHead(409); res.end('{}'); return;
+      }
+      if (body.complete && failLast) { res.writeHead(503); res.end('{}'); return; }
+      res.end(JSON.stringify({ ok: true, accepted: body.days.length }));
+    });
+  });
+  await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+  t.after(() => { server.closeAllConnections(); server.close(); });
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  writeConfig({ ...f.config, server: origin, protocol_version: 2, initial_sync_pending: false,
+    synced_days: { '2024-01-01': 'old-account-hash' }, replace_pending: true, last_ok_at: 123 }, dir);
+  const cli = new URL('../bin/tokenrank.js', import.meta.url).pathname;
+  const args = [cli, 'connect', origin, newToken], env = { ...process.env, HOME: home, USERPROFILE: home };
+  const wal = readFileSync(f.path + '-wal');
+  await assert.rejects(exec(process.execPath, args, { env }), /HTTP 503/);
+  const pending = readConfig(dir);
+  assert.equal(pending.initial_sync_pending, true); assert.equal(pending.replace_pending, false);
+  assert.equal(pending.last_ok_at, null); assert.equal(Object.keys(pending.synced_days).length, 400);
+  failLast = false;
+  await exec(process.execPath, args, { env });
+  assert.deepEqual(sent.map(body => body.days.length), [400, 1, 1]);
+  assert.ok(sent.every(body => body.full));
+  assert.equal(readConfig(dir).initial_sync_pending, false);
+  assert.equal(Object.keys(readConfig(dir).synced_days).length, 401);
+  await exec(process.execPath, args, { env });
+  assert.equal(sent.length, 3); // Same account does not re-upload unchanged days.
+  assert.deepEqual(readFileSync(f.path + '-wal'), wal);
 });

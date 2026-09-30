@@ -1,6 +1,6 @@
 const flow = require('../../utils/flow');
 const upstream = require('../../utils/upstream');
-const AUDIT_PROMPT = `请审计这台电脑的 TokenRank 独立同步器 v0.2.7，并给出代码和文件证据：
+const AUDIT_PROMPT = `请审计这台电脑的 TokenRank 独立同步器 v0.2.9，并给出代码和文件证据：
 1. 入口为 tokenrank，运行文件仅 bin/tokenrank.js 与 sync/。日常同步不调用旧 fork Store 或扫描器；安装阶段可以检测、安装原版并调用原版 scan / 自启。
 2. 默认以 SQLite readOnly + query_only 读取 ~/.tokenmeter/tokenmeter.db，配置和同步进度写 ~/.tokenrank。确认原库及其 settings 未被改写。
 3. 上报只包含 北京时间日期、原版总量、输入和输出计数、缓存计数、请求数、工具和模型名、随机设备 ID；用 rank push --full --dry-run 核对。接入码不要写入审计结果。

@@ -72,7 +72,13 @@ async function main() {
     const same = previous.server === server && previous.token === token && previous.db_path === dbPath;
     writeConfig({ ...previous, server, token, db_path: dbPath,
       device_id: previous.device_id || legacy['rank.device_id'] || crypto.randomUUID(),
-      synced_days: same ? previous.synced_days || {} : {}, last_error: null });
+      synced_days: same ? previous.synced_days || {} : {},
+      // A new credential may belong to a fresh account after deletion. Its first
+      // upload needs a full snapshot, even if this computer already speaks v2.
+      initial_sync_pending: same ? !!previous.initial_sync_pending : true,
+      replace_pending: same ? !!previous.replace_pending : false,
+      last_ok_at: same ? previous.last_ok_at || null : null,
+      last_error: null });
     const result = await push(); log(JSON.stringify(result));
   } else if (cmd === 'doctor') {
     const dbPath = rejectSharedDirectory(resolve(options.db || readConfig().db_path || DEFAULT_DB));

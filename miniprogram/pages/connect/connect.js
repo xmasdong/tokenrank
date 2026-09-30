@@ -6,8 +6,8 @@ const PRIVACY_ACK = 'privacy_notice_ack_v1';
 function buildCommand(os, origin, token) {
   if (!origin || !token) return '';
   return os === 'win'
-    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.7/install.ps1"))) "${origin}" "${token}"`
-    : `curl -fsSL ${origin}/releases/0.2.7/install.sh | sh -s -- ${origin} ${token}`;
+    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.9/install.ps1"))) "${origin}" "${token}"`
+    : `curl -fsSL ${origin}/releases/0.2.9/install.sh | sh -s -- ${origin} ${token}`;
 }
 function buildAiPrompt(command, os) {
   if (!command) return '';
