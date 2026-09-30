@@ -10,7 +10,7 @@
     <view class="note">命令里有你的接入码，不要发给别人。</view>
     <view class="privacy">
       <view class="privacy-line">只上传每天的用量数字，和用了哪些工具、模型。</view>
-      <view class="privacy-line">代码、对话内容、项目名和文件路径都不会离开你的电脑。</view>
+      <view class="privacy-line">代码、对话内容、项目名和文件路径都不会收集上传。</view>
       <view class="privacy-line">想先看看会传什么，可以在电脑上运行下面这条，只预览不上传：</view>
       <view class="privacy-cmd" data-cmd="tokenrank rank push --full --dry-run" bindtap="copyDryRun">tokenrank rank push --full --dry-run</view>
       <view class="privacy-line">代码全部开源，可以自己看：</view>

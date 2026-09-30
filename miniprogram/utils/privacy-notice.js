@@ -12,7 +12,7 @@ function maybeShow(wx) {
   if (wx.getStorageSync(KEY)) return false;
   modalQueue.show(wx, {
     title: '关于隐私和开源',
-    content: `只上传每天的用量数字，和用了哪些工具、模型。代码、对话、项目名和文件路径都不会离开你的电脑。\n小程序、服务端和电脑端程序全部开源：${REPO}\n不想上榜，可以在「我的」里关掉排名。`,
+    content: `只上传每天的用量数字，和用了哪些工具、模型。代码、对话、项目名和文件路径都不会收集上传。\n小程序、服务端和电脑端程序全部开源：${REPO}\n不想上榜，可以在「我的」里关掉排名。`,
     confirmText: '知道了',
     cancelText: '不再提示',
     success: res => { if (res.cancel) wx.setStorageSync(KEY, 1); },

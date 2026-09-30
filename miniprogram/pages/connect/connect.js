@@ -85,7 +85,7 @@ Page({
     if (wx.getStorageSync(PRIVACY_ACK)) return copy();
     wx.showModal({
       title: '接入前先说明',
-      content: '只上传每天的用量数字，和用了哪些工具、模型。\n代码、对话、项目名和文件路径都不会离开你的电脑。\n代码全部开源，接入后也可以在「我的」里关掉排名。',
+      content: '只上传每天的用量数字，和用了哪些工具、模型。\n代码、对话、项目名和文件路径都不会收集上传。\n代码全部开源，接入后也可以在「我的」里关掉排名。',
       confirmText: '继续复制', cancelText: '看源码',
       success: res => {
         if (res.confirm) { wx.setStorageSync(PRIVACY_ACK, 1); copy(); }
