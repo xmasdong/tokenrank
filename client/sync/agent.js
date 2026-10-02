@@ -15,13 +15,14 @@ export function plist({ node = process.execPath, script = entry, dir = SYNC_DIR 
 <key>Label</key><string>${LABEL}</string>
 <key>ProgramArguments</key><array>${args.map(a => `<string>${xml(a)}</string>`).join('')}</array>
 <key>RunAtLoad</key><true/><key>KeepAlive</key><true/>
+<key>ThrottleInterval</key><integer>15</integer>
 <key>StandardOutPath</key><string>${xml(join(dir, 'logs', 'sync.log'))}</string>
 <key>StandardErrorPath</key><string>${xml(join(dir, 'logs', 'sync.err.log'))}</string>
 </dict></plist>\n`;
 }
 export function windowsScript({ node = process.execPath, script = entry } = {}) {
   const quote = s => '"' + s.replaceAll('"', '""') + '"';
-  return `CreateObject("WScript.Shell").Run ${quote(quote(node) + ' --no-warnings ' + quote(script) + ' watch')}, 0, True\r\n`;
+  return `Dim result\r\nresult = CreateObject("WScript.Shell").Run(${quote(quote(node) + ' --no-warnings ' + quote(script) + ' watch')}, 0, True)\r\nWScript.Quit result\r\n`;
 }
 const stopWindows = () => `$script=${ps(entry)}; Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"' + $script + '"') -and $_.CommandLine -match '\\s+watch(?:\\s|$)' } | ForEach-Object { Stop-Process -Id $_.ProcessId }; `;
 export function installAgent({ dryRun = false, platform = process.platform, home = homedir(), dir = SYNC_DIR, runner = run, log = console.log } = {}) {
@@ -40,15 +41,15 @@ export function installAgent({ dryRun = false, platform = process.platform, home
     // AtLogOn starts a persistent read-only sync loop; only our dedicated task is touched.
     const command = `$ErrorActionPreference='Stop'; if(Get-ScheduledTask -TaskName ${ps(TASK)} -ErrorAction SilentlyContinue){Stop-ScheduledTask -TaskName ${ps(TASK)}}; ` + stopWindows()
       + `$a=New-ScheduledTaskAction -Execute 'wscript.exe' -Argument ${ps('"' + vbs + '"')}; `
-      + `$t=New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; `
-      + `$s=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1); `
-      + `Register-ScheduledTask -TaskName ${ps(TASK)} -Action $a -Trigger $t -Settings $s -User $env:USERNAME -RunLevel Limited -Force | Out-Null; Start-ScheduledTask -TaskName ${ps(TASK)}`;
+      + `$t=New-ScheduledTaskTrigger -AtLogOn -User $env:USERNAME; $retry=New-ScheduledTaskTrigger -Once -At (Get-Date).AddMinutes(5) -RepetitionInterval (New-TimeSpan -Minutes 5); `
+      + `$s=New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1) -MultipleInstances IgnoreNew -StartWhenAvailable -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries; `
+      + `Register-ScheduledTask -TaskName ${ps(TASK)} -Action $a -Trigger @($t,$retry) -Settings $s -User $env:USERNAME -RunLevel Limited -Force | Out-Null; Start-ScheduledTask -TaskName ${ps(TASK)}`;
     runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', command]);
   } else {
     const unitDir = join(home, '.config', 'systemd', 'user');
     mkdirSync(unitDir, { recursive: true });
     const quote = s => '"' + s.replaceAll('\\', '\\\\').replaceAll('"', '\\"').replaceAll('%', '%%') + '"';
-    writeFileSync(join(unitDir, 'tokenrank-sync.service'), `[Unit]\nDescription=TokenRank read-only sync\n[Service]\nExecStart=${quote(process.execPath)} --no-warnings ${quote(entry)} watch\nRestart=on-failure\n[Install]\nWantedBy=default.target\n`);
+    writeFileSync(join(unitDir, 'tokenrank-sync.service'), `[Unit]\nDescription=TokenRank read-only sync\n[Service]\nExecStart=${quote(process.execPath)} --no-warnings ${quote(entry)} watch\nRestart=always\nRestartSec=15\n[Install]\nWantedBy=default.target\n`);
     runner('systemctl', ['--user', 'daemon-reload']); runner('systemctl', ['--user', 'enable', '--now', 'tokenrank-sync.service']);
     runner('systemctl', ['--user', 'restart', 'tokenrank-sync.service']);
   }

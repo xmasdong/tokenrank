@@ -6,7 +6,7 @@ import worker from '../src/worker.js';
 import { deleteAccount } from '../src/account.js';
 import { storeTotalReport } from '../src/report.js';
 
-const ownedTables = ['user_avatars','mp_sessions','connect_tokens','rank_group_members','daily_stats','usage_shares',
+const ownedTables = ['sync_agents','user_avatars','mp_sessions','connect_tokens','rank_group_members','daily_stats','usage_shares',
   'daily_totals','usage_sync_state','usage_replacements','usage_replacement_chunks','usage_rebuild_guard'];
 function fixture(t) {
   const db = new DatabaseSync(':memory:');
@@ -32,6 +32,7 @@ function fixture(t) {
     db.prepare('INSERT INTO users(id,openid,nickname,avatar_path,created_at,updated_at) VALUES(?,?,?,?,?,?)')
       .run(uid,`dev:user${uid}`,`用户${uid}`,`${String(uid).repeat(36)}.png`,1,1);
     db.prepare('INSERT INTO user_avatars VALUES(?,?,?,?)').run(uid,new Uint8Array([1,2,3]),'image/png',1);
+    db.prepare("INSERT INTO sync_agents(user_id,device_id,client_version,platform,state,event_at,last_seen_at) VALUES(?,'device-test','0.2.10','darwin','idle',1,1)").run(uid);
     db.prepare('INSERT INTO mp_sessions VALUES(?,?,?)').run(`session-${uid}`,uid,Date.now()+100000);
     db.prepare('INSERT INTO connect_tokens(token,user_id,created_at) VALUES(?,?,?)').run(`connect-${uid}`,uid,1);
     db.prepare('INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(?,?,?,?)').run(uid,'2026-01-01',99,1);

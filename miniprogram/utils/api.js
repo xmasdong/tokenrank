@@ -360,6 +360,10 @@ module.exports = {
     const state = await request('/api/connect/token');
     const user = peek('/api/me');
     if (user && user.last_report_at !== state.last_report_at) invalidateReads();
+    else if (user) {
+      const key = cacheKey('/api/me'), cached = readCache.get(key);
+      if (cached) readCache.set(key, { ...cached, value:{...user,sync_health:state.sync_health} });
+    }
     return state;
   },
   rotateConnect: () => mutate('/api/connect/token', { method: 'POST' }),

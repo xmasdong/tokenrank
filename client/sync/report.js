@@ -29,7 +29,7 @@ export function batches(days, deviceId, { sourceAt = Date.now(), full = false, m
   return reports;
 }
 
-export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryRun = false, now = Date.now(), fetcher = fetch, wait = sleep, log = () => {} } = {}) {
+export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryRun = false, now = Date.now(), fetcher = fetch, wait = sleep, log = () => {}, onProgress = () => {} } = {}) {
   const config = readConfig(dir);
   if (!config.token || !config.server) return { skipped: 'not-connected' };
   if (process.env.TOKENRANK_OFFLINE === '1' || process.env.TOKENMETER_OFFLINE === '1') return { skipped: 'offline' };
@@ -52,11 +52,14 @@ export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryR
   };
   try {
     if (replace && !dryRun) {
+      onProgress({stage:'upload',source_day:null});
       const capability = await fetcher(`${server}/report/capabilities`, { signal: AbortSignal.timeout(15000) });
       if (!capability.ok || (await capability.json()).atomic_replace !== 1) throw new Error('服务端尚未支持完整替换，旧云端用量保持不变');
     }
     // Read every retained day so upstream corrections to old history are detected.
+    onProgress({stage:'source',source_day:null});
     const days = readDays(dbPath, { now });
+    const sourceDay=days.at(-1)?.day || null;
     const initializing = config.protocol_version !== 2 || config.initial_sync_pending;
     const unchanged = config.protocol_version === 2 ? config.synced_days || {} : {};
     const present = new Set(days.map(day => day.day));
@@ -64,6 +67,7 @@ export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryR
       cache_read: 0, cache_write: 0, requests: 0, models: [], tools: [] });
     days.sort((a,b) => a.day.localeCompare(b.day));
     const changed = full || replace ? days : days.filter(day => unchanged[day.day] !== fingerprint(day));
+    onProgress({stage:'upload',source_day:sourceDay});
     const reports = batches(changed, config.device_id, { sourceAt: now, full: !!(full || replace || initializing), metadata,
       replaceId: replace ? crypto.randomUUID().replaceAll('-','') : null });
     if (dryRun) return { dryRun: true, reports, total_days: days.length, changed_days: changed.length };

@@ -9,6 +9,8 @@ import { installAgent, uninstallAgent, migrateLegacyAgent } from '../sync/agent.
 import { prepareUpstream, startPreparedUpstream, inspectUpstream, collectorOutdated } from '../sync/upstream.js';
 import { updateAndResync } from '../sync/update.js';
 import { pruneDaily } from '../sync/cleanup.js';
+import { startWatch } from '../sync/watch.js';
+import { notifyStopped, readHealth } from '../sync/health.js';
 
 const args = process.argv.slice(2), options = {}, positional = [];
 try {
@@ -90,25 +92,26 @@ async function main() {
   } else if ((cmd === 'rank' && sub === 'status') || cmd === 'status') {
     const c = readConfig();
     console.log(JSON.stringify({ version, connected: !!(c.server && c.token), server: c.server || null, source: c.db_path || DEFAULT_DB,
-      read_only: true, synced_days: Object.keys(c.synced_days || {}).length, last_ok_at: c.last_ok_at || null, last_error: c.last_error || null }, null, 2));
+      read_only: true, synced_days: Object.keys(c.synced_days || {}).length, last_ok_at: c.last_ok_at || null, last_error: c.last_error || null,
+      sync_health: readHealth(SYNC_DIR,c) }, null, 2));
   } else if ((cmd === 'rank' && sub === 'off') || cmd === 'off') {
     const c = readConfig(); writeConfig({ ...c, token: null, synced_days: {}, last_error: null }); log('已断开上报，原版数据保持不变。');
+    if (!await notifyStopped('USER_DISABLED',{config:c})) log('未能通知云端；本机已停止上传。');
   } else if (cmd === 'watch' || cmd === 'rank-watch') {
     const release = acquireLock(SYNC_DIR, 'watch');
     if (!release) { log('已有独立同步器在运行。'); return; }
     process.on('exit', release);
-    for (const signal of ['SIGTERM', 'SIGINT']) process.on(signal, () => { release(); process.exit(0); });
-    const tick = async () => { try { log(JSON.stringify(await push({}))); } catch (err) { log(err.message); }
-      try { pruneDaily({ log }); } catch (err) { log(`备份清理跳过：${err.message}`); } };
-    await tick(); setInterval(tick, 300000);
+    const watcher=startWatch({log,onIdle:()=>{try {pruneDaily({log});} catch {log('备份清理跳过');}}});
+    for (const signal of ['SIGTERM', 'SIGINT']) process.once(signal,async()=>{await watcher.stop();release();process.exit(0);});
   } else if (cmd === 'install-agent') installAgent({ dryRun: !!options['dry-run'] });
-  else if (cmd === 'uninstall-agent') { uninstallAgent(); log('已移除 TokenRank 独立自启。'); }
+  else if (cmd === 'uninstall-agent') { uninstallAgent(); await notifyStopped('SERVICE_STOPPED'); log('已移除 TokenRank 独立自启。'); }
   else if (cmd === 'migrate-legacy-agent') migrateLegacyAgent({ appRoot: options['app-root'] });
   else if (cmd === 'uninstall') {
     uninstallAgent();
     const c = readConfig();
     if (options['purge-data']) rmSync(join(SYNC_DIR, 'config.json'), { force: true });
     else writeConfig({ ...c, token: null, synced_days: {} });
+    await notifyStopped('USER_UNINSTALLED',{config:c});
     log('已停止同步并清除接入凭证；token-watcher 与其统计库保持不变。');
   } else throw new Error('未知命令，请运行 tokenrank --help');
 }

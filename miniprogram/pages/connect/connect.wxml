@@ -9,7 +9,7 @@
     <button class="btn btn-ink wide" bindtap="copyCommand" disabled="{{rotating}}">复制命令</button>
     <view class="note">命令里有你的接入码，不要发给别人。</view>
     <view class="privacy">
-      <view class="privacy-line">只上传每天的用量数字，和用了哪些工具、模型。</view>
+      <view class="privacy-line">上传每天的用量数字、工具和模型，以及同步程序的运行状态与版本。</view>
       <view class="privacy-line">代码、对话内容、项目名和文件路径都不会收集上传。</view>
       <view class="privacy-line">想先看看会传什么，可以在电脑上运行下面这条，只预览不上传：</view>
       <view class="privacy-cmd" data-cmd="tokenrank rank push --full --dry-run" bindtap="copyDryRun">tokenrank rank push --full --dry-run</view>
@@ -26,14 +26,15 @@
   <view class="sync-section" wx:if="{{command}}">
     <view class="section-title display">同步状态</view>
     <view wx:if="{{error}}" class="error-note">{{error}}</view>
-    <view wx:else class="status status-{{connState}}"><text class="dot"></text><text>{{hasReported ? connText : '等待首次同步'}}</text></view>
-    <view class="pending-note" wx:if="{{!hasReported && !error}}">运行命令后，这里会自动刷新状态。</view>
+    <view wx:else class="status status-{{connState}}"><text class="dot"></text><text>{{connText}}</text></view>
+    <view class="pending-note" wx:if="{{!error}}">{{connHint}}</view>
+    <view class="sync-times" wx:if="{{!error}}"><view class="sync-time" wx:for="{{syncTimes}}" wx:key="label"><text>{{item.label}}</text><text>{{item.value}}</text></view></view>
     <button class="btn btn-seal wide return-button" wx:if="{{hasReported && !error}}" bindtap="goBoard">{{sourceGroup ? '查看本群排名' : '查看我的用量'}}</button>
     <button class="btn btn-ghost wide check-button" loading="{{checking}}" disabled="{{checking || rotating}}" bindtap="checkNow">检查同步状态</button>
   </view>
   <block wx:if="{{command}}">
     <view class="ai-card"><view class="ai-title display">用 AI 安装</view><view class="ai-desc">把提示词发给电脑上的 Claude Code、Codex 等工具，由它执行安装。</view><button class="btn btn-ghost" bindtap="toggleAi">{{showAi ? '收起提示词' : '查看提示词'}}</button><block wx:if="{{showAi}}"><text class="audit" user-select>{{aiPrompt}}</text><button class="btn btn-ink ai-btn" bindtap="copyAiPrompt" disabled="{{!aiPrompt || rotating}}">复制提示词</button></block></view>
-    <view class="note">只上传按天汇总的用量，不含代码和对话。</view>
+    <view class="note">上传用量汇总与同步状态，不含代码和对话。</view>
   </block>
   <view class="upstream-intro"><template is="upstream-project" data="{{upstream}}" /></view>
   <block wx:if="{{command}}">

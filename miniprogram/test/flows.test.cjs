@@ -310,11 +310,11 @@ test('接入成功返回原群；没有原页面栈时也保留群上下文', ()
   pages.length = 0; p.goBoard(); assert.match(navigation[1][1], /g=origin&from=connect/);
 });
 
-test('接入失败可重试；多日前的上报标为较久未同步', async () => {
+test('接入失败可重试；旧版只有历史上报时标为运行状态未知', async () => {
   let fail = true;
   const { p } = page('connect', { getConnect: async () => { if (fail) throw new Error('网络断开'); return { token: 'token', last_report_at: Date.now() - 86400000 }; } });
   await p.load(); assert.match(p.data.error, /网络断开/);
-  fail = false; await p.load(); assert.equal(p.data.error, ''); assert.equal(p.data.connState, 'stale');
+  fail = false; await p.load(); assert.equal(p.data.error, ''); assert.equal(p.data.connState, 'unknown');
 });
 
 test('首次登录失败后可就地重试，登录期间选择的系统用于最终命令', async () => {
@@ -345,7 +345,7 @@ test('已有历史同步的用户即使今日零用量或没有群，也不回�
     myUsage: async () => ({ ...usageData('day', 0), has_history: true }),
   });
   await p.load();
-  assert.equal(p.data.hasReported, true); assert.equal(p.data.connState, 'stale');
+  assert.equal(p.data.hasReported, true); assert.equal(p.data.connState, 'unknown');
   assert.equal(p.data.usage.summary.tokens, 0); assert.equal(p.data.myGroups.length, 0);
 });
 
@@ -550,6 +550,31 @@ test('接入页检测到新上报后清空缓存，返回用量页会读取新�
   }) });
   await api.ensureLogin(); await api.myUsage('day'); await api.getConnect();
   assert.equal(api.peekMe(), null); assert.equal(api.peekUsage('day'), null);
+});
+
+test('仅心跳变化刷新本人状态，不使已缓存的用量反复请求', async () => {
+  const api = realApi({ getStorageSync: () => 'session', request: options => queueMicrotask(() => {
+    const data = options.url.endsWith('/api/me') ? { user_id: 1, last_report_at: 10 }
+      : options.url.endsWith('/api/connect/token') ? { token: 'private', last_report_at: 10, sync_health:{supported:true,state:'online'} } : {marker:'cached'};
+    options.success({statusCode:200,data});
+  }) });
+  await api.ensureLogin(); await api.myUsage('day'); await api.getConnect();
+  assert.equal(api.peekMe().sync_health.state,'online');assert.equal(api.peekUsage('day').marker,'cached');
+  assert.equal(api.peekMe().token,undefined);
+});
+
+test('用量未变仍显示在线，失联、主动关闭、错误和旧版未知分别呈现', async () => {
+  const now=Date.now(); let state={token:'t',last_report_at:now-86400000,
+    sync_health:{supported:true,state:'online',result:'idle',last_seen_at:now,last_check_at:now}};
+  const {p}=page('connect',{getConnect:async()=>state});p.onLoad({});await p.onShow();
+  assert.equal(p.data.connState,'live');assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/无新增用量/);
+  assert.equal(p.data.syncTimes.length,3);
+  state.sync_health.last_seen_at=now-16*60000;await p.load();assert.equal(p.data.connState,'stale');assert.match(p.data.connHint,/休眠、断网/);
+  state.sync_health.state='stopped';state.sync_health.error_code='USER_DISABLED';await p.load();assert.equal(p.data.connText,'已主动关闭同步');
+  state.sync_health={supported:true,state:'error',last_seen_at:now,error_code:'SOURCE_READ_FAILED'};await p.load();assert.match(p.data.connHint,/读取本机统计失败/);
+  state.sync_health={supported:false,state:'unknown'};await p.load();assert.equal(p.data.connState,'unknown');
+  state={token:'t',last_report_at:null,sync_health:{supported:true,state:'online',result:'idle',last_seen_at:now,last_check_at:now}};
+  await p.load();assert.equal(p.data.hasReported,false);assert.equal(p.data.connText,'同步程序在线');p.onHide();
 });
 
 test('并发的过期会话请求只登录一次，登录响应直接复用用户资料', async () => {
@@ -1068,7 +1093,7 @@ test('手动检查同步状态总是给出结果提示，未接入与已接入�
   p.onLoad({}); await p.onShow();
   await p.checkNow(); assert.equal(toasts.at(-1), '还没收到用量，确认电脑上的命令已运行完成');
   state = { token: 't', connected: true, last_report_at: Date.now() - 60000 };
-  await p.checkNow(); assert.match(toasts.at(-1), /已接入/);
+  await p.checkNow(); assert.match(toasts.at(-1), /运行状态未知/);
   p.onHide();
 });
 

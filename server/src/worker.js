@@ -8,6 +8,7 @@ import { shareCode } from './wx-code.js';
 import { readShare, createShare } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
 import { deleteAccount } from './account.js';
+import { heartbeat, syncHealth } from './sync-health.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -124,6 +125,7 @@ async function route(request, env, url, path) {
   // ---- 采集接入 ----
   if (method === 'GET' && path === '/api/connect/token') return withCors(await getConnectToken(request, env));
   if (method === 'POST' && path === '/api/connect/token') return withCors(await createConnectToken(request, env));
+  if (method === 'POST' && path === '/agent/heartbeat') return withCors(await heartbeat(request, env));
   if (method === 'GET' && path === '/report/capabilities') return withCors(Response.json({ atomic_replace: 1 }));
   if (method === 'POST' && path === '/report') return withCors(await report(request, env));
 
@@ -220,6 +222,7 @@ async function publicUser(env, userId, origin = '') {
     // 接入状态三态的依据：connected=有码；last_report_at=数据确实到达过
     last_report_at: u.last_report_at ?? null,
     rank_hidden: !!u.rank_hidden,
+    sync_health: await syncHealth(env, userId),
   };
 }
 
@@ -288,6 +291,7 @@ async function getConnectToken(request, env) {
     connected: true,
     token,
     last_report_at: row?.last_report_at ?? null,
+    sync_health: await syncHealth(env, user.id),
     install_command: `npx tokenrank-client@latest connect ${userOrigin(env, request)} ${token}`,
   });
 }
@@ -299,6 +303,7 @@ async function createConnectToken(request, env) {
   const token = hexToken(16);
   const now = Date.now();
   const batch = [
+    env.DB.prepare('DELETE FROM sync_agents WHERE user_id=?1').bind(user.id),
     env.DB.prepare('DELETE FROM connect_tokens WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('INSERT INTO connect_tokens (token, user_id, created_at) VALUES (?1, ?2, ?3)').bind(token, user.id, now),
   ];

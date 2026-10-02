@@ -28,7 +28,10 @@
 .section-title { font-size: 30rpx; font-weight: 700; }
 .status { display: flex; align-items: center; gap: 12rpx; margin-top: 16rpx; font-size: 25rpx; line-height: 1.7; color: var(--ink-soft); }
 .dot { width: 12rpx; height: 12rpx; flex: none; border-radius: 50%; background: var(--gold); }
-.status-pending .dot, .status-stale .dot { background: var(--seal); }
+.status-live .dot { background: #39765a; }
+.status-pending .dot, .status-stale .dot, .status-error .dot, .status-stopped .dot { background: var(--seal); }
+.sync-times { margin-top: 20rpx; padding-top: 12rpx; border-top: 1rpx solid var(--hairline); }
+.sync-time { display: flex; justify-content: space-between; gap: 20rpx; padding: 6rpx 0; font-size: 24rpx; line-height: 1.7; color: var(--ink-soft); }
 .pending-note, .error-note { margin: 12rpx 0 0; font-size: 24rpx; line-height: 1.7; color: var(--ink-soft); }
 .error-note { color: var(--seal); }
 .sync-section .wide { margin: 20rpx 0 0; }

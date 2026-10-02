@@ -8,7 +8,7 @@ function arm() { due = true; }
 
 /** conditions: { user, hasReported, joined } — joined means at least one group board. */
 function maybePrompt(wx, { user, hasReported, joined }, goConnect) {
-  if (!due || showing || !user || hasReported || !joined) return false;
+  if (!due || showing || !user || hasReported || !joined || user.sync_health?.supported) return false;
   due = false;
   showing = true;
   modalQueue.show(wx, {

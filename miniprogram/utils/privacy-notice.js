@@ -1,7 +1,7 @@
 // Shown every time the mini program is opened, until the user taps “不再提示”.
 // Rendered by components/privacy-notice so the repository address can be copied.
 const modalQueue = require('./modal-queue');
-const KEY = 'privacy_notice_hidden_v1';
+const KEY = 'privacy_notice_hidden_v2';
 const REPO_URL = 'https://github.com/xmasdong/tokenrank';
 let due = false;
 

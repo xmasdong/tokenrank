@@ -10,7 +10,7 @@ export async function deleteAccount(env, userId) {
       WHERE m.group_id=rank_groups.id AND m.user_id<>?1)`),
     sql('DELETE FROM rank_group_members WHERE user_id=?1 OR group_id IN (SELECT id FROM rank_groups WHERE owner_user_id=?1)'),
     sql('DELETE FROM rank_groups WHERE owner_user_id=?1'),
-    ...['usage_replacement_chunks', 'usage_replacements', 'usage_rebuild_guard',
+    ...['sync_agents', 'usage_replacement_chunks', 'usage_replacements', 'usage_rebuild_guard',
       'daily_totals', 'daily_stats', 'usage_sync_state', 'usage_shares', 'user_avatars',
       'connect_tokens', 'mp_sessions'].map(table => sql(`DELETE FROM ${table} WHERE user_id=?1`)),
     sql('DELETE FROM users WHERE id=?1'),
