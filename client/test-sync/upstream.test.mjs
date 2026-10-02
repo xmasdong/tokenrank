@@ -20,11 +20,11 @@ function fixture(t, platform='linux') {
   const home=mkdtempSync(join(tmpdir(),'tokenrank-bootstrap-test-')),dir=join(home,'.tokenrank'),bin=join(home,'bin');
   mkdirSync(bin);const npm=join(home,'npm/bin/npm-cli.js');mkdirSync(join(npm,'..'),{recursive:true});writeFileSync(npm,'// npm fixture');
   symlinkSync(npm,join(bin,'npm'));const prefix=upstreamPrefix(home,platform),db=join(home,'.tokenmeter/tokenmeter.db');
-  const calls=[];let failInstall=false,failScan=false,failService=false,latest='1.8.2';const fetches=[];
+  const calls=[];let failInstall=false,failScan=false,failService=false,latest='1.8.3';const fetches=[];
   const runner=(command,args)=>{
     calls.push({command,args});
     if(args.includes('root'))return join(home,'global/node_modules');
-    if(args.includes('install')) {if(failInstall)throw new Error('npm failed');pkg(join(prefix,'node_modules/token-watcher'),'token-watcher',args.at(-1).startsWith('https://codeload')?'1.8.2':latest);return '';}
+    if(args.includes('install')) {if(failInstall)throw new Error('npm failed');pkg(join(prefix,'node_modules/token-watcher'),'token-watcher',args.at(-1).startsWith('https://codeload')?'1.8.3':latest);return '';}
     if(args.includes('scan')){if(failScan)throw new Error('scan failed');if(!existsSync(db))source(db);return '';}
     if(command==='launchctl'&&args[0]==='print')throw new Error('not loaded');
     if(failService)throw new Error('service unavailable');
@@ -58,7 +58,7 @@ test('official legacy tokenwatcher/tokenmeter bin names retain repository identi
 test('missing original installs pinned official package in user scope, scans then starts; rerun is idempotent',async t=>{
   const f=fixture(t);const result=await prepareUpstream(f.options);
   assert.equal(result.managed,true);assert.equal(result.version,UPSTREAM_VERSION);
-  const install=f.calls.find(x=>x.args.includes('install'));assert.ok(install);assert.ok(install.args.includes('--prefix'));assert.ok(install.args.includes('token-watcher@1.8.2'));assert.ok(install.args.includes('https://registry.npmjs.org/'));assert.equal(install.args.includes('-g'),false);
+  const install=f.calls.find(x=>x.args.includes('install'));assert.ok(install);assert.ok(install.args.includes('--prefix'));assert.ok(install.args.includes('token-watcher@1.8.3'));assert.ok(install.args.includes('https://registry.npmjs.org/'));assert.equal(install.args.includes('-g'),false);
   assert.equal(f.calls.filter(x=>x.args.includes('scan')).length,1);
   assert.deepEqual(startPreparedUpstream(f.options),{started:true});
   assert.ok(existsSync(join(f.home,'.config/systemd/user/token-watcher-for-tokenrank.service')));
@@ -150,7 +150,7 @@ test('fresh install takes the newest official release, never one without the dup
   const f=fixture(t);f.setLatest('1.9.0');const result=await prepareUpstream(f.options);
   assert.equal(result.version,'1.9.0');assert.ok(f.calls.find(x=>x.args.includes('install')).args.includes('token-watcher@1.9.0'));
   const g=fixture(t);g.setLatest('1.8.1');const fixed=await prepareUpstream(g.options);
-  assert.equal(fixed.version,'1.8.2');assert.equal(g.calls.find(x=>x.args.includes('install')).args.at(-1),FIXED_SOURCE);
+  assert.equal(fixed.version,'1.8.3');assert.equal(g.calls.find(x=>x.args.includes('install')).args.at(-1),FIXED_SOURCE);
 });
 
 test('existing pre-fix original is kept for the explicit upgrade and reported as outdated',async t=>{

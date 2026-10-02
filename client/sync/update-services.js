@@ -35,7 +35,7 @@ function collectorFromLaunch(config) {
 }
 
 /** Only stop services whose saved executable is verified, retaining all launch settings. */
-export function updateServices({ home, dir, platform, found, runner, log = () => {} }) {
+export function updateServices({ home, dir, platform, found, runner, log = () => {}, requireServices = true }) {
   const collector = [], sync = [];
   const syncEntry = join(dir, 'app/bin/tokenrank.js');
   const syncPackage = JSON.parse(readFileSync(join(dir, 'app/package.json'), 'utf8'));
@@ -116,7 +116,7 @@ export function updateServices({ home, dir, platform, found, runner, log = () =>
       });
     }
   } else throw new Error('更新命令支持 macOS、Windows 和使用 systemd 的 Linux');
-  if (!collector.length || !sync.length) throw new Error('未找到可验证的采集和同步后台。请先完成小程序一键接入；自定义后台需先按其启动方式升级');
+  if (requireServices && (!collector.length || !sync.length)) throw new Error('未找到可验证的采集和同步后台。请先完成小程序一键接入；自定义后台需先按其启动方式升级');
   return { collector, sync, found };
 }
 

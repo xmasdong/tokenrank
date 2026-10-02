@@ -41,12 +41,12 @@ function fixture(t, version = '1.8.0') {
       if (args.includes('install')) {
         actions.push('download'); if (flags.download) throw new Error('download failed');
         assert.equal(args.at(-1), FIXED_SOURCE); assert.ok(args.includes('--ignore-scripts')); assert.ok(args.includes('--install-strategy=nested'));
-        pkg(join(args[args.indexOf('--prefix') + 1], 'node_modules/token-watcher'), '1.8.2'); return '';
+        pkg(join(args[args.indexOf('--prefix') + 1], 'node_modules/token-watcher'), '1.8.3'); return '';
       }
       if (args.some(arg => arg.endsWith('/rebuild-worker.js'))) {
         actions.push('scan'); assert.equal(acquireLock(dir, 'sync'), null);
         if (flags.scan) throw new Error('scan failed');
-        assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).version, version === '1.9.0' ? '1.9.0' : '1.8.2');
+        assert.equal(JSON.parse(readFileSync(join(root, 'package.json'))).version, version === '1.9.0' ? '1.9.0' : '1.8.3');
         const source = new DatabaseSync(args.at(-1)); source.exec('UPDATE events SET total_tokens=100'); source.close(); return '';
       }
       return '';
@@ -66,11 +66,12 @@ function fixture(t, version = '1.8.0') {
 }
 
 test('latest resolver uses released fixes; older npm latest uses immutable merged official commit; failures do not silently downgrade', async () => {
-  assert.equal((await resolveUpdate(async () => Response.json({ name: 'token-watcher', version: '1.8.1' }))).spec, FIXED_SOURCE);
-  for (const version of ['1.8.2', '1.10.0', '2.0.0'])
+  for (const version of ['1.8.1', '1.8.2'])
+    assert.equal((await resolveUpdate(async () => Response.json({ name: 'token-watcher', version }))).spec, FIXED_SOURCE);
+  for (const version of ['1.8.3', '1.10.0', '2.0.0'])
     assert.equal((await resolveUpdate(async () => Response.json({ name: 'token-watcher', version }))).spec, `token-watcher@${version}`);
   await assert.rejects(resolveUpdate(async () => new Response('', { status: 503 })), /503/);
-  await assert.rejects(resolveUpdate(async () => Response.json({ name: 'other', version: '1.8.2' })), /无效/);
+  await assert.rejects(resolveUpdate(async () => Response.json({ name: 'other', version: '1.8.3' })), /无效/);
 });
 
 test('explicit update backs up old totals, upgrades and restarts, uploads reduced historical totals with same account/device', async t => {
@@ -78,12 +79,12 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   const menuBar = join(f.root, 'bin/token-watcher.app/Contents'); mkdirSync(menuBar, { recursive: true });
   writeFileSync(join(menuBar, 'original-binary'), 'preserve-existing-menu-bar');
   const result = await updateAndResync(f.options);
-  assert.equal(result.version, '1.8.2'); assert.equal(result.accepted, 1);
+  assert.equal(result.version, '1.8.3'); assert.equal(result.accepted, 1);
   assert.deepEqual(f.actions, ['download', 'stop-sync', 'stop-core', 'assert-stopped', 'scan', 'start-core', 'upload', 'start-sync']);
   assert.equal(f.bodies[0].full, true); assert.equal(f.bodies[0].complete, true);
   assert.equal(f.bodies[0].days[0].tokens, 100); assert.equal(f.bodies[0].device_id, 'same-device');
   const c = readConfig(f.dir); assert.equal(c.token, 'a'.repeat(32)); assert.equal(c.last_update.status, 'complete');
-  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.10');
+  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.11');
   assert.equal(readFileSync(join(c.last_update.adapter_backup,'bin/tokenrank.js'),'utf8'),'// previous sync');
   const backup = new DatabaseSync(c.last_update.backup, { readOnly: true });
   assert.equal(backup.prepare('SELECT SUM(total_tokens) t FROM events').get().t, 200); backup.close();
@@ -93,6 +94,48 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   f.actions.length = 0;
   await updateAndResync(f.options); assert.equal(f.actions.includes('download'), false); assert.equal(f.bodies.length, 2);
   assert.equal(f.bodies[1].days[0].tokens, 100);
+});
+
+test('install checks upgrade a statistically valid 1.8.2 collector to the reliability release', async t => {
+  const f = fixture(t, '1.8.2');
+  const result = await updateAndResync({ ...f.options, onlyIfOutdated: true });
+  assert.equal(result.version, '1.8.3');
+  assert.equal(f.actions.includes('download'), true);
+  assert.equal(f.bodies.length, 1);
+  assert.equal(readConfig(f.dir).last_update.status, 'complete');
+});
+
+test('install checks query latest every time, skip current/newer versions, and notice future releases', async t => {
+  const f = fixture(t, '1.8.3');
+  let queries = 0, latest = '1.8.3';
+  const options = { ...f.options, onlyIfOutdated: true,
+    fetcher: async () => { queries++; return Response.json({ name: 'token-watcher', version: latest }); } };
+  assert.equal((await updateAndResync(options)).skipped, 'up-to-date');
+  pkg(f.root, '1.9.0');
+  assert.equal((await updateAndResync(options)).version, '1.9.0');
+  assert.deepEqual(f.actions, []);
+  // Prove a later stable release reaches the download step without modifying the fixture package.
+  latest = '1.10.0'; f.flags.download = true;
+  await assert.rejects(updateAndResync(options), /download failed/);
+  assert.equal(queries, 3);
+  assert.deepEqual(f.actions, ['download']);
+});
+
+test('latest lookup failure never claims current or changes services/data', async t => {
+  const f = fixture(t, '1.8.3'), before = readFileSync(f.dbPath);
+  await assert.rejects(updateAndResync({ ...f.options, onlyIfOutdated: true,
+    fetcher: async () => new Response('', { status: 503 }) }), /503/);
+  assert.deepEqual(f.actions, []); assert.deepEqual(readFileSync(f.dbPath), before);
+  assert.ok(f.logs.every(line => !line.includes('无需重复')));
+});
+
+test('rerunning install retries an interrupted rebuild even after the collector package was upgraded', async t => {
+  const f = fixture(t); f.flags.scan = true;
+  await assert.rejects(updateAndResync({ ...f.options, onlyIfOutdated: true }), /scan failed/);
+  f.flags.scan = false; f.actions.length = 0;
+  const result = await updateAndResync({ ...f.options, onlyIfOutdated: true });
+  assert.equal(result.version, '1.8.3'); assert.equal(f.actions.includes('download'), false);
+  assert.equal(f.actions.includes('scan'), true); assert.equal(f.bodies.length, 1);
 });
 
 test('download failure leaves services, source and package untouched', async t => {
@@ -205,7 +248,7 @@ function macServicesFixture(f, configs, activeLabels) {
 }
 
 test('reported token-stats source launch is chosen over a cached npm install; legacy label and default serve work', t => {
-  const f = fixture(t), root = join(f.home, 'Vibing/token-stats'), entry = pkg(root, '1.8.2');
+  const f = fixture(t), root = join(f.home, 'Vibing/token-stats'), entry = pkg(root, '1.8.3');
   mkdirSync(join(root, '.git'));
   const manifest = JSON.parse(readFileSync(join(root, 'package.json')));
   manifest.bin = { tokenwatcher: 'bin/tokenwatcher.js', tokenmeter: 'bin/tokenwatcher.js' };
@@ -213,7 +256,7 @@ test('reported token-stats source launch is chosen over a cached npm install; le
   for (const suffix of [['serve'], [], ['--port', '9001', '--no-open']]) {
     const m = macServicesFixture(f, { 'com.tokenmeter.server': { ProgramArguments: ['/usr/local/bin/node', '--no-warnings', entry, ...suffix] } }, ['com.tokenmeter.server']);
     const plan = updateServices(m.options);
-    assert.equal(plan.found.version, '1.8.2'); assert.equal(plan.collector[0].name, 'com.tokenmeter.server');
+    assert.equal(plan.found.version, '1.8.3'); assert.equal(plan.collector[0].name, 'com.tokenmeter.server');
     const before = readFileSync(join(f.home, 'Library/LaunchAgents/com.tokenmeter.server.plist'));
     plan.collector[0].stop(); plan.collector[0].start(); assert.equal(plan.collector[0].check(), true);
     assert.deepEqual(readFileSync(join(f.home, 'Library/LaunchAgents/com.tokenmeter.server.plist')), before);
@@ -244,7 +287,7 @@ test('macOS permission failures are not mistaken for an unloaded legacy service;
 });
 
 test('already fixed source checkout rescans without replacing source; outdated source remains untouched', async t => {
-  const f = fixture(t, '1.8.2'); mkdirSync(join(f.root, '.git'));
+  const f = fixture(t, '1.8.3'); mkdirSync(join(f.root, '.git'));
   await updateAndResync(f.options); assert.equal(f.actions.includes('download'), false); assert.equal(f.bodies.length, 1);
   f.actions.length = 0; pkg(f.root, '1.8.0');
   await assert.rejects(updateAndResync(f.options), /按原方式升级/);
@@ -252,7 +295,7 @@ test('already fixed source checkout rescans without replacing source; outdated s
 });
 
 test('maintenance rescans and remembers the active source checkout, leaving an older cached install untouched', async t => {
-  const f = fixture(t), root = join(f.home, 'Vibing/token-stats'), entry = pkg(root, '1.8.2');
+  const f = fixture(t), root = join(f.home, 'Vibing/token-stats'), entry = pkg(root, '1.8.3');
   mkdirSync(join(root, '.git'));
   const m = macServicesFixture(f, { 'com.tokenmeter.server': {
     ProgramArguments: ['/usr/local/bin/node', '--no-warnings', entry, 'serve'],
@@ -268,7 +311,7 @@ test('maintenance rescans and remembers the active source checkout, leaving an o
       return f.options.runner(command, args);
     },
   });
-  assert.equal(result.version, '1.8.2'); assert.equal(f.bodies[0].days[0].tokens, 100);
+  assert.equal(result.version, '1.8.3'); assert.equal(f.bodies[0].days[0].tokens, 100);
   const config = readConfig(f.dir);
   assert.equal(config.upstream_entry, realpathSync(entry)); assert.equal(config.last_update.package_backup, null);
   assert.equal(JSON.parse(readFileSync(join(f.root, 'package.json'))).version, '1.8.0');
@@ -276,7 +319,7 @@ test('maintenance rescans and remembers the active source checkout, leaving an o
 });
 
 test('two loaded collectors are refused before any service or database mutation', t => {
-  const f = fixture(t), other = pkg(join(f.home, 'other-original'), '1.8.2');
+  const f = fixture(t), other = pkg(join(f.home, 'other-original'), '1.8.3');
   const m = macServicesFixture(f, {
     'com.tokenwatcher.server': { ProgramArguments: ['node', f.entry, 'serve'] },
     'com.tokenmeter.server': { ProgramArguments: ['node', other, 'serve'] },

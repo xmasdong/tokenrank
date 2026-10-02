@@ -46,7 +46,7 @@ tokenrank rank push --full --dry-run
                                         微信小程序（miniprogram）
 ```
 
-读日志、识别 13 种 AI 编程工具的工作由 [luwill/token-watcher](https://github.com/luwill/token-watcher)（MIT）完成，这个项目不改它的代码，也不写它的数据库。安装脚本在本机没有 token-watcher 时会装官方最新稳定版，已有版本低于 1.8.2（旧版会重复统计 Codex 和 DSH）时先升级并重新计算。
+读日志、识别 13 种 AI 编程工具的工作由 [luwill/token-watcher](https://github.com/luwill/token-watcher)（MIT）完成，这个项目不改它的代码，也不写它的数据库。安装和更新脚本都会查询官方最新稳定版（最低 1.8.3，包含采集卡住后的自恢复）。本机缺失时安装，有新版本时升级并重新计算，不降级较新版本。低于 1.8.2 的版本会重复统计 Codex 和 DSH，升级前暂停上传；1.8.2 的统计数据仍可正常上报。
 
 总用量用 token-watcher 的 `total_tokens`，含缓存，按北京时间自然日统计。这是各人电脑自报的数字，只能当交流参考，不等于厂商账单。
 
@@ -54,7 +54,7 @@ tokenrank rank push --full --dry-run
 
 | 目录 | 内容 |
 |---|---|
-| `client/sync` | 电脑端同步器（当前 0.2.10）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
+| `client/sync` | 电脑端同步器（当前 0.2.11）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
 | `client/bin/tokenrank.js` | 同步器命令行入口 |
 | `server` | Cloudflare Worker、D1 表结构与迁移、安装和更新脚本 |
 | `miniprogram` | 原生微信小程序 |

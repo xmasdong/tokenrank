@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { readConfig, writeConfig, SYNC_DIR, normalizeUrl, normalizeToken, rejectSharedDirectory } from './config.js';
 import { readDays } from './source.js';
-import { inspectUpstream, collectorOutdated, UPSTREAM_VERSION } from './upstream.js';
+import { inspectUpstream, collectorOutdated, MIN_REPORT_VERSION } from './upstream.js';
 const CLIENT_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),'utf8')).version;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 export const MAX_DAYS = 400;
@@ -39,7 +39,7 @@ export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryR
   const metadata = { client_version: CLIENT_VERSION, collector_version: inspectUpstream(config.upstream_entry)?.version || null };
   if (!dryRun && collectorOutdated(metadata.collector_version)) {
     // Pre-fix collectors double count Codex/DSH usage; never publish those totals.
-    const message = `统计内核 token-watcher ${metadata.collector_version} 低于 ${UPSTREAM_VERSION}，会重复计算用量；请运行小程序「说明」页的更新命令`;
+    const message = `统计内核 token-watcher ${metadata.collector_version} 低于 ${MIN_REPORT_VERSION}，会重复计算用量；请运行小程序「说明」页的更新命令`;
     writeConfig({ ...readConfig(dir), last_error: message }, dir);
     log(message);
     return { skipped: 'collector-outdated', error: message };

@@ -26,30 +26,38 @@ export function backupSource(dbPath, destination) {
 /** Explicit user-triggered upgrade, upstream rescan and full replacement upload. */
 export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platform = process.platform, path,
   runner = run, fetcher = fetch, upload = sync, services = updateServices, stopped = assertCollectorStopped,
-  sleep = wait, log = console.log } = {}) {
+  sleep = wait, log = console.log, onlyIfOutdated = false } = {}) {
   if (process.env.TOKENRANK_OFFLINE === '1' || process.env.TOKENMETER_OFFLINE === '1') throw new Error('当前为离线模式，未执行更新或回传');
   const config = readConfig(dir);
   if (!config.server || !config.token || !config.device_id) throw new Error('尚未绑定小程序，请先执行小程序里的接入命令');
   normalizeUrl(config.server); normalizeToken(config.token);
-  const dbPath = rejectSharedDirectory(config.db_path, dir);
-  if (dbPath !== realpathSync(join(home, '.tokenmeter/tokenmeter.db'))) throw new Error('自定义统计库需按原采集服务的配置升级；本命令未修改数据');
-  readDays(dbPath);
   const releaseUpdate = acquireLock(dir, 'update');
   if (!releaseUpdate) throw new Error('已有更新正在进行，请等待该命令完成');
   let releaseSync, stage, adapter, work, coreStopped = false, syncStopped = false, scanStarted = false, scanned = false, plan, completionMessage;
   try {
     let found = findUpstream({ home, platform, path, preferred: config.upstream_entry, runner });
     if (!found) throw new Error('未找到已安装的原版 token-watcher，请先完成接入');
-    plan = services({ home, dir, platform, found, runner, log });
+    plan = services({ home, dir, platform, found, runner, log, requireServices: !onlyIfOutdated });
     found = plan.found || found;
+    log('检查 token-watcher 官方最新稳定版…');
     const target = await resolveUpdate(fetcher);
     if (compareVersions(found.version, target.version) > 0) { target.version = found.version; target.spec = null; target.source = '本机较新版本'; }
     const needsUpdate = compareVersions(found.version, target.version) < 0;
+    // A failed previous rebuild must be retried even if the package was already upgraded.
+    const incompleteUpdate = config.last_update && config.last_update.status !== 'complete';
+    if (onlyIfOutdated && !needsUpdate && !incompleteUpdate) {
+      log(`统计内核 ${found.version} 已达到最新稳定版要求，无需重复升级或重算。`);
+      return { skipped: 'up-to-date', version: found.version };
+    }
+    if (!plan.collector.length || !plan.sync.length) throw new Error('未找到可验证的采集和同步后台。请先完成小程序一键接入；自定义后台需先按其启动方式升级');
+    const dbPath = rejectSharedDirectory(config.db_path, dir);
+    if (dbPath !== realpathSync(join(home, '.tokenmeter/tokenmeter.db'))) throw new Error('自定义统计库需按原采集服务的配置升级；本命令未修改数据');
+    readDays(dbPath);
     if (needsUpdate && (existsSync(join(found.root, '.git')) || /[\\/]Cellar[\\/]/.test(found.root)))
       throw new Error(`实际采集服务使用 ${found.version}，由源码或 Homebrew 管理。请先按原方式升级至 ${target.version}，再运行本命令重算回传；未覆盖该安装`);
     adapter = stageAdapter(dir);
     log(`统计内核：${found.version} → ${target.version}（${target.source}）`);
-    if (target.source.startsWith('GitHub')) log(`npm 尚未发布去重修复，使用上游已合并的 ${FIXED_VERSION} 固定源码。`);
+    if (target.source.startsWith('GitHub')) log(`npm 返回的版本低于 ${FIXED_VERSION}，使用上游已合并的固定源码。`);
     let replacement;
     if (needsUpdate) {
       accessSync(dirname(found.root), constants.W_OK);

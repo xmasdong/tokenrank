@@ -5,9 +5,11 @@ import { execFileSync } from 'node:child_process';
 import { readConfig, writeConfig, SYNC_DIR, rejectSharedDirectory } from './config.js';
 import { readDays } from './source.js';
 
-// Minimum original release with the Codex replay and DSH duplicate fixes.
-export const UPSTREAM_VERSION = '1.8.2';
-export const FIXED_COMMIT = 'c5a84fcc4a3ea63fb46a44a860b164999b9f7748';
+// Install/update floor includes upstream's stalled-collector watchdog.
+export const UPSTREAM_VERSION = '1.8.3';
+// Valid statistics do not require the later reliability-only release.
+export const MIN_REPORT_VERSION = '1.8.2';
+export const FIXED_COMMIT = '7ed6f51aa64a80055169a82f91d569b2b0c200bf';
 export const FIXED_SOURCE = `https://codeload.github.com/luwill/token-watcher/tar.gz/${FIXED_COMMIT}`;
 export const REGISTRY = process.env.TOKENRANK_REGISTRY || 'https://registry.npmjs.org/';
 const OWNER = 'tokenrank-upstream-bootstrap-v1';
@@ -26,7 +28,7 @@ export function compareVersions(a, b) {
   return 0;
 }
 /** Versions without the duplicate-count fixes; unknown versions are left to the caller. */
-export const collectorOutdated = version => !!parts(version) && compareVersions(version, UPSTREAM_VERSION) < 0;
+export const collectorOutdated = version => !!parts(version) && compareVersions(version, MIN_REPORT_VERSION) < 0;
 
 /** Latest official stable release, never older than the fixed release. */
 export async function resolveUpdate(fetcher = fetch) {
@@ -129,8 +131,8 @@ export async function prepareUpstream({ home = homedir(), platform = process.pla
     found = inspectUpstream(join(prefix, 'node_modules/token-watcher/bin/tokenwatcher.js'));
     if (!found || found.version !== target.version) throw new Error('原版安装未完成或版本不符合预期；尚未配置同步');
   } else if (collectorOutdated(found.version)) {
-    log(`已检测到 token-watcher ${found.version}，低于修复重复统计的 ${UPSTREAM_VERSION}；接入后会自动升级并重新计算，升级前不上传用量。`);
-  } else log(`已检测到 token-watcher ${found.version}，已包含去重修复，直接复用。`);
+    log(`已检测到 token-watcher ${found.version}，低于修复重复统计的 ${MIN_REPORT_VERSION}；接入后会自动升级并重新计算，升级前不上传用量。`);
+  } else log(`已检测到 token-watcher ${found.version}，保留现有安装位置；接入后检查官方最新稳定版。`);
   const managed = state?.owner === OWNER && same(found.entry, join(prefix, 'node_modules/token-watcher/bin/tokenwatcher.js'));
   if (!existsSync(db) || (managed && !state.scanned)) {
     if (!same(db, defaultDB)) throw new Error('自定义统计库不存在，请先确认原版采集器的数据路径');

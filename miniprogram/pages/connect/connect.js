@@ -6,14 +6,14 @@ const PRIVACY_ACK = 'privacy_notice_ack_v2';
 function buildCommand(os, origin, token) {
   if (!origin || !token) return '';
   return os === 'win'
-    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.10/install.ps1"))) "${origin}" "${token}"`
-    : `curl -fsSL ${origin}/releases/0.2.10/install.sh | sh -s -- ${origin} ${token}`;
+    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.11/install.ps1"))) "${origin}" "${token}"`
+    : `curl -fsSL ${origin}/releases/0.2.11/install.sh | sh -s -- ${origin} ${token}`;
 }
 function buildAiPrompt(command, os) {
   if (!command) return '';
   return `请帮我在这台${os === 'win' ? 'Windows' : 'macOS'}电脑上接入「Token 群排名」。
 1. 检查 Node.js 版本，需要 22.13 或更高版本；如未安装，请协助安装。
-2. 接入脚本会检查原版 token-watcher：缺失时安装官方最新稳定版到用户目录；已有版本低于 1.8.2（旧版会重复统计）时先升级并重新计算，再开始上传。不要另行全局重装原版。
+2. 接入脚本会检查原版 token-watcher：缺失时安装官方最新稳定版到用户目录；已有版本也检查最新稳定版（最低 1.8.3），有更新时升级重算并回传，不降级。低于 1.8.2 时暂停上传。不要另行全局重装原版。
 原版开源仓库：${upstream.info.links[0].url}
 原版功能与使用说明：${upstream.info.links[1].url}
 3. 运行以下个人接入命令（其中含凭证，请勿公开转发）：

@@ -6,7 +6,7 @@ import { readDays, readLegacySettings } from '../sync/source.js';
 import { sync } from '../sync/report.js';
 import { acquireLock } from '../sync/lock.js';
 import { installAgent, uninstallAgent, migrateLegacyAgent } from '../sync/agent.js';
-import { prepareUpstream, startPreparedUpstream, inspectUpstream, collectorOutdated } from '../sync/upstream.js';
+import { prepareUpstream, startPreparedUpstream } from '../sync/upstream.js';
 import { updateAndResync } from '../sync/update.js';
 import { pruneDaily } from '../sync/cleanup.js';
 import { startWatch } from '../sync/watch.js';
@@ -31,14 +31,14 @@ const help = `TokenRank 独立同步器 v${version}
   prepare-upstream                      检测原版，缺失时安装并完成首次采集
   start-upstream                        为本脚本新安装的原版配置独立采集后台
   update-and-resync                     更新内核和同步器、备份重建、完整替换本账号云端统计
-  update-if-outdated                    仅当原版低于去重修复版本时执行 update-and-resync
+  update-if-outdated                    检查官方最新稳定版，有更新时升级重算并回传
   migrate-config [--db 路径]             只读导入旧版 TokenRank 接入配置
   install-agent [--dry-run]              安装独立后台同步服务
   uninstall-agent                       停止独立后台服务
   watch                                 前台持续同步（原版采集器须独立运行）
   uninstall [--purge-data]               断开并移除自己的自启；可清除自己的配置
 
-安装脚本会复用已有原版；缺失时安装官方最新稳定版，低于去重修复版本时先升级重算再上传。
+安装脚本检查官方最新稳定版；缺失时安装，有更新时升级重算并回传，不降级本机较新版本。
 日常同步只读原库；不会自动升级或卸载原版，也不改写原版程序。
 `;
 
@@ -55,10 +55,7 @@ async function main() {
   if (cmd === 'prepare-upstream') { await prepareUpstream({ log }); }
   else if (cmd === 'start-upstream') { startPreparedUpstream({ log }); }
   else if (cmd === 'update-if-outdated') {
-    // Install flow: an existing pre-fix original is upgraded and rebuilt before any usage is published.
-    const current = inspectUpstream(readConfig().upstream_entry);
-    if (!current || !collectorOutdated(current.version)) { log(`统计内核 ${current?.version || '未知'} 无需升级。`); return; }
-    await updateAndResync({ log });
+    await updateAndResync({ log, onlyIfOutdated: true });
   }
   else if (cmd === 'update-and-resync') {
     if (options['dry-run']) throw new Error('update-and-resync 不支持 --dry-run；预览上报请使用 rank push --full --dry-run');

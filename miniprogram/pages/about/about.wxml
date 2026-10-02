@@ -5,7 +5,7 @@
   <view class="sec connect-first"><view class="sec-title display">接入电脑</view>
     <view class="p">在电脑终端运行你的接入命令。</view>
     <button class="btn btn-ink" bindtap="goConnect">获取接入命令</button>
-    <view class="note">需要 Node.js 22.13+。脚本会安装 token-watcher，已有版本低于 1.8.2 时先升级并重新计算。</view>
+    <view class="note">需要 Node.js 22.13+。脚本会检查 token-watcher 最新稳定版，缺失时安装，有更新时升级并重新计算。</view>
   </view>
   <view class="sec"><view class="sec-title display">更新统计</view>
     <view class="p">用量明显不对、很久没同步，或提示版本过低时运行。不需要接入码。</view>
