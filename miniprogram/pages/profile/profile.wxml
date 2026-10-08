@@ -10,6 +10,7 @@
       <view class="hero-number num-font">{{usage.value}}<text class="hero-unit">{{usage.unit}}</text></view>
       <view class="exact num-font">{{usage.exact}} tokens</view>
       <view class="range">{{usage.range}} · {{usage.timezoneLabel}}<text wx:if="{{usage.syncText}}"> · 同步于 {{usage.syncText}}</text></view>
+      <view class="note" wx:if="{{usage.costDisplay.available}}">API 等值估算 <text class="num-font">${{usage.costDisplay.amount}}</text> USD<text wx:if="{{usage.costDisplay.note}}"> · {{usage.costDisplay.note}}</text></view>
       <button class="btn btn-ink share-button" wx:if="{{usage.has_history}}" bindtap="goShare">生成分享卡片</button>
       <view class="metrics"><view class="metric"><view class="metric-value num-font">{{usage.requestsText}}</view><view class="metric-label">调用次数</view></view><view wx:if="{{period !== 'day'}}" class="metric metric-secondary"><view class="metric-value num-font">{{usage.summary.active_days}}<text class="metric-unit"> 天</text></view><view class="metric-label">活跃天数</view></view></view>
       <view wx:if="{{!usage.has_history && !hasReported}}" class="first-report"><view>还没有接入电脑。</view><button class="btn btn-seal" bindtap="goConnect">接入电脑</button></view>

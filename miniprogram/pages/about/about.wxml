@@ -28,15 +28,16 @@
   </view>
   <view class="sec"><view class="sec-title display">统计口径</view>
     <view class="p">总用量取 token-watcher 的 total_tokens，含缓存；输入、输出、缓存读写分开显示。按北京时间自然日统计。不等于厂商账单。</view>
-    <view class="p">每天保留用量前 8 的工具和模型，其余计入未分类。重新同步会覆盖同一天的旧值。一个账号只显示最近接入的一台电脑，多台不相加。</view>
+    <view class="p">Token 明细每天保留用量前 8 的工具和模型，其余计入未分类。重新同步会覆盖同一天的旧值。一个账号只显示最近接入的一台电脑，多台不相加。</view>
   </view>
+  <view class="sec"><view class="sec-title display">金额估算</view><view class="p">金额沿用电脑上 token-watcher 的价格表和汇率，按输入、输出及缓存读写折算为 USD，属于 API 等值估算，不是实际扣费。没有价格的模型不计入金额，并单独标注。</view><view class="p">旧用户运行一次更新命令后，历史金额会自动同步。账单分享固定生成时的金额和模型明细，之后价格变化不会改动已发出的账单。</view></view>
   <view class="sec"><view class="sec-title display">开源</view>
     <view class="p">小程序、服务端和电脑端同步器的代码全部开源（MIT），可以自己核对上传了什么。</view>
     <view class="cmd" data-cmd="https://github.com/xmasdong/tokenrank" bindtap="copyCmd">github.com/xmasdong/tokenrank</view>
   </view>
   <view class="sec"><view class="sec-title display">上传什么</view>
     <view class="p">不想被排名，可以在「我的」里关掉，关掉后用量只有自己能看到。只想在某个群里不显示，就在那个群的榜单页关掉“在本群显示我的排名”。</view>
-    <view class="p">读取：统计库里的日期、计数、工具名和模型名。上传：按天汇总的数字和随机设备 ID，不含代码、对话、项目名或路径。</view>
+    <view class="p">读取：统计库里的日期、计数、工具名和模型名。上传：按天汇总的用量、估算金额及随机设备 ID，不含代码、对话、项目名或路径。</view>
     <view class="p">写入：~/.tokenrank 下的配置、进度和日志。后台服务 macOS 为 com.tokenrank.sync，Windows 为 TokenRankSync。</view>
     <view class="p">统计库结构不兼容时停止同步，不改动数据库。</view>
   </view>

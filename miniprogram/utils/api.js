@@ -334,7 +334,7 @@ module.exports = {
   peekRankings: period => peek(rankingsPath(period)),
   peekGroup: id => peek(groupPath(id)),
   peekLeaderboard: query => peek(boardPath(query)),
-  createShare: period => request('/api/shares', { method: 'POST', data: { period } }),
+  createShare: (period, style = 'usage') => request('/api/shares', { method: 'POST', data: { period, style } }),
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
   revokeShare: id => request('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
 

@@ -7,7 +7,7 @@ export async function readShare(env, id) {
     .bind(id, Date.now()).first();
   return row ? { id: row.id, ...JSON.parse(row.snapshot_json), created_at: row.created_at, expires_at: row.expires_at } : null;
 }
-export async function createShare(env, user, usage) {
+export async function createShare(env, user, usage, style = 'usage') {
   // Whitelist only what the card displays. No private daily history, IDs or credentials.
   const snapshot = {
     user: { nickname: user.nickname || `AI玩家-${String(user.user_id).slice(-4).padStart(4,'0')}`, avatar_url: user.avatar_url || null },
@@ -15,6 +15,15 @@ export async function createShare(env, user, usage) {
       summary: { tokens: usage.summary.tokens, requests: usage.summary.requests, active_days: usage.summary.active_days },
       tools: usage.tools.filter(t => !t.unclassified).slice(0, 1), activity: usage.activity, standing: usage.standing },
   };
+  if (style === 'receipt') {
+    snapshot.style = 'receipt';
+    for (const key of ['input_tokens','output_tokens','cache_read','cache_write']) snapshot.usage.summary[key] = usage.summary[key];
+    const cost = usage.cost;
+    snapshot.usage.cost = { basis: cost.basis, currency: cost.currency, status: cost.status, usd_micros: cost.usd_micros,
+      models: cost.models.slice(0, 5), other_usd_micros: cost.models.slice(5).reduce((s,m) => s + m.usd_micros, 0),
+      other_model_count: Math.max(0, cost.models.length - 5), model_count: new Set([...cost.models.map(m=>m.name), ...cost.unpriced_models]).size,
+      unpriced_count: cost.unpriced_models.length, missing_days: cost.missing_days };
+  }
   const json = JSON.stringify(snapshot);
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(json));
   const fingerprint = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2,'0')).join('');

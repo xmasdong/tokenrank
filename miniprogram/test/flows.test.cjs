@@ -673,7 +673,7 @@ test('我的用量切换周期后丢弃旧响应，今日零数据保留历史�
 
 function canvasWx(exports) {
   const ctx = { measureText: str => ({ width: [...str].length * 12 }),
-    save() {}, restore() {}, arc() {}, clip() {}, fill() {}, fillRect() {}, strokeRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fillText() {}, drawImage() {} };
+    save() {}, restore() {}, closePath() {}, setLineDash() {}, arc() {}, clip() {}, fill() {}, fillRect() {}, strokeRect() {}, beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fillText() {}, drawImage() {} };
   const node = { width: 0, height: 0, getContext: () => ctx };
   const query = { in() { return this; }, select() { return this; }, fields() { return this; }, exec(fn) { fn([{ node }]); } };
   return { createSelectorQuery: () => query, canvasToTempFilePath: options => exports.push({ options, height: node.height }) };
@@ -686,13 +686,13 @@ test('个人海报顺序导出竖图和5:4封面，转发不包含身份或接�
   p.onLoad({ period: 'week' }); await p.onShow();
   assert.equal(exports.length, 0);
   const build = p.onReady(); await flush();
-  assert.equal(exports[0].height, 1400); assert.equal(exports.length, 1);
+  assert.equal(exports[0].height, 1940); assert.equal(exports.length, 1);
   exports[0].options.success({ tempFilePath: 'poster.png' }); await flush();
   assert.equal(exports[1].height, 800);
   exports[1].options.success({ tempFilePath: 'cover.png' }); await build;
   assert.equal(p.data.posterPath, 'poster.png'); assert.equal(p.data.coverPath, 'cover.png');
   assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + 'a'.repeat(24));
-  assert.match(p.onShareAppMessage().title, /近7天/);
+  assert.match(p.onShareAppMessage().title, /API 等值估算/);
   assert.equal(p.onShareAppMessage().imageUrl, 'cover.png');
   assert.equal(shareOptions.withShareTicket, true);
 });
@@ -856,7 +856,7 @@ test('个人卡片指向作者记录，小程序码加载不携带作者或主�
   const {p}=page('share',{createShare:async()=>({id:'b'.repeat(24),user:{nickname:'原昵称'},usage:snapshot}),
     loadCodeImage:async(...args)=>{codes.push(args);return {};}
   },canvasWx(exports));
-  p.onLoad({});await p.onShow();const build=p.onReady();await flush();
+  p.onLoad({});p.setData({style:'usage'});await p.onShow();const build=p.onReady();await flush();
   exports[0].options.success({tempFilePath:'usage.png'});await flush();
   exports[1].options.success({tempFilePath:'usage-cover.png'});await build;
   const shared=p.onShareAppMessage();

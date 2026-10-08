@@ -38,6 +38,7 @@ test('上次更新未完成时不删除任何备份；后台清理每天最多�
   const { dir, make } = fixture(t);
   writeConfig({ last_update: { status: 'rescanning' } }, dir);
   make('backups/update-1/tokenmeter.db', 30 * 86400000, now);
+  const old = (now - 30 * 86400000) / 1000; utimesSync(join(dir, 'backups/update-1'), old, old);
   assert.equal(pruneBackups({ dir, now }).skipped, 'update-incomplete'); assert.equal(existsSync(join(dir, 'backups/update-1')), true);
   writeConfig({ ...readConfig(dir), last_update: { status: 'complete' } }, dir);
   assert.equal(pruneDaily({ dir, now }).removed.length, 1);

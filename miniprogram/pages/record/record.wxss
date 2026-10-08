@@ -4,3 +4,5 @@
 
 .bottom-action{position:fixed;left:0;right:0;bottom:0;z-index:10;padding:20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));background:var(--paper);border-top:1rpx solid var(--hairline)}.bottom-action .btn{width:100%;margin:0}
 .group-invite{margin-top:36rpx;padding-top:28rpx;border-top:1rpx solid var(--hairline)}.group-title{font-size:30rpx;font-weight:600}.group-invite .btn{width:100%;min-height:48px;box-sizing:border-box;margin:24rpx 0 0;padding:18rpx 24rpx;line-height:1.5}
+
+.receipt{padding:32rpx 0;border-top:2rpx dashed var(--hairline-strong);border-bottom:2rpx dashed var(--hairline-strong)}.receipt-title{font-size:38rpx}.receipt-amount{font-size:76rpx;font-weight:700;margin:32rpx 0 12rpx;overflow-wrap:anywhere}.receipt-row{display:flex;justify-content:space-between;gap:20rpx;padding:18rpx 0;font-size:26rpx}.receipt-row text:first-child{min-width:0;overflow-wrap:anywhere}.receipt-row text:last-child{flex:none}.receipt-heading{margin-top:24rpx;color:var(--ink-fade);border-bottom:1rpx dashed var(--hairline)}

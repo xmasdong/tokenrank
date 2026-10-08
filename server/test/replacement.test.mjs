@@ -16,7 +16,7 @@ function fixture(t) {
   for (const uid of [1,2]) {
     db.prepare('INSERT INTO users(id,openid,nickname,created_at,updated_at) VALUES(?,?,?,?,?)').run(uid,'user-'+uid,'name-'+uid,now,now);
     db.prepare('INSERT INTO connect_tokens(token,user_id,created_at) VALUES(?,?,?)').run(String(uid).repeat(32),uid,now);
-    db.prepare(`INSERT INTO daily_totals VALUES(?,?,?,900,900,0,0,0,1,'[]','[]',?,?)`).run(uid,'same-device','2026-01-01',now-1000,now-1000);
+    db.prepare(`INSERT INTO daily_totals VALUES(?,?,?,900,900,0,0,0,1,'[]','[]',?,?,NULL)`).run(uid,'same-device','2026-01-01',now-1000,now-1000);
     db.prepare('INSERT INTO usage_sync_state VALUES(?,?,?,?)').run(uid,'same-device',now-1000,now-1000);
   }
   function prepare(sql) {
@@ -39,9 +39,21 @@ function fixture(t) {
   return f;
 }
 
+test('regular and atomic replacement uploads retain costs; a later legacy upload invalidates stale costs', async t => {
+  const f=fixture(t), d=day('2026-02-01',100);
+  d.cost={basis:'token_watcher_api_estimate',currency:'USD',usd_micros:1234567,models:[['priced-model',1234567]],unpriced_models:[],unpriced_tokens:0};
+  assert.equal((await f.send(f.body([d]))).status,200);
+  const read=()=>JSON.parse(f.db.prepare('SELECT cost_json FROM daily_totals WHERE user_id=1 AND day=?').get(d.day).cost_json);
+  assert.deepEqual(read(),d.cost);
+  assert.equal((await f.send(f.part(0,1,[d],1,'c'.repeat(32),{source_at:f.now+1}))).status,200);
+  assert.deepEqual(read(),d.cost);
+  assert.equal((await f.send(f.body([day(d.day,101)],{source_at:f.now+2}))).status,200);
+  assert.equal(read(),null);
+});
+
 test('replacement stays invisible until complete; commit removes old days, devices and legacy totals only for this account', async t=>{
   const f=fixture(t), before=f.rows(1), other=f.rows(2);
-  f.db.exec(`INSERT INTO daily_totals SELECT user_id,'old-device',day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at FROM daily_totals WHERE user_id=1;
+  f.db.exec(`INSERT INTO daily_totals SELECT user_id,'old-device',day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json FROM daily_totals WHERE user_id=1;
     INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(1,'2025-01-01',999,1);
     INSERT INTO rank_groups(id,name,owner_user_id,created_at) VALUES('group','保留群',1,1);
     INSERT INTO rank_group_members(group_id,user_id,joined_at) VALUES('group',1,1);`);

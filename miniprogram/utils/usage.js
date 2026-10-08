@@ -1,3 +1,4 @@
+const { presentCost } = require('./cost');
 const PERIODS = [
   { key: 'day', label: '今日' }, { key: 'week', label: '近7天' },
   { key: 'month', label: '近30天' }, { key: 'all', label: '累计' },
@@ -25,7 +26,7 @@ function present(usage) {
   const summary = usage.summary;
   const peak = Math.max(0, ...usage.daily.map(d => d.tokens));
   const detail = items => items.map(item => ({ ...item, exact: integer(item.tokens), formatted: formatTokens(item.tokens) }));
-  return { ...usage, ...usageBasis(usage), ...compact(summary.tokens), exact: integer(summary.tokens),
+  return { ...usage, costDisplay: presentCost(usage.cost), ...usageBasis(usage), ...compact(summary.tokens), exact: integer(summary.tokens),
     periodLabel: PERIODS.find(p => p.key === usage.period)?.label || '今日',
     range: usage.from === usage.to ? usage.to : `${usage.from} — ${usage.to}`,
     requestsText: integer(summary.requests), cacheReadText: formatTokens(summary.cache_read), cacheWriteText: formatTokens(summary.cache_write),

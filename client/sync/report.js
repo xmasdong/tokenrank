@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { readConfig, writeConfig, SYNC_DIR, normalizeUrl, normalizeToken, rejectSharedDirectory } from './config.js';
-import { readDays } from './source.js';
+import { readCostedDays } from './costs.js';
 import { inspectUpstream, collectorOutdated, MIN_REPORT_VERSION } from './upstream.js';
 const CLIENT_VERSION = JSON.parse(readFileSync(new URL('../package.json', import.meta.url),'utf8')).version;
 const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
@@ -58,7 +58,7 @@ export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryR
     }
     // Read every retained day so upstream corrections to old history are detected.
     onProgress({stage:'source',source_day:null});
-    const days = readDays(dbPath, { now });
+    const days = await readCostedDays(dbPath, { entry: config.upstream_entry, now, log });
     const sourceDay=days.at(-1)?.day || null;
     const initializing = config.protocol_version !== 2 || config.initial_sync_pending;
     const unchanged = config.protocol_version === 2 ? config.synced_days || {} : {};

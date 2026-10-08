@@ -1,17 +1,20 @@
 const api = require('../../utils/api');
 const usage = require('../../utils/usage');
 const { drawUsagePoster } = require('../../utils/usage-poster');
+const { drawReceiptPoster, RECEIPT_HEIGHT } = require('../../utils/receipt-poster');
+const { presentCost, receiptTitle } = require('../../utils/cost');
 const { loadCodeImage } = require('../../utils/share-code');
 const { loadAvatarImage } = require('../../utils/share-avatar');
 const { shareTitle } = require('../../utils/share-story');
 Page({
-  data: { period: 'day', theme: 'paper', loading: true, error: '', generating: false,
+  data: { period: 'day', style: 'receipt', theme: 'paper', cost: null, loading: true, error: '', generating: false,
     shareId: '', revoking: false, imageError: '', posterPath: '', coverPath: '', saving: false, periodLabel: '今日', basisLabel: '总用量 · 含缓存', hasHistory: false },
   onLoad(options) {
     wx.hideShareMenu();
     const period = usage.PERIODS.some(p => p.key === options.period) ? options.period : 'day';
     const theme = wx.getStorageSync('usage_card_theme') === 'ink' ? 'ink' : 'paper';
-    this.setData({ period, theme, periodLabel: usage.PERIODS.find(p => p.key === period).label });
+    const style = wx.getStorageSync('usage_card_style') === 'usage' ? 'usage' : 'receipt';
+    this.setData({ period, theme, style, periodLabel: usage.PERIODS.find(p => p.key === period).label });
   },
   onShow() {
     this._visible = true;
@@ -34,14 +37,19 @@ Page({
       const result = await api.myUsage(this.data.period);
       if (requestId !== this._requestId) return;
       if (!result.has_history) { this.setData({ loading: false, hasHistory: false }); return; }
-      const record = await api.createShare(this.data.period);
+      const record = await api.createShare(this.data.period, this.data.style);
       if (requestId !== this._requestId) return;
-      this._snapshot = { user: record.user, usage: record.usage };
-      this.setData({ loading: false, hasHistory: true, shareId: record.id, basisLabel: usage.usageBasis(record.usage).basisLabel });
+      this._snapshot = { user: record.user, usage: record.usage, created_at: record.created_at };
+      this.setData({ loading: false, hasHistory: true, shareId: record.id, cost: presentCost(record.usage.cost), basisLabel: usage.usageBasis(record.usage).basisLabel });
       return this.buildImages();
     } catch (err) {
       if (requestId === this._requestId) this.setData({ loading: false, error: err.message });
     }
+  },
+  switchStyle(e) {
+    const style = e.currentTarget.dataset.style;
+    if (!['usage','receipt'].includes(style) || style === this.data.style) return;
+    wx.setStorageSync('usage_card_style', style); this.setData({ style }); return this.load();
   },
   switchTheme(e) {
     const theme = e.currentTarget.dataset.theme;
@@ -57,7 +65,7 @@ Page({
     if (this._drawing) { this._drawPending = true; return; }
     this._drawing = true;
     const version = this._imageVersion;
-    const snapshot = this._snapshot, theme = this.data.theme;
+    const snapshot = this._snapshot, theme = this.data.theme, style = this.data.style;
     this.setData({ generating: true, imageError: '' });
     try {
       const canvas = await new Promise(resolve => wx.createSelectorQuery().in(this).select('#usageCanvas')
@@ -68,13 +76,13 @@ Page({
       if (version !== this._imageVersion) return;
       const exportImage = (height, cover) => {
         canvas.width = 1000; canvas.height = height;
-        drawUsagePoster(canvas.getContext('2d'), { ...snapshot, theme, cover, codeImage, avatarImage });
+        (style === 'receipt' ? drawReceiptPoster : drawUsagePoster)(canvas.getContext('2d'), { ...snapshot, theme, cover, codeImage, avatarImage });
         return new Promise((resolve, reject) => wx.canvasToTempFilePath({
           canvas, destWidth: 1000, destHeight: height, fileType: 'png',
           success: r => resolve(r.tempFilePath), fail: () => reject(new Error('图片生成失败，请重试')),
         }));
       };
-      const posterPath = await exportImage(1400, false);
+      const posterPath = await exportImage(style === 'receipt' ? RECEIPT_HEIGHT : 1400, false);
       if (version !== this._imageVersion) return;
       const coverPath = await exportImage(800, true);
       if (version === this._imageVersion) {
@@ -128,7 +136,7 @@ Page({
   },
   onShareAppMessage() {
     const snapshot = this._snapshot;
-    return { title: snapshot ? shareTitle(snapshot.user, snapshot.usage) : 'Token 用量统计',
+    return { title: snapshot ? (this.data.style === 'receipt' ? receiptTitle : shareTitle)(snapshot.user, snapshot.usage) : 'Token 用量统计',
       path: this.data.shareId ? '/pages/record/record?id=' + this.data.shareId : '/pages/index/index',
       imageUrl: this.data.coverPath || '/assets/share-cover.png' };
   },

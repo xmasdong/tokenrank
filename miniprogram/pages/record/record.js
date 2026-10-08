@@ -1,6 +1,7 @@
 const api=require('../../utils/api');
 const {story,shareTitle}=require('../../utils/share-story');
 const {integer}=require('../../utils/usage');
+const {presentCost,issuedAt,receiptTitle}=require('../../utils/cost');
 const flow=require('../../utils/flow');
 Page({
   data:{id:'',mode:'achievement',loading:true,error:'',record:null,story:null,exact:'',initial:'记',avatarFailed:false,fromGroup:false},
@@ -21,7 +22,7 @@ Page({
     const requestId=this._requestId=(this._requestId||0)+1;
     this.setData({loading:true,error:'',record:null});
     try{const record=await api.sharedRecord(this.data.id);if(requestId!==this._requestId)return;
-      this.setData({record,initial:[...(record.user.nickname||'记')][0],story:story(record.usage,this.data.mode),exact:integer(record.usage.summary.tokens),loading:false});
+      this.setData({record,cost:presentCost(record.usage.cost),issuedAt:issuedAt(record.created_at),initial:[...(record.user.nickname||'记')][0],story:story(record.usage,this.data.mode),exact:integer(record.usage.summary.tokens),loading:false});
       wx.showShareMenu({menus:['shareAppMessage'],withShareTicket:true});
     }catch(err){if(requestId===this._requestId)this.setData({loading:false,error:err.message});}
   },
@@ -30,7 +31,7 @@ Page({
   goGroup(){wx.navigateTo({url:api.accountState()?'/pages/account/account':'/pages/group/group?enter=1'});},
   onShareAppMessage(){
     const record=this.data.record;
-    return record ? {title:shareTitle(record.user,record.usage),path:'/pages/record/record?id='+this.data.id}
+    return record ? {title:(record.style==='receipt'?receiptTitle:shareTitle)(record.user,record.usage),path:'/pages/record/record?id='+this.data.id}
       : {title:'Token 用量统计',path:'/pages/index/index'};
   },
 });

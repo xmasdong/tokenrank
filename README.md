@@ -54,7 +54,7 @@ tokenrank rank push --full --dry-run
 
 | 目录 | 内容 |
 |---|---|
-| `client/sync` | 电脑端同步器（当前 0.2.11）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
+| `client/sync` | 电脑端同步器（当前 0.2.12）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
 | `client/bin/tokenrank.js` | 同步器命令行入口 |
 | `server` | Cloudflare Worker、D1 表结构与迁移、安装和更新脚本 |
 | `miniprogram` | 原生微信小程序 |
@@ -152,3 +152,11 @@ npx wrangler d1 execute <数据库名> --remote --command "UPDATE users SET disa
 ## 协议
 
 [MIT](LICENSE)
+
+## 金额账单分享
+
+同步器 0.2.12 起复用本机 token-watcher 的 `aggregateCosts`、价格解析和汇率缓存，将每天、每个模型的 API 等值估算以 USD 微元整数上报。计算在离线隔离进程中进行，原版统计库只读，价格文件复制到临时目录后使用，不上传价格文件、汇率缓存、代码或原始会话。云端不能根据旧的前 8 模型 Token 摘要准确补算费用，老用户需要升级一次电脑同步器，历史金额随后自动回填。
+
+“用量账单”海报显示前五个模型金额、其他模型合计、缓存用量、活跃天数及固定小程序码；转发小程序卡片打开同一份作者账单。金额是按本机当前价格与缓存汇率计算的 API 等值估算，非实际扣费。缺少价格或金额未同步会明确标注；原来的 Token 卡片及历史分享不追加公开金额。
+
+生产升级需先执行 `server/migrations/0011_usage_costs.sql`，再部署 Worker 和 0.2.12 分发包，最后上传新版小程序。

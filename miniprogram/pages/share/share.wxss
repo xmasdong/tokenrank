@@ -17,3 +17,5 @@
 .export-canvas { position: fixed; left: -2200px; top: 0; width: 1000px; height: 1400px; pointer-events: none; }
 
 .revoke { background: transparent; font-size: 22rpx; color: var(--ink-fade); margin-top: 20rpx; }.revoke::after { border: none; }
+
+.style-picker { margin-top: 28rpx; }

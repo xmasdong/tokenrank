@@ -5,7 +5,16 @@
   <block wx:else>
     <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">截至 {{record.usage.to}}</view></view></view>
     
-    <view class="total"><view>{{story.label}}用量</view><view class="number num-font">{{story.value}}<text class="number-unit">{{story.unit}}</text></view><view class="exact num-font">{{exact}} tokens</view></view>
+    <view wx:if="{{record.style === 'receipt'}}" class="receipt">
+      <view class="receipt-title display">AI 用量账单</view><view class="muted">{{record.usage.from}} — {{record.usage.to}}</view>
+      <view class="receipt-amount num-font">{{cost.available ? '$' + cost.amount : '—'}}</view>
+      <view class="muted">API 等值估算 · USD · 非实际扣费</view><view wx:if="{{cost.note}}" class="muted">{{cost.note}}</view>
+      <view class="receipt-row receipt-heading"><text>模型</text><text>USD</text></view>
+      <view wx:for="{{cost.models}}" wx:key="name" class="receipt-row"><text>{{item.name}}</text><text class="num-font">${{item.amount}}</text></view>
+      <view class="receipt-row"><text>总用量</text><text class="num-font">{{exact}} tokens</text></view>
+      <view class="muted">生成于 {{issuedAt}} · 北京时间</view>
+    </view>
+    <view wx:else class="total"><view>{{story.label}}用量</view><view class="number num-font">{{story.value}}<text class="number-unit">{{story.unit}}</text></view><view class="exact num-font">{{exact}} tokens</view></view>
     <view class="metrics"><view class="metric"><view class="metric-label">全站排名</view><view class="metric-value">{{story.rankText}}</view><view class="metric-note">{{story.rankNote}}</view></view><view class="metric"><view class="metric-label">{{story.streakLabel}}</view><view class="metric-value">{{story.streakValue}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.streakNote}}</view></view><view class="metric"><view class="metric-label">累计活跃</view><view class="metric-value">{{story.days}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.firstDay ? '自 ' + story.firstDay + ' 起' : '暂无活跃记录'}}</view></view></view>
     <view class="partner"><view class="muted">最常用工具</view><view class="partner-name">{{story.top.name || '暂无工具明细'}}<text class="partner-percent" wx:if="{{story.top}}">{{story.top.percent}}%</text></view></view>
     <view class="note"><view>{{record.usage.from}} — {{record.usage.to}} · {{story.timezoneLabel}}自然日</view><view>{{story.basisLabel}}。数据为分享时的记录。</view></view>

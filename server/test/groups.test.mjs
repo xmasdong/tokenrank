@@ -472,6 +472,24 @@ test('分享摘要由服务端生成，不接受客户端伪造数据，公开�
   assert.equal(f.db.prepare('SELECT COUNT(*) AS n FROM rank_group_members').get().n, 0);
 });
 
+test('账单分享固定金额与前五模型，隐藏其余名称；旧卡片不自动公开金额', async t => {
+  const f=fixture(t);seedUsage(f,1,0,12800);
+  const models=Array.from({length:7},(_,i)=>['model-'+i,700000-i*100000]);
+  const cost={basis:'token_watcher_api_estimate',currency:'USD',usd_micros:2800000,models,unpriced_models:['private-unpriced'],unpriced_tokens:10};
+  f.db.prepare('UPDATE daily_totals SET cost_json=? WHERE user_id=1').run(JSON.stringify(cost));
+  const usage=(await f.request('/api/my/usage?period=day')).data;
+  assert.equal(usage.cost.usd_micros,2800000);assert.equal(usage.cost.status,'partial');
+  const receipt=(await f.request('/api/shares',{period:'day',style:'receipt',cost:{usd_micros:999999999}})).data;
+  assert.equal(receipt.style,'receipt');assert.equal(receipt.usage.cost.usd_micros,2800000);
+  assert.equal(receipt.usage.cost.models.length,5);assert.equal(receipt.usage.cost.other_usd_micros,300000);
+  assert.equal(receipt.usage.cost.model_count,8);assert.equal(receipt.usage.cost.unpriced_count,1);
+  assert.doesNotMatch(JSON.stringify(receipt),/private-unpriced|model-5|model-6|device_id|cost_json/);
+  const legacy=(await f.request('/api/shares',{period:'day'})).data;
+  assert.equal(legacy.usage.cost,undefined);assert.notEqual(legacy.id,receipt.id);
+  f.db.prepare('UPDATE daily_totals SET cost_json=NULL WHERE user_id=1').run();
+  assert.deepEqual((await f.request('/api/shares/'+receipt.id,null,0)).data,receipt);
+});
+
 test('分享去重复用同一摘要；后续同步、改名和榜单变化不改变已分享的记录', async t => {
   const f = fixture(t); seedUsage(f, 1, 0, 200);
   const [a, b] = await Promise.all([f.request('/api/shares', {period:'day'}), f.request('/api/shares', {period:'day'})]);

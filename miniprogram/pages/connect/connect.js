@@ -6,8 +6,8 @@ const PRIVACY_ACK = 'privacy_notice_ack_v2';
 function buildCommand(os, origin, token) {
   if (!origin || !token) return '';
   return os === 'win'
-    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.11/install.ps1"))) "${origin}" "${token}"`
-    : `curl -fsSL ${origin}/releases/0.2.11/install.sh | sh -s -- ${origin} ${token}`;
+    ? `& ([scriptblock]::Create((irm "${origin}/releases/0.2.12/install.ps1"))) "${origin}" "${token}"`
+    : `curl -fsSL ${origin}/releases/0.2.12/install.sh | sh -s -- ${origin} ${token}`;
 }
 function buildAiPrompt(command, os) {
   if (!command) return '';
@@ -18,7 +18,7 @@ function buildAiPrompt(command, os) {
 原版功能与使用说明：${upstream.info.links[1].url}
 3. 运行以下个人接入命令（其中含凭证，请勿公开转发）：
 ${command}
-4. TokenRank 只读原版统计库，按北京时间日聚合原版 total_tokens 总用量（含缓存）并分批回填全部已保留历史，每批最多 400 天；上传聚合数字、模型和工具名，并上报同步状态与版本；不上传代码、对话或路径。自己的配置保存在 ~/.tokenrank，不写入原版数据库。
+4. TokenRank 只读原版统计库，按北京时间日聚合原版 total_tokens 总用量（含缓存）并分批回填全部已保留历史，每批最多 400 天；上传聚合数字、模型和工具名、按原版价格表计算的 USD 估算金额，并上报同步状态与版本；不上传代码、对话或路径。自己的配置保存在 ~/.tokenrank，不写入原版数据库。
 5. 安装脚本包含独立同步服务（macOS: com.tokenrank.sync；Windows: TokenRankSync）。如从旧版 TokenRank 升级，脚本仅停用确认属于旧版的后台服务，并保留程序备份和原统计库；新装原版也会配置采集后台；复用已有原版时保留其后台配置，请确认其仍在采集。
 6. 使用 tokenrank doctor 和 tokenrank rank status 检查只读兼容性、首次上报及自启；命令未加入 PATH 时使用脚本输出路径。自定义原版数据库路径用 connect 的 --db 参数。核对报文用 rank push --full --dry-run。
 最后告诉我接入、首次数据上报、后台自启是否成功。有失败时给出原因和下一步。`;

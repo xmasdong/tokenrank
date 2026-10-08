@@ -1,0 +1,33 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync,mkdirSync,writeFileSync,readFileSync,rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { tmpdir } from 'node:os';
+import { DatabaseSync } from 'node:sqlite';
+import { readCostedDays } from '../sync/costs.js';
+test('pricing delegates to installed upstream in an offline isolated home, with exact Beijing windows and read-only source',async t=>{
+  const home=mkdtempSync(join(tmpdir(),'cost-adapter-'));t.after(()=>rmSync(home,{recursive:true,force:true}));
+  const root=join(home,'original'),data=join(home,'data');mkdirSync(join(root,'src'),{recursive:true});mkdirSync(join(root,'bin'));mkdirSync(data);
+  writeFileSync(join(root,'package.json'),JSON.stringify({name:'token-watcher',version:'1.8.3',type:'module',repository:'https://github.com/luwill/token-watcher',bin:{'token-watcher':'bin/tokenwatcher.js'}}));
+  const entry=join(root,'bin/tokenwatcher.js');writeFileSync(entry,'// not executed');
+  writeFileSync(join(root,'src/pricing.js'),`import{homedir}from'node:os';import{readFileSync,writeFileSync}from'node:fs';import{join}from'node:path';
+export const PEAK_SQL='1';export function loadPricing(){const p=join(homedir(),'.tokenmeter/pricing.json');const v=JSON.parse(readFileSync(p));writeFileSync(p,'modified only in sandbox');return v;}
+export function aggregateCosts(db,since,{rate,table}){const rows=db.prepare('SELECT model,SUM(input_tokens+cached_input+cache_write+output_tokens) n FROM events WHERE ts>=? GROUP BY model').all(since);return{by_model:rows.filter(r=>table[r.model]).map(r=>({model:r.model,cost_cny:r.n*table[r.model]*rate}))};}`);
+  writeFileSync(join(root,'src/litellm.js'),`export async function ensurePrices(){if(process.env.TOKENMETER_OFFLINE!=='1')throw Error('not offline');}`);
+  writeFileSync(join(root,'src/fx.js'),`export async function ensureFxRate(){return{rate:7.2}}`);
+  const pricing=JSON.stringify({models:{priced:0.000001}});writeFileSync(join(data,'pricing.json'),pricing);
+  const path=join(data,'tokenmeter.db'),db=new DatabaseSync(path);
+  db.exec('PRAGMA journal_mode=WAL;CREATE TABLE events(ts INTEGER,tool TEXT,model TEXT,total_tokens INTEGER,input_tokens INTEGER,output_tokens INTEGER,cached_input INTEGER,cache_write INTEGER)');
+  const add=db.prepare("INSERT INTO events VALUES(?,'codex',?,1000,100,200,300,400)");
+  add.run(Date.parse('2026-10-07T15:59:00Z'),'priced');add.run(Date.parse('2026-10-07T16:01:00Z'),'priced');
+  add.run(Date.parse('2026-10-07T16:02:00Z'),'unknown');add.run(Date.parse('2026-10-09T00:00:00Z'),'priced');
+  const wal=readFileSync(path+'-wal');
+  const days=await readCostedDays(path,{entry,now:Date.parse('2026-10-08T12:00:00Z')});
+  assert.deepEqual(days.map(d=>d.day),['2026-10-07','2026-10-08']);assert.equal(days[1].tokens,2000);
+  assert.equal(days[0].cost.usd_micros,1000);assert.equal(days[1].cost.usd_micros,1000);
+  assert.deepEqual(days[1].cost.unpriced_models,['unknown']);assert.equal(days[1].cost.unpriced_tokens,1000);
+  assert.equal(readFileSync(join(data,'pricing.json'),'utf8'),pricing);assert.deepEqual(readFileSync(path+'-wal'),wal);db.close();
+  writeFileSync(join(root,'src/pricing.js'),'throw Error("incompatible upstream")');
+  const logs=[],fallback=await readCostedDays(path,{entry,log:s=>logs.push(s),now:Date.parse('2026-10-08T12:00:00Z')});
+  assert.equal(fallback[1].cost,undefined);assert.equal(fallback[1].tokens,2000);assert.equal(logs.length,1);
+});

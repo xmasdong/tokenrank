@@ -36,7 +36,7 @@ function fixture(t) {
     db.prepare('INSERT INTO mp_sessions VALUES(?,?,?)').run(`session-${uid}`,uid,Date.now()+100000);
     db.prepare('INSERT INTO connect_tokens(token,user_id,created_at) VALUES(?,?,?)').run(`connect-${uid}`,uid,1);
     db.prepare('INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(?,?,?,?)').run(uid,'2026-01-01',99,1);
-    db.prepare("INSERT INTO daily_totals VALUES(?,?,'2026-01-01',99,99,0,0,0,1,'[]','[]',1,1)").run(uid,'device-'+uid);
+    db.prepare("INSERT INTO daily_totals VALUES(?,?,'2026-01-01',99,99,0,0,0,1,'[]','[]',1,1,NULL)").run(uid,'device-'+uid);
     db.prepare('INSERT INTO usage_sync_state VALUES(?,?,?,?)').run(uid,'device-'+uid,1,1);
     db.prepare("INSERT INTO usage_shares VALUES(?,?,?,'{}',1,?,NULL)").run(String(uid).repeat(24),uid,'fingerprint',Date.now()+100000);
     db.prepare("INSERT INTO usage_replacements VALUES(?,?,?,1,1,1,'0.2.8','1.8.2','collecting',?)").run(uid,String(uid).repeat(32),'device-'+uid,Date.now()+100000);
@@ -49,7 +49,7 @@ function fixture(t) {
   }
   // Cover multiple devices, credentials and hidden membership too.
   db.prepare('INSERT INTO mp_sessions VALUES(?,?,?)').run('second-session',1,Date.now()+100000);
-  db.prepare("INSERT INTO daily_totals SELECT user_id,'old-device',day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at FROM daily_totals WHERE user_id=1").run();
+  db.prepare("INSERT INTO daily_totals SELECT user_id,'old-device',day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json FROM daily_totals WHERE user_id=1").run();
   db.prepare("UPDATE rank_group_members SET hidden=1 WHERE group_id='shared' AND user_id=2").run();
   f.request = (path, method='GET', data, token='session-1') => worker.fetch(new Request('https://rank.test'+path, {
     method, headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},

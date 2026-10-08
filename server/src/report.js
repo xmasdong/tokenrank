@@ -1,5 +1,6 @@
 import { jsonError } from './lib.js';
 import { storeReplacement, versionAtLeast } from './replacement.js';
+import { validateCost } from './costs.js';
 
 const fields = ['tokens', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write', 'requests'];
 export function validateTotalReport(body, now = Date.now()) {
@@ -12,6 +13,7 @@ export function validateTotalReport(body, now = Date.now()) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(d?.day || '') || !Number.isFinite(Date.parse(d.day + 'T00:00:00Z'))
       || new Date(d.day + 'T00:00:00Z').toISOString().slice(0, 10) !== d.day || d.day > today || seen.has(d.day)) throw new Error('invalid day');
     seen.add(d.day);
+    validateCost(d.cost, d.tokens);
     for (const field of fields) if (!Number.isSafeInteger(d[field]) || d[field] < 0 || d[field] > (field === 'requests' ? 1e7 : 1e13)) throw new Error('invalid count');
     for (const field of ['models', 'tools']) {
       if (!Array.isArray(d[field]) || d[field].length > 8) throw new Error('invalid details');
@@ -39,16 +41,16 @@ export async function storeTotalReport(env, conn, body, now = Date.now()) {
   if ((!state || state.device_id !== body.device_id) && !body.full) return jsonError(409, '请执行 tokenrank rank push --full 完整同步此电脑');
   if (state && body.source_at < state.source_at) return jsonError(409, '此批数据早于已同步记录，请重新同步');
   const stmts = body.days.map(d => env.DB.prepare(`INSERT INTO daily_totals
-    (user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at)
-    SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13
+    (user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
+    SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?15
     WHERE COALESCE((SELECT source_at FROM usage_rebuild_guard WHERE user_id=?1),0)=?14
       AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?1 AND status='collecting' AND expires_at>?13)
     ON CONFLICT(user_id,device_id,day) DO UPDATE SET tokens=excluded.tokens,input_tokens=excluded.input_tokens,
     output_tokens=excluded.output_tokens,cache_read=excluded.cache_read,cache_write=excluded.cache_write,requests=excluded.requests,
-    models_json=excluded.models_json,tools_json=excluded.tools_json,source_at=excluded.source_at,updated_at=excluded.updated_at
+    models_json=excluded.models_json,tools_json=excluded.tools_json,source_at=excluded.source_at,updated_at=excluded.updated_at,cost_json=excluded.cost_json
     WHERE excluded.source_at >= daily_totals.source_at`)
     .bind(conn.user_id,body.device_id,d.day,d.tokens,d.input_tokens,d.output_tokens,d.cache_read,d.cache_write,d.requests,
-      JSON.stringify(d.models),JSON.stringify(d.tools),body.source_at,now,guard?.source_at || 0));
+      JSON.stringify(d.models),JSON.stringify(d.tools),body.source_at,now,guard?.source_at || 0,d.cost ? JSON.stringify(d.cost) : null));
   if (body.complete) stmts.push(env.DB.prepare(`INSERT INTO usage_sync_state (user_id,device_id,source_at,updated_at)
     SELECT ?1,?2,?3,?4 WHERE COALESCE((SELECT source_at FROM usage_rebuild_guard WHERE user_id=?1),0)=?5
       AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?1 AND status='collecting' AND expires_at>?4)

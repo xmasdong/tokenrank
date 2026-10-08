@@ -101,6 +101,7 @@ CREATE TABLE IF NOT EXISTS daily_totals (
   tools_json TEXT NOT NULL,
   source_at INTEGER NOT NULL,
   updated_at INTEGER NOT NULL,
+  cost_json TEXT,
   PRIMARY KEY (user_id, device_id, day)
 );
 CREATE INDEX IF NOT EXISTS idx_totals_day ON daily_totals(day);

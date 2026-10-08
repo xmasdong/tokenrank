@@ -23,7 +23,7 @@ export function openSource(path = DEFAULT_DB) {
 }
 
 /** All SELECTs share one snapshot, including committed WAL records. No upstream Store or scanner is loaded. */
-export function readDays(path, { now = Date.now(), fromDay = null } = {}) {
+export function readDays(path, { now = Date.now(), fromDay = null, costing = null } = {}) {
   const db = openSource(path);
   try {
     db.exec('BEGIN');
@@ -47,6 +47,7 @@ export function readDays(path, { now = Date.now(), fromDay = null } = {}) {
       return map;
     };
     const modelMap = detailMap(models), toolMap = detailMap(tools);
+    const costs = costing ? costing(db, from, now) : null;
     const days = rows.map(row => {
       const day = new Date(row.daynum * 86400000).toISOString().slice(0, 10);
       for (const [key, max] of Object.entries(MAX)) {
@@ -54,7 +55,8 @@ export function readDays(path, { now = Date.now(), fromDay = null } = {}) {
           throw new Error(`${day} 的 ${key} 超出当前上报协议范围；已停止同步，不截断或改写原始数据`);
       }
       return { day, tokens: row.tokens, input_tokens: row.input_tokens, output_tokens: row.output_tokens, requests: row.requests, cache_read: row.cache_read, cache_write: row.cache_write,
-        models: modelMap.get(row.daynum) || [], tools: toolMap.get(row.daynum) || [] };
+        models: modelMap.get(row.daynum) || [], tools: toolMap.get(row.daynum) || [],
+        ...(costs?.has(row.daynum) ? { cost: costs.get(row.daynum) } : {}) };
     });
     db.exec('COMMIT');
     return days;

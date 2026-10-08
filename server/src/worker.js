@@ -94,7 +94,7 @@ async function route(request, env, url, path) {
     if (!result.ok) return withCors(result);
     const usage = await result.json();
     if (!usage.has_history) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
-    return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage));
+    return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage, body?.style === 'receipt' ? 'receipt' : 'usage'));
   }
   if (method === 'GET' && path.startsWith('/api/shares/')) {
     const shared = await readShare(env, path.slice('/api/shares/'.length));
@@ -651,7 +651,7 @@ async function myUsage(request, env, url) {
   // 今日页也返回最近 7 天趋势，趋势范围不改变今日总量。
   const readFrom = range.period === 'day' ? daysAgo(6, now) : range.from;
   const rowsTask = env.DB.prepare(`SELECT day, tokens, input_tokens, output_tokens, requests, cache_read, cache_write,
-    models_json, tools_json, updated_at FROM ranked_usage
+    models_json, tools_json, updated_at, cost_json FROM ranked_usage
     WHERE user_id = ?1 AND day >= ?2 AND day <= ?3 ORDER BY day`).bind(user.id, readFrom, range.to).all();
   const historyTask = env.DB.prepare(`SELECT COUNT(*) AS days, SUM(tokens) AS tokens,
     MIN(day) AS first_day, MAX(updated_at) AS updated_at FROM ranked_usage
