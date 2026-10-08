@@ -3,7 +3,7 @@
   <view class="page-title display">{{style === 'receipt' ? 'AI 用量账单' : '我的 Token 用量'}}</view>
   <view class="subtitle">{{periodLabel}} · {{basisLabel}}</view>
   <view class="tabs style-picker"><view class="tab {{style === 'receipt' ? 'tab-active' : ''}}" data-style="receipt" bindtap="switchStyle">用量账单</view><view class="tab {{style === 'usage' ? 'tab-active' : ''}}" data-style="usage" bindtap="switchStyle">Token 卡片</view></view>
-  <view class="theme-picker"><button class="theme {{theme === 'paper' ? 'selected' : ''}}" data-theme="paper" bindtap="switchTheme"><text class="swatch paper"></text>宣纸</button><button class="theme {{theme === 'ink' ? 'selected' : ''}}" data-theme="ink" bindtap="switchTheme"><text class="swatch ink"></text>墨金</button></view>
+  <view class="theme-picker"><button class="theme {{theme === 'paper' ? 'selected' : ''}}" data-theme="paper" bindtap="switchTheme"><text class="swatch paper {{style === 'receipt' ? 'receipt-paper' : ''}}"></text>{{style === 'receipt' ? '白纸' : '宣纸'}}</button><button class="theme {{theme === 'ink' ? 'selected' : ''}}" data-theme="ink" bindtap="switchTheme"><text class="swatch ink"></text>墨金</button></view>
   <view wx:if="{{loading}}" class="state">加载中…</view>
   <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重新加载</button></view>
   <block wx:else>
