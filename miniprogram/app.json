@@ -12,14 +12,14 @@
   ],
   "window": {
     "navigationBarTitleText": "Token 群排名",
-    "navigationBarBackgroundColor": "#F7F4EC",
+    "navigationBarBackgroundColor": "#FFFFFF",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#F7F4EC"
+    "backgroundColor": "#FFFFFF"
   },
   "tabBar": {
-    "color": "#8A8271",
-    "selectedColor": "#B03A2E",
-    "backgroundColor": "#FBF8F1",
+    "color": "#999999",
+    "selectedColor": "#07C160",
+    "backgroundColor": "#FFFFFF",
     "borderStyle": "black",
     "list": [
       {

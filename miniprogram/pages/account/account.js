@@ -9,7 +9,7 @@ Page({
     wx.showModal({
       title: '确认注销账号？',
       content: '头像、昵称、全部云端用量和分享记录将永久删除。电脑接入码立即失效，无法恢复。',
-      confirmText: '确认注销', confirmColor: '#B03A2E', cancelText: '取消',
+      confirmText: '确认注销', confirmColor: '#FA5151', cancelText: '取消',
       success: res => { if (res.confirm) this.removeAccount(); },
       complete: () => this.setData({ confirming: false }),
     });

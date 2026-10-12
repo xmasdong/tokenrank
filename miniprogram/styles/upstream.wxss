@@ -1,11 +1,11 @@
-.upstream-project { padding: 28rpx 0; border-top: 1rpx solid var(--hairline); border-bottom: 1rpx solid var(--hairline); }
-.upstream-heading { font-size: 32rpx; font-weight: 700; }
-.upstream-name { font-size: 28rpx; font-weight: 600; margin-top: 22rpx; }
-.upstream-meta { font-size: 23rpx; color: var(--ink-fade); line-height: 1.7; margin-top: 8rpx; }
-.upstream-description { font-size: 25rpx; color: var(--ink-soft); line-height: 1.8; margin-top: 16rpx; }
-.upstream-link { margin-top: 20rpx; }
-.upstream-link-head { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; font-size: 25rpx; color: var(--ink); }
-.upstream-project .upstream-copy { flex: none; width: auto; min-height: 44px; box-sizing: border-box; margin: 0; padding: 12rpx 0 12rpx 16rpx; background: transparent; color: var(--seal); border-radius: 0; font-size: 24rpx; font-weight: 400; line-height: 1.5; display: flex; align-items: center; }
-.upstream-project .upstream-copy::after { border: none; }
-.upstream-url { display: block; color: var(--ink-soft); font-size: 24rpx; line-height: 1.7; word-break: break-all; }
-.upstream-relationship { padding-top: 18rpx; margin-top: 28rpx; border-top: 1rpx solid var(--hairline); margin-bottom: 16rpx; }
+.upstream-project { padding: 20px 0; border-top: 1rpx solid var(--separator); border-bottom: 1rpx solid var(--separator); }
+.upstream-heading { font-size: 17px; font-weight: 500; }
+.upstream-name { font-size: 15px; font-weight: 500; margin-top: 16px; }
+.upstream-meta { font-size: 12px; color: var(--text-secondary); line-height: 1.7; margin-top: 6px; }
+.upstream-description { font-size: 14px; color: var(--text-secondary); line-height: 1.8; margin-top: 12px; }
+.upstream-link { margin-top: 12px; }
+.upstream-link-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 14px; color: var(--text); }
+.upstream-project .upstream-copy { display: flex; align-items: center; flex: none; width: auto; min-height: 44px; box-sizing: border-box; margin: 0; padding: 8px 0 8px 16px; border-radius: 0; background: transparent; color: var(--link); font-size: 13px; font-weight: 400; line-height: 1.5; }
+.upstream-copy::after { border: none; }
+.upstream-url { display: block; color: var(--link); font-size: 13px; line-height: 1.7; word-break: break-all; }
+.upstream-relationship { padding-top: 16px; margin-top: 20px; border-top: 1rpx solid var(--separator); margin-bottom: 12px; }

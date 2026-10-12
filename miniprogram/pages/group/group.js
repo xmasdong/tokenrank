@@ -4,6 +4,9 @@ const connectPrompt = require('../../utils/connect-prompt');
 const { loadCodeImage } = require('../../utils/share-code');
 const { drawGroupPoster } = require('../../utils/group-poster');
 const { profileEditor } = require('../../utils/profile-editor');
+const { presentEntries, presentMe } = require('../../utils/leaderboard');
+const { loadAvatarImage } = require('../../utils/share-avatar');
+const { drawRankingPoster, rankingAvatarUrls, rankingPosterHeight } = require('../../utils/ranking-poster');
 
 Page({
   ...profileEditor(api, wx, { requireAvatar: true, onSaved(user) {
@@ -16,13 +19,16 @@ Page({
     nickname: '', avatarUrl: '', avatarDraft: '', saving: false, profileError: '',
     nicknameReady: false, nicknameFocus: false, privacyBusy: false, avatarNative: true, sourceName: '', draftName: '', named: true, canRename: false, myHidden: false, visibilitySaving: false,
     enterState: 'idle', enterError: '', joining: false, groupExists: false, owner_id: null, posterPath: '', shareCardPath: '', posterError: '',
+    posterStyles: ['排行榜', 'Token 榜单'], posterStyleIndex: 0, posterStyle: 'ranking', posterGenerating: false,
     connState: 'pending', connText: '', hasReported: false, updated_fmt: '' },
   onLoad(options) {
     const id = options.g || options.id || '';
     // 从已加入的群列表或接入页返回时保留群上下文；卡片进入必须识别当前真实微信群。
     this._needsResolve = !['mine', 'connect'].includes(options.from) || !id;
     const missing = !id && options.enter !== '1' && options.create !== '1';
-    this.setData({ id, missing, sourceName: flow.sourceName(options), enterState: this._needsResolve ? 'idle' : 'ready' });
+    const originalPoster = wx.getStorageSync('group_poster_style') === 'original';
+    this.setData({ id, missing, sourceName: flow.sourceName(options), enterState: this._needsResolve ? 'idle' : 'ready',
+      posterStyle: originalPoster ? 'original' : 'ranking', posterStyleIndex: originalPoster ? 1 : 0 });
   },
   onShow() {
     wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true });
@@ -145,14 +151,13 @@ Page({
     if (changed) {
       this._posterVersion = (this._posterVersion || 0) + 1;
       this.setData({ posterPath: '', shareCardPath: '', posterError: '',
-        entries: lb.entries.map(e => ({ ...e, tokens_fmt: api.fmtTokens(e.tokens), rk: api.cnRank(e.rank), initial: api.initialOf(e.nickname) })),
+        entries: presentEntries(lb.entries, lb.me),
         total: lb.total ?? null, hasMore: !!lb.has_more, nextOffset: lb.next_offset ?? null,
         snapshot: lb.snapshot || '', loadingMore: false, moreError: '' });
     }
     this.setData({
       members: lb.members ?? this.data.members,
-      me: lb.me ? { ...lb.me, tokens_fmt: api.fmtTokens(lb.me.tokens), rk: api.cnRank(lb.me.rank),
-        global_rank_label: lb.me.global_rank ? api.cnRank(lb.me.global_rank).label : '' } : null,
+      me: presentMe(lb.me),
       updated_fmt: api.fmtRelTime(lb.updated_at), loading: false, error: '',
     });
     if (changed || !this.data.posterPath) this.buildPoster();
@@ -215,8 +220,7 @@ Page({
       const lb = await api.fetchLeaderboard({ scope: 'group', id, period, offset: nextOffset, snapshot }, { force: true });
       if (!current()) return;
       if (lb.snapshot !== snapshot) { const err = new Error('榜单已有更新'); err.statusCode = 409; throw err; }
-      this.setData({ entries: this.data.entries.concat(lb.entries.map(e => ({ ...e,
-        tokens_fmt: api.fmtTokens(e.tokens), rk: api.cnRank(e.rank), initial: api.initialOf(e.nickname) }))),
+      this.setData({ entries: this.data.entries.concat(presentEntries(lb.entries, this.data.me)),
         total: lb.total, hasMore: !!lb.has_more, nextOffset: lb.next_offset ?? null, loadingMore: false });
     } catch (err) {
       if (!current()) return;
@@ -266,40 +270,62 @@ Page({
     if (this._posterBusy) { this._posterPending = true; return; }
     this._posterBusy = true;
     const version = this._posterVersion;
-    this.setData({ posterError: '' });
+    const data = { ...this.data, scope: 'group', day: this._boardSnapshot?.day };
+    this.setData({ posterError: '', posterGenerating: true });
     try {
       const node = await new Promise(resolve => wx.createSelectorQuery().in(this)
         .select('#poster').fields({ node: true, size: true }).exec(res => resolve(res && res[0] && res[0].node)));
       if (!node || version !== this._posterVersion) return;
-      const codeImage = await loadCodeImage(node);
+      const urls = data.posterStyle === 'ranking' ? rankingAvatarUrls(data) : [];
+      const [codeImage, images] = await Promise.all([loadCodeImage(node), Promise.all(urls.map(url => loadAvatarImage(node, url)))]);
       if (version !== this._posterVersion) return;
+      const avatarImages = Object.fromEntries(urls.map((url, index) => [url, images[index]]));
       const ctx = node.getContext('2d');
       const exportImage = (width, height) => new Promise((resolve, reject) => wx.canvasToTempFilePath({
         canvas: node, destWidth: width, destHeight: height, fileType: 'png',
         success: r => resolve(r.tempFilePath), fail: reject,
       }));
-      node.width = 750; node.height = 1150;
-      this.drawPoster(ctx, 750, 1150, codeImage);
-      const posterPath = await exportImage(750, 1150);
+      const width = data.posterStyle === 'ranking' ? 1000 : 750;
+      const height = data.posterStyle === 'ranking' ? rankingPosterHeight(data) : 1150;
+      const coverHeight = data.posterStyle === 'ranking' ? 800 : 600;
+      node.width = width; node.height = height;
+      this.drawPoster(ctx, width, height, codeImage, avatarImages, data);
+      const posterPath = await exportImage(width, height);
       if (version !== this._posterVersion) return;
-      node.width = 750; node.height = 600;
-      this.drawShareCard(ctx, 750, 600, codeImage);
-      const shareCardPath = await exportImage(750, 600);
+      node.width = width; node.height = coverHeight;
+      this.drawShareCard(ctx, width, coverHeight, codeImage, avatarImages, data);
+      const shareCardPath = await exportImage(width, coverHeight);
       if (version === this._posterVersion) this.setData({ posterPath, shareCardPath });
     } catch (err) { if (version === this._posterVersion) this.setData({ posterError: err.message || '分享图生成失败，请重试' }); }
     finally {
       this._posterBusy = false;
+      if (version === this._posterVersion) this.setData({ posterGenerating: false });
       if (this._posterPending) {
         this._posterPending = false;
         if (this._visible && !this.data.loading) this.buildPoster();
       }
     }
   },
-  drawShareCard(ctx, W, H, codeImage) { drawGroupPoster(ctx, { data: this.data, cover: true, codeImage }); },
-  drawPoster(ctx, W, H, codeImage) { drawGroupPoster(ctx, { data: this.data, codeImage }); },
+  drawShareCard(ctx, W, H, codeImage, avatarImages = {}, data = this.data) {
+    if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, cover: true, codeImage, avatarImages });
+    else drawGroupPoster(ctx, { data, cover: true, codeImage });
+  },
+  drawPoster(ctx, W, H, codeImage, avatarImages = {}, data = this.data) {
+    if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, codeImage, avatarImages });
+    else drawGroupPoster(ctx, { data, codeImage });
+  },
+  changePosterStyle(e) {
+    const index = Number(e.detail.value);
+    if (![0, 1].includes(index) || index === this.data.posterStyleIndex) return;
+    const posterStyle = index === 0 ? 'ranking' : 'original';
+    wx.setStorageSync('group_poster_style', posterStyle);
+    this._posterVersion = (this._posterVersion || 0) + 1;
+    this.setData({ posterStyle, posterStyleIndex: index, posterPath: '', shareCardPath: '' });
+    return this.buildPoster();
+  },
 
   previewPoster() {
-    if (this.data.posterPath) wx.previewImage({ urls: [this.data.posterPath] });
+    if (this.data.posterPath && !this.data.posterGenerating) wx.previewImage({ urls: [this.data.posterPath] });
   },
   switchPeriod(e) {
     const period = e.currentTarget.dataset.key;

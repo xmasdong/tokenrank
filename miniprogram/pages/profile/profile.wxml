@@ -1,6 +1,5 @@
 <import src="../../templates/profile-editor.wxml" />
 <view class="page">
-  <view class="page-head"><view class="page-title display">我的用量</view></view>
   <view class="tabs period-tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
   <view wx:if="{{loading || usageLoading}}" class="loading-state"><view class="sk loading-number"></view><view class="note">加载中…</view></view>
   <view wx:elif="{{error || usageError}}" class="error-note">{{error || usageError}}<button class="btn btn-ghost" bindtap="load">重新加载</button></view>
@@ -11,9 +10,9 @@
       <view class="exact num-font">{{usage.exact}} tokens</view>
       <view class="range">{{usage.range}} · {{usage.timezoneLabel}}<text wx:if="{{usage.syncText}}"> · 同步于 {{usage.syncText}}</text></view>
       <view class="note" wx:if="{{usage.costDisplay.available}}">API 等值估算 <text class="num-font">${{usage.costDisplay.amount}}</text> USD<text wx:if="{{usage.costDisplay.note}}"> · {{usage.costDisplay.note}}</text></view>
-      <button class="btn btn-ink share-button" wx:if="{{usage.has_history}}" bindtap="goShare">生成分享卡片</button>
+      <button class="btn btn-primary share-button" wx:if="{{usage.has_history}}" bindtap="goShare">生成分享卡片</button>
       <view class="metrics"><view class="metric"><view class="metric-value num-font">{{usage.requestsText}}</view><view class="metric-label">调用次数</view></view><view wx:if="{{period !== 'day'}}" class="metric metric-secondary"><view class="metric-value num-font">{{usage.summary.active_days}}<text class="metric-unit"> 天</text></view><view class="metric-label">活跃天数</view></view></view>
-      <view wx:if="{{!usage.has_history && !hasReported}}" class="first-report"><view>还没有接入电脑。</view><button class="btn btn-seal" bindtap="goConnect">接入电脑</button></view>
+      <view wx:if="{{!usage.has_history && !hasReported}}" class="first-report"><view>还没有接入电脑。</view><button class="btn btn-primary" bindtap="goConnect">接入电脑</button></view>
       <view wx:if="{{usage.has_history && !usage.summary.tokens}}" class="note">这个周期没有用量。</view>
     </view>
     <view class="section trend-section">
@@ -45,15 +44,15 @@
     <button class="btn btn-ghost" bindtap="goConnect">{{hasReported ? '接入设置' : '接入电脑'}}</button>
   </view>
   <view class="account-section">
-    <view class="ranking-row"><view class="section-title display">参与排名</view><switch checked="{{!(user && user.rank_hidden)}}" disabled="{{!user || rankingSaving}}" color="#B03A2E" bindchange="toggleRanking" /></view>
+    <view class="ranking-row"><view class="section-title display">参与排名</view><switch checked="{{!(user && user.rank_hidden)}}" disabled="{{!user || rankingSaving}}" color="#07C160" bindchange="toggleRanking" /></view>
     <view class="sync-text">{{user && user.rank_hidden ? '已关闭：你的用量只有自己能看到，广场和群榜都不显示你。' : '关掉后，你的用量只有自己能看到，广场和群榜都不显示你。'}}</view>
   </view>
   <view class="account-section">
     <view class="section-title display">头像和昵称</view>
     <template is="profile-editor" data="{{user, nickname, avatarUrl, saving, nicknameReady, nicknameFocus, privacyBusy, avatarNative, profileError}}" />
   </view>
-  <view class="menu-item" bindtap="goGroups"><text>我的群榜</text><text>→</text></view>
-  <view class="menu-item" bindtap="goAbout"><text>使用说明</text><text>→</text></view>
-  <view class="menu-item account-delete" bindtap="goAccount"><text>注销账号</text><text>→</text></view>
+  <view class="menu-item" bindtap="goGroups"><text>我的群榜</text><text class="menu-arrow" aria-hidden="true">›</text></view>
+  <view class="menu-item" bindtap="goAbout"><text>使用说明</text><text class="menu-arrow" aria-hidden="true">›</text></view>
+  <view class="menu-item account-delete" bindtap="goAccount"><text>注销账号</text><text class="menu-arrow" aria-hidden="true">›</text></view>
 </view>
 <privacy-notice />

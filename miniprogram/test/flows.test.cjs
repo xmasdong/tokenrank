@@ -360,6 +360,7 @@ test('海报导出完成后才调整同一画布尺寸，并只生成一套图�
   const node = { width: 0, height: 0, getContext: () => ({}) };
   const query = { in() { return this; }, select() { return this; }, fields() { return this; }, exec(fn) { fn([{ node }]); } };
   const { p } = page('group', {}, { createSelectorQuery: () => query, canvasToTempFilePath: options => exports.push({ options, height: node.height }) });
+  p.setData({ posterStyle: 'original', posterStyleIndex: 1 });
   p.drawPoster = () => {}; p.drawShareCard = () => {};
   const build = p.buildPoster(); await flush();
   assert.equal(exports.length, 1); assert.equal(node.height, 1150);
@@ -436,7 +437,40 @@ test('群榜触底加载 50/50/23 人，重复点击合并，末页停止且不�
   await p.onReachBottom(); assert.equal(p.data.entries.length, 123); assert.equal(p.data.hasMore, false);
   await p.onReachBottom(); assert.equal(calls.length, 3); assert.equal(posters, 1);
   assert.equal(p.data.me.rank, 123);
+  assert.equal(p.data.entries.filter(e => e.isMe).length, 1);
+  assert.equal(p.data.entries[122].isMe, true);
   assert.deepEqual(Array.from(p.data.entries, e => e.rank), Array.from({ length: 123 }, (_, i) => i + 1));
+});
+
+test('榜单以本人名次识别自己的行，同昵称不误标；上亿后主数字和单位分开呈现', () => {
+  for (const name of ['square', 'group']) {
+    const { p } = page(name);
+    p.buildPoster = () => {};
+    p.showBoard({ ...board(''), entries: [
+      { rank: 1, nickname: '同名用户', tokens: 258000000, requests: 1000 },
+      { rank: 2, nickname: '同名用户', tokens: 12000, requests: 3 },
+    ], me: { rank: 2, tokens: 12000 }, total: 2 });
+    assert.equal(p.data.entries[0].isMe, false, name);
+    assert.equal(p.data.entries[1].isMe, true, name);
+    assert.equal(p.data.entries[0].tokens_value, '2.58', name);
+    assert.equal(p.data.entries[0].tokens_unit, '亿', name);
+    assert.equal(p.data.entries[0].tokens_fmt, '2.58 亿', name);
+    assert.equal(p.data.me.tokens_value, '1.2', name);
+    assert.equal(p.data.me.tokens_unit, '万', name);
+  }
+});
+
+test('广场头像资料较慢不阻塞榜单；切换周期后丢弃迟到资料', async () => {
+  const profiles = [];
+  const { p, navigation } = page('square', { ensureLogin: () => new Promise(resolve => profiles.push(resolve)) });
+  await p.load();
+  assert.equal(p.data.loading, false);
+  assert.equal(p.data.entries.length, 1);
+  await p.switchPeriod({ currentTarget: { dataset: { key: 'week' } } });
+  profiles[1]({ nickname: '当前用户', avatar_url: 'new-avatar' }); await flush();
+  profiles[0]({ nickname: '旧响应', avatar_url: 'old-avatar' }); await flush();
+  assert.equal(p.data.user.avatar_url, 'new-avatar');
+  p.goMine(); assert.deepEqual(navigation.at(-1), ['tab', '/pages/profile/profile']);
 });
 
 test('续页失败保留已有列表，触底不自动重试风暴，点击后恢复', async () => {
@@ -1167,4 +1201,72 @@ test('所有弹窗按钮文字不超过 4 个字（微信 showModal 超长会直
     for (const m of text.matchAll(/(confirmText|cancelText):\s*'([^']*)'/g)) if ([...m[2]].length > 4) long.push(`${f} ${m[1]} ${m[2]}`);
   }
   assert.deepEqual(long, []);
+});
+
+test('新增排行榜类型生成真码海报和封面，点开仍是作者的个人展示页', async () => {
+  const exports = [], calls = [];
+  const usage = { ...usageData('week', 258000000), standing: { rank: 52 }, token_basis: 'upstream_total', timezone: 'Asia/Shanghai' };
+  const { p } = page('share', {
+    createShare: async (period, style) => { calls.push([period, style]); return { id: 'd'.repeat(24), user: { nickname: '作者' }, usage }; },
+    fetchLeaderboard: async (query, options) => {
+      assert.equal(query.period, 'week'); assert.equal(options.force, true);
+      return { entries: Array.from({ length: 8 }, (_, i) => ({ rank: i + 1, nickname: '成员' + i, tokens: 500000000 - i })), me: { rank: 52, tokens: 258000000 }, total: 123 };
+    },
+  }, canvasWx(exports));
+  p.onLoad({ period: 'week', style: 'ranking' }); await p.onShow();
+  const drawing = p.onReady(); await flush();
+  assert.equal(exports[0].height, 1540);
+  exports[0].options.success({ tempFilePath: 'ranking.png' }); await flush();
+  assert.equal(exports[1].height, 800);
+  exports[1].options.success({ tempFilePath: 'ranking-cover.png' }); await drawing;
+  assert.deepEqual(calls, [['week', 'usage']]);
+  const card = p.onShareAppMessage();
+  assert.equal(card.path, '/pages/record/record?id=' + 'd'.repeat(24));
+  assert.equal(card.imageUrl, 'ranking-cover.png'); assert.match(card.title, /作者.*2.58 亿.*52/);
+  assert.equal(p._ranking.me.rank, 52);
+});
+
+test('排行榜重试仍不一致时不给出可转发的旧图和旧记录', async () => {
+  let reads = 0;
+  const { p } = page('share', {
+    createShare: async () => ({ id: 'd'.repeat(24), user: { nickname: '作者' }, usage: { ...usageData(), standing: { rank: 2 } } }),
+    fetchLeaderboard: async () => { reads++; return { entries: [], total: 0, me: { rank: 1, tokens: 12000 } }; },
+  });
+  p.onLoad({ style: 'ranking' }); await p.onShow();
+  assert.equal(reads, 2); assert.match(p.data.error, /榜单已有更新/);
+  assert.equal(p.data.shareId, ''); assert.equal(p.data.coverPath, ''); assert.equal(p._snapshot, null);
+});
+
+test('排行榜请求迟到不能覆盖后来选择的 Token 卡片；累计周期也能选择排行榜', async () => {
+  let finishBoard;
+  const { p } = page('share', { fetchLeaderboard: () => new Promise(resolve => finishBoard = resolve) });
+  p.onLoad({ period: 'all', style: 'ranking' });
+  const old = p.onShow(); await flush();
+  await p.switchStyle({ currentTarget: { dataset: { style: 'usage' } } });
+  const snapshot = p._snapshot;
+  finishBoard({ entries: [], me: null, total: 0 }); await old;
+  assert.equal(p.data.period, 'all'); assert.equal(p.data.style, 'usage');
+  assert.equal(p._snapshot, snapshot); assert.equal(p._ranking, null);
+});
+
+test('群榜选择排行榜会生成新封面并保留真实群入口，原版图片仍可切换', async () => {
+  const exports = [];
+  const { p } = page('group', {}, canvasWx(exports));
+  p._visible = true; p.onLoad({ g: 'current', from: 'mine' });
+  p.setData({ joined: true, name: '实际群', members: 138, total: 123, user: { nickname: '我' },
+    entries: Array.from({ length: 5 }, (_, i) => ({ rank: i + 1, nickname: '成员' + i, tokens: 500000000 - i })), me: { rank: 52, tokens: 258000000 },
+    posterPath: 'old.png', shareCardPath: 'old-cover.png', posterStyle: 'original', posterStyleIndex: 1 });
+  const build = p.changePosterStyle({ detail: { value: '0' } }); await flush();
+  assert.equal(p.data.shareCardPath, ''); assert.equal(p.data.posterGenerating, true);
+  exports[0].options.success({ tempFilePath: 'new-ranking.png' }); await flush();
+  assert.equal(exports[1].height, 800);
+  exports[1].options.success({ tempFilePath: 'new-ranking-cover.png' }); await build;
+  const card = p.onShareAppMessage();
+  assert.equal(card.imageUrl, 'new-ranking-cover.png'); assert.match(card.path, /^\/pages\/group\/group\?enter=1&src=/);
+  assert.match(card.title, /138 人已加入/); assert.equal(p.data.posterGenerating, false);
+  const legacy = p.changePosterStyle({ detail: { value: '1' } }); await flush();
+  assert.equal(exports[2].height, 1150);
+  exports[2].options.success({ tempFilePath: 'legacy.png' }); await flush();
+  exports[3].options.success({ tempFilePath: 'legacy-cover.png' }); await legacy;
+  assert.equal(p.data.posterPath, 'legacy.png'); assert.equal(p.data.shareCardPath, 'legacy-cover.png');
 });

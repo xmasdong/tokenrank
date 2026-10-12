@@ -1,10 +1,10 @@
-.pn-mask { position: fixed; z-index: 1000; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; padding: 0 48rpx; background: rgba(20, 18, 16, 0.5); }
-.pn-card { width: 100%; box-sizing: border-box; padding: 44rpx 40rpx 36rpx; border-radius: 24rpx; background: var(--paper-lift, #FBF8F1); color: var(--ink, #2A2723); }
-.pn-title { font-size: 36rpx; font-weight: 700; margin-bottom: 24rpx; }
-.pn-p { font-size: 28rpx; line-height: 1.7; color: var(--ink, #2A2723); }
-.pn-soft { margin-top: 16rpx; color: var(--ink-soft, #55503F); font-size: 26rpx; }
-.pn-repo { display: flex; align-items: center; justify-content: space-between; gap: 16rpx; margin: 12rpx 0 4rpx; padding: 18rpx 22rpx; border-radius: 12rpx; background: var(--paper, #F7F4EC); border: 1rpx solid var(--hairline, #DCD4C0); }
-.pn-url { flex: 1; min-width: 0; font-family: Menlo, Consolas, monospace; font-size: 25rpx; word-break: break-all; }
-.pn-copy { flex: none; color: var(--seal, #B03A2E); font-size: 26rpx; font-weight: 600; }
-.pn-actions { display: flex; gap: 20rpx; margin-top: 32rpx; }
-.pn-actions .pn-btn { flex: 1; width: auto; margin: 0; min-height: 44px; font-size: 28rpx; }
+.pn-mask { position: fixed; z-index: 1000; inset: 0; left: 0; right: 0; top: 0; bottom: 0; display: flex; align-items: center; justify-content: center; padding: 0 24px; background: rgba(0, 0, 0, .5); }
+.pn-card { width: 100%; box-sizing: border-box; padding: 24px 20px 20px; border-radius: 12px; background: var(--surface, #FFFFFF); color: var(--text, #191919); }
+.pn-title { font-size: 18px; font-weight: 500; margin-bottom: 16px; }
+.pn-p { font-size: 14px; line-height: 1.8; color: var(--text, #191919); }
+.pn-soft { margin-top: 12px; color: var(--text-secondary, #666666); font-size: 13px; }
+.pn-repo { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 12px 0 4px; padding: 12px; border-radius: 6px; background: var(--surface-muted, #F7F7F7); }
+.pn-url { flex: 1; min-width: 0; font-family: Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
+.pn-copy { flex: none; display: flex; align-items: center; min-height: 44px; color: var(--link, #576B95); font-size: 13px; font-weight: 400; }
+.pn-actions { display: flex; gap: 12px; margin-top: 20px; }
+.pn-actions .pn-btn { flex: 1; width: auto; margin: 0; min-height: 44px; font-size: 14px; }

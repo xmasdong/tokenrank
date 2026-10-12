@@ -1,10 +1,9 @@
 <import src="../../templates/upstream.wxml" />
 <view class="page">
-  <view class="head"><view class="title display">使用说明</view><view class="sub">接入、更新、统计口径和卸载</view></view>
-  <view class="double-rule"></view>
+  <view class="head">接入、更新、统计口径和卸载</view>
   <view class="sec connect-first"><view class="sec-title display">接入电脑</view>
     <view class="p">在电脑终端运行你的接入命令。</view>
-    <button class="btn btn-ink" bindtap="goConnect">获取接入命令</button>
+    <button class="btn btn-primary" bindtap="goConnect">获取接入命令</button>
     <view class="note">需要 Node.js 22.13+。脚本会检查 token-watcher 最新稳定版，缺失时安装，有更新时升级并重新计算。</view>
   </view>
   <view class="sec"><view class="sec-title display">更新统计</view>

@@ -1,1 +1,4 @@
-{"navigationBarTitleText": "Token 群排名", "enablePullDownRefresh": true}
+{
+  "navigationBarTitleText": "我的用量",
+  "enablePullDownRefresh": true
+}

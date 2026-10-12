@@ -1,0 +1,24 @@
+<template name="leaderboard-row">
+  <view class="lb-row {{item.isMe ? 'lb-row-me' : ''}}" id="rank-{{item.rank}}">
+    <text class="lb-rank">{{item.rank}}</text>
+    <image wx:if="{{item.avatar_url}}" class="lb-avatar" src="{{item.avatar_url}}" mode="aspectFill" />
+    <view wx:else class="lb-avatar rank-avatar-ph">{{item.initial}}</view>
+    <view class="lb-person">
+      <view class="lb-name-line"><text class="lb-name">{{item.nickname}}</text><text wx:if="{{item.isMe}}" class="lb-me-tag">我</text></view>
+    </view>
+    <view class="lb-value"><text class="lb-number">{{item.tokens_value}}</text><text wx:if="{{item.tokens_unit}}" class="lb-unit">{{item.tokens_unit}}</text></view>
+  </view>
+</template>
+
+<template name="leaderboard-me">
+  <button class="lb-self" bindtap="goMine" aria-label="{{rankLabel}}，{{me ? '第 ' + me.rank + ' 名，' + me.tokens_fmt + ' tokens' : emptyLabel}}，查看我的用量">
+    <text class="lb-rank">{{me ? me.rank : '—'}}</text>
+    <image wx:if="{{user.avatar_url}}" class="lb-avatar" src="{{user.avatar_url}}" mode="aspectFill" />
+    <view wx:else class="lb-avatar rank-avatar-ph">我</view>
+    <view class="lb-person">
+      <view class="lb-name-line"><text class="lb-name">{{user.nickname || '我'}}</text><text class="lb-me-tag">我</text></view>
+      <view class="lb-self-note">{{me ? rankLabel : emptyLabel}}<text wx:if="{{me && showGlobal && me.global_rank}}"> · 全站 {{me.global_rank}}</text></view>
+    </view>
+    <view wx:if="{{me}}" class="lb-value"><text class="lb-number">{{me.tokens_value}}</text><text wx:if="{{me.tokens_unit}}" class="lb-unit">{{me.tokens_unit}}</text></view>
+  </button>
+</template>

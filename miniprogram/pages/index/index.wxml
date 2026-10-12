@@ -1,10 +1,5 @@
 <view class="page">
-  <view class="masthead">
-    <view class="seal seal-lg display">群</view>
-    <view class="mast-text"><view class="mast-title display">我的群榜</view><view class="mast-sub">每个群一张榜</view></view>
-    <view class="mast-about" bindtap="goAbout">说明</view>
-  </view>
-  <view class="double-rule"></view>
+  <view class="home-toolbar"><text>每个群一张榜</text><button class="mast-about" bindtap="goAbout">使用说明</button></view>
   <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
   <view class="own-usage">
     <view class="own-head"><text class="display">我的用量</text><button wx:if="{{!hasReported && (usageLoading || usageError || (usage && usage.has_history))}}" class="own-link own-entry" bindtap="goConnect">接入电脑</button><text wx:elif="{{hasReported}}" class="own-link" bindtap="goProfile">详情</text></view>
@@ -12,7 +7,7 @@
     <view wx:elif="{{usageError}}" class="own-note">用量加载失败：{{usageError}}<text class="own-link" bindtap="load"> 重试</text></view>
     <block wx:elif="{{usage && !usage.has_history && !hasReported}}">
       <view class="own-note">在电脑上运行接入命令后显示用量。不想上榜也行，接入后可以关掉排名。</view>
-      <button class="btn btn-seal quick-start" bindtap="goConnect">接入电脑</button>
+      <button class="btn btn-primary quick-start" bindtap="goConnect">接入电脑</button>
     </block>
     <block wx:elif="{{usage}}">
       <view class="own-number num-font" bindtap="goProfile">{{usage.value}}<text class="own-unit">{{usage.unit}}</text><text class="own-tokens"> tokens</text></view>
@@ -30,17 +25,18 @@
   <view wx:elif="{{!myGroups.length}}" class="hint">
     <view class="hint-title display">还没有加入群榜</view>
     <view class="hint-sub">把卡片发到微信群，从群里点开后加入。</view>
-    <button class="btn btn-seal retry" open-type="share">分享到微信群</button>
+    <button class="btn btn-primary retry" open-type="share">分享到微信群</button>
     <view class="hint-link" bindtap="goSquare">看广场榜</view>
   </view>
   <block wx:else>
     <view class="mg-sec">
+      <view class="mg-sec-title"><text>已加入群榜</text><text>{{myGroups.length}} 个</text></view>
       <view class="mg-card" wx:for="{{myGroups}}" wx:key="id" bindtap="openGroup" data-id="{{item.id}}">
         <view class="mg-top"><text class="mg-name">{{item.name}}</text><text class="mg-upd">{{item.updated_fmt}}</text></view>
-        <view class="mg-meta"><text>群内 <text class="mg-num num-font">{{item.my_rank_label}}</text></text><text>{{item.tokens_fmt}} tokens</text><text class="mg-members">{{item.members}} 人</text></view>
+        <view class="mg-meta"><text>群内 <text class="mg-num num-font">{{item.my_rank_label}}</text></text><text class="mg-tokens num-font">{{item.tokens_fmt}}<text class="mg-unit">tokens</text></text><text class="mg-members">{{item.members}} 人已加入</text></view>
       </view>
     </view>
-    <view class="actions"><button class="btn btn-seal" open-type="share">分享到其他群</button></view>
+    <view class="actions"><button class="btn btn-primary" open-type="share">分享到其他群</button></view>
   </block>
   <view class="legal">数据由用户电脑上报，仅供参考</view>
 </view>

@@ -12,7 +12,7 @@
         <input wx:if="{{nicknameReady}}" class="nickname-input" name="nickname" type="nickname" value="{{nickname}}" maxlength="32" placeholder="使用微信昵称，或填写昵称" placeholder-class="ph" bindinput="onNicknameInput" bindblur="onNicknameInput" disabled="{{saving}}" focus="{{nicknameFocus}}" aria-label="昵称" />
         <button wx:else class="nickname-activate" bindtap="enableNickname" loading="{{privacyBusy}}" disabled="{{saving || privacyBusy || !user}}" aria-label="启用微信昵称"><text class="nickname-value">{{nickname || '使用微信昵称'}}</text><text class="nickname-edit">{{nickname ? '修改' : '选择'}}</text></button>
       </view>
-      <button class="btn {{required ? 'btn-seal' : 'btn-ghost'}} profile-save" form-type="submit" loading="{{saving}}" disabled="{{saving || !user}}">{{saving ? '正在保存…' : required ? '保存并继续' : '保存'}}</button>
+      <button class="btn {{required ? 'btn-primary' : 'btn-ghost'}} profile-save" form-type="submit" loading="{{saving}}" disabled="{{saving || !user}}">{{saving ? '正在保存…' : required ? '保存并继续' : '保存'}}</button>
     </form>
     <view wx:if="{{profileError}}" class="profile-error">{{profileError}}</view>
     <view class="note">昵称 1–16 个字，保存后生效</view>

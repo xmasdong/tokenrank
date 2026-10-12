@@ -1,12 +1,11 @@
-.account-page { padding: 56rpx 32rpx calc(64rpx + env(safe-area-inset-bottom)); }
-.eyebrow { color: var(--ink-fade); font-size: 24rpx; margin-bottom: 18rpx; }
-.page-title { font-size: 48rpx; font-weight: 600; }
-.intro { margin: 24rpx 0 40rpx; font-size: 30rpx; line-height: 1.7; }
-.deletion-list { border-top: 1rpx solid var(--hairline); }
-.deletion-item { padding: 28rpx 0; border-bottom: 1rpx solid var(--hairline); }
-.item-title { font-size: 30rpx; font-weight: 600; margin-bottom: 10rpx; }
-.detail, .scope-note { color: var(--ink-fade); font-size: 26rpx; line-height: 1.8; }
-.scope-note { margin: 32rpx 0 44rpx; }
-.delete-button { width: 100%; }
-.status-mark { color: var(--seal); font-size: 64rpx; margin: 32rpx 0; }
-.btn { margin-top: 40rpx; }
+.account-page { padding: 20px 16px calc(32px + env(safe-area-inset-bottom)); }
+.page-title { font-size: 20px; font-weight: 500; }
+.intro { margin: 12px 0 20px; font-size: 15px; line-height: 1.7; }
+.deletion-list { border-top: 1rpx solid var(--separator); }
+.deletion-item { padding: 16px 0; border-bottom: 1rpx solid var(--separator); }
+.item-title { font-size: 16px; font-weight: 500; margin-bottom: 6px; }
+.detail, .scope-note { color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
+.scope-note { margin: 20px 0; }
+.status-mark { color: var(--primary); font-size: 32px; margin: 16px 0; }
+.account-page .btn { width: 100%; margin: 20px 0 0; }
+.error-note { margin-top: 16px; color: var(--danger); font-size: 14px; line-height: 1.7; }

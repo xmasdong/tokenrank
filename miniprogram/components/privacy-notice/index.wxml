@@ -11,7 +11,7 @@
     <view class="pn-p pn-soft">不想上榜，可以在「我的」里关掉排名。</view>
     <view class="pn-actions">
       <button class="btn btn-ghost pn-btn" data-never="1" bindtap="close">不再提示</button>
-      <button class="btn btn-seal pn-btn" data-never="0" bindtap="close">知道了</button>
+      <button class="btn btn-primary pn-btn" data-never="0" bindtap="close">知道了</button>
     </view>
   </view>
 </view>
