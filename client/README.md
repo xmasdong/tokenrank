@@ -1,6 +1,6 @@
 # TokenRank 独立同步器
 
-v0.2.13 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
+v0.2.14 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
 
 更换服务器、接入码或统计库后，会重新全量上传本机保留的历史用量，包含注销后重新接入的情况。上传中断可分批续传；重复执行同一账号的接入命令不会重传未变化的日期。
 
@@ -125,3 +125,7 @@ tokenrank uninstall --purge-data         # 移除自启、清除独立配置文�
 ## 重算后清理失效归档（0.2.13）
 
 token-watcher 1.8 首次迁移 Codex 去重键时，会在统计库里留下一张 `codex_key_migration_backup` 归档表，按行号记录改动前的记录。更新重算会删除并从原始日志重扫全部 Codex 记录，行号随之改变，这张表从此对不上任何现存记录，却可能占到统计库的大部分，并被原版每日快照重复复制。0.2.13 在重算副本中删除它；更新前的完整统计库仍保存在 `~/.tokenrank/backups/update-*`。已更新过的用户再运行一次更新命令即可缩小统计库。
+
+## 清理旧采集程序备份（0.2.14）
+
+更新时如需升级原版，旧的 token-watcher 程序会移到安装目录旁的 `token-watcher.tokenrank-backup-<时间>`，供失败时回滚。0.2.14 起，上次更新完成后，后台每天检查一次，删除创建满 7 天的这类备份；只处理已配置安装目录旁、名称完全匹配且确为 token-watcher 包的目录，更新未完成时不动。

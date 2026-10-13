@@ -1,5 +1,5 @@
-import { existsSync, readdirSync, rmSync, statSync } from 'node:fs';
-import { join } from 'node:path';
+import { existsSync, readdirSync, readFileSync, rmSync, statSync } from 'node:fs';
+import { basename, dirname, join } from 'node:path';
 import { readConfig, writeConfig, SYNC_DIR } from './config.js';
 
 export const BACKUP_KEEP_MS = 7 * 24 * 3600_000;
@@ -31,6 +31,24 @@ export function pruneBackups({ dir = SYNC_DIR, now = Date.now(), log = () => {} 
   const apps = readdirSync(dir).filter(n => n.startsWith('app-backup-')).map(n => join(dir, n))
     .sort((a, b) => statSync(b).mtimeMs - statSync(a).mtimeMs);
   apps.forEach((path, i) => { if (i > 0 && age(path) > BACKUP_KEEP_MS) remove(path); });
+
+  // An upgrade moves the old token-watcher package aside as <install>.tokenrank-backup-<ms>, next to
+  // the live install. Remove those a week after they were made (the name carries the time; the moved
+  // directory keeps its old mtime), and only exact siblings that still are token-watcher packages.
+  if (config.upstream_entry) {
+    const root = dirname(dirname(config.upstream_entry)), parent = dirname(root), prefix = basename(root) + '.tokenrank-backup-';
+    let names = [];
+    try { names = readdirSync(parent); } catch {}
+    for (const n of names) {
+      const made = Number(n.slice(prefix.length));
+      if (!n.startsWith(prefix) || !/^\d+$/.test(n.slice(prefix.length)) || now - made <= BACKUP_KEEP_MS) continue;
+      const path = join(parent, n);
+      try {
+        if (JSON.parse(readFileSync(join(path, 'package.json'), 'utf8')).name !== 'token-watcher') continue;
+        remove(path);
+      } catch { /* unreadable or not removable: leave it */ }
+    }
+  }
 
   if (removed.length) log(`已清理 ${removed.length} 个过期备份`);
   return { removed };
