@@ -19,11 +19,11 @@ $stage = Join-Path $tmp 'stage'
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 try {
   Write-Host '下载接入程序，检查并准备原版 token-watcher…'
-  Invoke-WebRequest -Uri ($Server.TrimEnd('/') + '/dl/tokenrank-client-0.2.12.tar.gz') -OutFile (Join-Path $tmp 'app.tar.gz') -UseBasicParsing
+  Invoke-WebRequest -Uri ($Server.TrimEnd('/') + '/dl/tokenrank-client-0.2.13.tar.gz') -OutFile (Join-Path $tmp 'app.tar.gz') -UseBasicParsing
   tar -xzf (Join-Path $tmp 'app.tar.gz') -C $stage
   if ($LASTEXITCODE -ne 0) { throw '解压失败，旧版本尚未替换' }
   $pkg = Get-Content (Join-Path $stage 'package.json') -Raw | ConvertFrom-Json
-  if ($pkg.name -ne 'tokenrank-client' -or $pkg.version -ne '0.2.12') { throw '下载内容不是预期的独立同步器' }
+  if ($pkg.name -ne 'tokenrank-client' -or $pkg.version -ne '0.2.13') { throw '下载内容不是预期的独立同步器' }
   $entry = Join-Path $stage 'bin\tokenrank.js'
   Run-Node --no-warnings $entry prepare-upstream
   Run-Node --no-warnings $entry migrate-legacy-agent --app-root $app

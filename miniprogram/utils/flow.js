@@ -6,6 +6,15 @@ const PERIODS = [
   { key: 'month', label: '近30天' },
 ];
 
+// Newest computer-side sync client. Older clients keep working; they only get a gentle update hint.
+const LATEST_CLIENT = '0.2.13';
+function olderThan(version, target) {
+  const a = String(version || '').split('-')[0].split('.').map(Number), b = target.split('.').map(Number);
+  if (a.length !== 3 || a.some(n => !Number.isInteger(n))) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
+
 function connection(user, now = Date.now()) {
   const last = user && user.last_report_at;
   const health = user?.sync_health;
@@ -31,7 +40,8 @@ function connection(user, now = Date.now()) {
     connState,
     hasReported: !!last,
     connText: labels[state] || (last?'运行状态未知 · 上次上传 '+api.fmtRelTime(last):'等待电脑接入'),
-    connHint: hints[state],
+    connHint: state==='online' && olderThan(health?.client_version, LATEST_CLIENT)
+      ? '电脑端同步程序有新版本，可在「使用说明」复制更新命令运行一次。' : hints[state],
     syncTimes: [
       { label:'最近联系', value:health?.last_seen_at ? api.fmtRelTime(health.last_seen_at) : '尚无心跳' },
       { label:'最近检查', value:health?.last_check_at ? api.fmtRelTime(health.last_check_at) : '暂无记录' },

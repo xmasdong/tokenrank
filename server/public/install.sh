@@ -14,9 +14,9 @@ TMP=$(mktemp -d "$HOME/.tokenrank/install.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 mkdir "$TMP/stage"
 echo '下载接入程序，检查并准备原版 token-watcher…'
-curl -fsSL "${SERVER%/}/dl/tokenrank-client-0.2.12.tar.gz" -o "$TMP/app.tar.gz"
+curl -fsSL "${SERVER%/}/dl/tokenrank-client-0.2.13.tar.gz" -o "$TMP/app.tar.gz"
 tar -xzf "$TMP/app.tar.gz" -C "$TMP/stage"
-node -e 'const p=require(process.argv[1]); if(p.name!=="tokenrank-client"||p.version!=="0.2.12")process.exit(1)' "$TMP/stage/package.json"
+node -e 'const p=require(process.argv[1]); if(p.name!=="tokenrank-client"||p.version!=="0.2.13")process.exit(1)' "$TMP/stage/package.json"
 node --no-warnings "$TMP/stage/bin/tokenrank.js" prepare-upstream
 node --no-warnings "$TMP/stage/bin/tokenrank.js" migrate-legacy-agent --app-root "$APP"
 node --no-warnings "$TMP/stage/bin/tokenrank.js" start-upstream

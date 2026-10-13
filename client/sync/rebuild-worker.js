@@ -32,6 +32,11 @@ try {
     }, 15000);
     const result = await scanner.scanAll();
     if (Object.values(scanner.stats).some(s => s.parse_errors)) throw new Error('原版扫描存在文件错误，未替换原库或云端数据；请检查原版采集状态');
+    // token-watcher 1.8 keeps a one-time Codex key migration archive keyed by row id. The Codex rows it
+    // points at were deleted above and rescanned under new ids, so it can no longer restore anything,
+    // yet it is most of the database and is copied into every daily snapshot. The pre-update database
+    // stays in the update backup.
+    if (names.includes('codex')) store.db.exec('DROP TABLE IF EXISTS codex_key_migration_backup');
     store.db.exec('PRAGMA wal_checkpoint(TRUNCATE)');
     console.log(`[tokenrank] 现存日志重建完成：${result.files} 个文件。`);
   } finally { clearInterval(timer); store.close(); }

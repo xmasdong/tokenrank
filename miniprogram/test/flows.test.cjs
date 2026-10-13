@@ -603,7 +603,10 @@ test('用量未变仍显示在线，失联、主动关闭、错误和旧版未�
   const {p}=page('connect',{getConnect:async()=>state});p.onLoad({});await p.onShow();
   assert.equal(p.data.connState,'live');assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/无新增用量/);
   assert.equal(p.data.syncTimes.length,3);
-  state.sync_health.last_seen_at=now-16*60000;await p.load();assert.equal(p.data.connState,'stale');assert.match(p.data.connHint,/休眠、断网/);
+  state.sync_health.client_version='0.2.12';await p.load();assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/有新版本/);
+  state.sync_health.client_version='0.2.13';await p.load();assert.match(p.data.connHint,/无新增用量/);
+  state.sync_health.client_version='0.3.0-beta.1';await p.load();assert.match(p.data.connHint,/无新增用量/);
+  state.sync_health.last_seen_at=now-16*60000;state.sync_health.client_version='0.2.12';await p.load();assert.equal(p.data.connState,'stale');assert.match(p.data.connHint,/休眠、断网/);
   state.sync_health.state='stopped';state.sync_health.error_code='USER_DISABLED';await p.load();assert.equal(p.data.connText,'已主动关闭同步');
   state.sync_health={supported:true,state:'error',last_seen_at:now,error_code:'SOURCE_READ_FAILED'};await p.load();assert.match(p.data.connHint,/读取本机统计失败/);
   state.sync_health={supported:false,state:'unknown'};await p.load();assert.equal(p.data.connState,'unknown');

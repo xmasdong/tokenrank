@@ -8,7 +8,7 @@ import { spawnSync } from 'node:child_process';
 import { Store } from '../../token-watcher/src/store.js';
 import { DatabaseSync } from 'node:sqlite';
 
-test('clean rebuild ignores current cursors, removes stale derived rows, preserves settings and poller data, and repeats identically', t=>{
+test('clean rebuild ignores current cursors, removes stale derived rows and the orphaned Codex key archive, preserves settings and poller data, and repeats identically', t=>{
   const temp=mkdtempSync(join(tmpdir(),'rank-clean-test-'));t.after(()=>rmSync(temp,{recursive:true,force:true}));
   const logs=join(temp,'sessions');mkdirSync(logs);const file=join(logs,'rollout-fixture.jsonl'), dbPath=join(temp,'copy.db');
   const root=resolve(import.meta.dirname,'../../token-watcher'), helper=resolve(import.meta.dirname,'../sync/rebuild-worker.js');
@@ -19,17 +19,20 @@ test('clean rebuild ignores current cursors, removes stale derived rows, preserv
   store.insertEvent({ts,tool:'codex',total_tokens:9999,dedup_key:'orphan-legacy-row'});
   store.insertEvent({ts,tool:'cursor',total_tokens:7,dedup_key:'poller-history'});
   store.db.prepare('INSERT INTO settings VALUES(?,?)').run('keep-setting','"unchanged"');
+  store.db.exec('CREATE TABLE IF NOT EXISTS codex_key_migration_backup (table_name TEXT NOT NULL, source_rowid INTEGER NOT NULL, row_json TEXT NOT NULL, PRIMARY KEY (table_name, source_rowid))');
+  store.db.prepare('INSERT INTO codex_key_migration_backup VALUES(?,?,?)').run('events',1,'{"dedup_key":"codex:/old/path/rollout-fixture.jsonl:1"}');
   store.saveFile({path:file,tool:'codex',session_id:'rollout-fixture',size:bytes.length,mtime_ms:0,offset:bytes.length,state_json:'{"_v":4}'});store.close();
   const harness=join(temp,'harness.mjs');writeFileSync(harness,`import {SOURCES} from ${JSON.stringify(pathToFileURL(join(root,'src/config.js')).href)};
     const codex=SOURCES.find(s=>s.tool==='codex');SOURCES.splice(0,SOURCES.length,{...codex,roots:[process.argv[2]]});
     process.argv=[process.execPath,${JSON.stringify(helper)},${JSON.stringify(root)},${JSON.stringify(dbPath)}];
     await import(${JSON.stringify(pathToFileURL(helper).href)});`);
   const run=path=>spawnSync(process.execPath,['--no-warnings',harness,path],{encoding:'utf8'});
-  const summarize=()=>{const db=new DatabaseSync(dbPath,{readOnly:true});try{return {rows:db.prepare('SELECT tool,total_tokens,dedup_key FROM events ORDER BY tool,ts').all(),setting:db.prepare('SELECT value FROM settings WHERE key=?').get('keep-setting').value}}finally{db.close()}};
+  const summarize=()=>{const db=new DatabaseSync(dbPath,{readOnly:true});try{return {rows:db.prepare('SELECT tool,total_tokens,dedup_key FROM events ORDER BY tool,ts').all(),setting:db.prepare('SELECT value FROM settings WHERE key=?').get('keep-setting').value,
+    archive:db.prepare("SELECT count(*) n FROM sqlite_master WHERE name='codex_key_migration_backup'").get().n}}finally{db.close()}};
   const first=run(logs);assert.equal(first.status,0,first.stderr);const after=summarize();
   assert.equal(after.rows.filter(r=>r.tool==='codex').reduce((sum,r)=>sum+r.total_tokens,0),145);
   assert.equal(after.rows.find(r=>r.tool==='cursor').total_tokens,7);assert.equal(after.setting,'"unchanged"');
-  assert.ok(after.rows.every(r=>r.dedup_key!=='orphan-legacy-row'));assert.deepEqual(readFileSync(file),bytes);
+  assert.ok(after.rows.every(r=>r.dedup_key!=='orphan-legacy-row'));assert.equal(after.archive,0);assert.deepEqual(readFileSync(file),bytes);
   assert.equal(run(logs).status,0);assert.deepEqual(summarize(),after);
   const missing=run(join(temp,'missing'));assert.equal(missing.status,1);assert.match(missing.stderr,/原始日志目录不可用/);
   assert.deepEqual(summarize(),after);

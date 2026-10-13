@@ -7,7 +7,7 @@
     <view class="note">需要 Node.js 22.13+。脚本会检查 token-watcher 最新稳定版，缺失时安装，有更新时升级并重新计算。</view>
   </view>
   <view class="sec"><view class="sec-title display">更新统计</view>
-    <view class="p">用量明显不对、很久没同步，或提示版本过低时运行。不需要接入码。</view>
+    <view class="p">用量明显不对、很久没同步、提示有新版本，或电脑上的统计库占用空间很大时运行。不需要接入码。</view>
     <block wx:for="{{updateCmds}}" wx:key="key">
       <view class="cmd-label">{{item.label}}</view>
       <view class="cmd" data-cmd="{{item.cmd}}" bindtap="copyCmd">{{item.cmd}}</view>
