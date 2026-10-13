@@ -39,6 +39,19 @@ test('排行榜海报与封面均携带真码，分别展示前5名和前3名，
   }
 });
 
+test('排行榜海报在昵称下写出每人用量最多的模型，本人行跟在名次后', () => {
+  const withModels = entries.map((e, i) => ({ ...e, top_model: i === 1 ? null : `model-${i + 1}` }));
+  const data = personalRanking(record, { entries: withModels, total: 123, me: { rank: 52, tokens: 100000000, top_model: 'model-me' } });
+  assert.equal(data.me.top_model, 'model-me');
+  const { ctx, texts } = context();
+  drawRankingPoster(ctx, { data, codeImage: {} });
+  const values = texts.map(t => t.value);
+  for (const m of ['model-1', 'model-3', 'model-4', 'model-5']) assert.ok(values.includes(m), m);
+  assert.ok(!values.includes('model-6')); assert.ok(values.includes('我的全站排名 · model-me'));
+  const name = texts.find(t => t.value === '成员1'), model = texts.find(t => t.value === 'model-1');
+  assert.ok(model.y > name.y && model.x === name.x);
+});
+
 test('人数少的榜单缩短海报；未上榜状态不生成虚假名次', () => {
   const data = { ...personalRanking(record, { entries, total: 8, me: { rank: 52, tokens: 100000000 } }), entries: entries.slice(0, 1), me: null };
   assert.equal(rankingPosterHeight(data), 900);

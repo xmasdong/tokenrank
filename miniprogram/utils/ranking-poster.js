@@ -26,7 +26,7 @@ function personalRanking(record, board) {
   const range = record.usage.from === record.usage.to ? record.usage.to : `${record.usage.from} — ${record.usage.to}`;
   return { scope: 'global', name: '全站排名', period: record.usage.period, range, user: record.user,
     entries: board.entries, total: board.total, shortNote: usageBasis(record.usage).shortNote,
-    me: { rank, tokens, global_rank: rank } };
+    me: { rank, tokens, global_rank: rank, top_model: board.me?.top_model ?? null } };
 }
 
 function rankingAvatarUrls(data) {
@@ -78,7 +78,8 @@ function drawRankingPoster(ctx, { data, cover = false, codeImage, avatarImages =
     const isMe = own || (data.me?.rank != null && entry.rank === data.me.rank);
     if (isMe) { ctx.fillStyle = C.own; ctx.fillRect(0, y, W, height); }
     const size = cover ? 78 : 88, avatarX = 122, nameX = avatarX + size + 28;
-    const baseline = y + height / 2 + (own ? 1 : 15);
+    const model = entry.rank == null ? '' : entry.top_model || '';
+    const baseline = y + height / 2 + (own || model ? 1 : 15);
     const numberSize = cover ? 48 : 54;
     const numberWidth = entry.tokens == null ? 0 : amountWidth(entry.tokens, numberSize);
     const nameWidth = Math.max(40, right - numberWidth - 34 - nameX);
@@ -89,8 +90,8 @@ function drawRankingPoster(ctx, { data, cover = false, codeImage, avatarImages =
     if (own) {
       const label = entry.rank == null ? (data.emptyLabel || '本周期未上榜') : data.scope === 'group' ? '我的群内排名' : '我的全站排名';
       const global = data.scope === 'group' && entry.global_rank ? ` · 全站 ${entry.global_rank}` : '';
-      text(label + global, nameX, baseline + 38, 24, C.soft, nameWidth);
-    }
+      text(label + global + (model ? ` · ${model}` : ''), nameX, baseline + 38, 24, C.soft, nameWidth);
+    } else if (model) text(model, nameX, baseline + 38, 26, C.soft, nameWidth);
     if (entry.tokens != null) amount(entry.tokens, right, y + height / 2 + 18, numberSize);
     line(y + height);
   };

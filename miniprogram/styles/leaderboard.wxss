@@ -9,6 +9,7 @@
 .lb-person { flex: 1; min-width: 0; text-align: left; }
 .lb-name-line { display: flex; align-items: center; gap: 6px; }
 .lb-name { min-width: 0; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; font-size: 16px; font-weight: 400; line-height: 1.5; }
+.lb-model { margin-top: 2px; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; color: var(--text-muted); font-size: 12px; font-weight: 400; line-height: 1.4; }
 .lb-me-tag { flex: none; color: var(--text-muted); font-size: 11px; font-weight: 400; }
 .lb-value { display: flex; flex: none; align-items: baseline; justify-content: flex-end; gap: 4px; text-align: right; color: var(--amount); line-height: 1.4; font-variant-numeric: tabular-nums; }
 .lb-number { white-space: nowrap; font-size: 24px; font-weight: 400; }

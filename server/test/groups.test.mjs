@@ -321,6 +321,16 @@ test('个人用量无须入群；仅返回本人，不能通过 user_id 查询�
   assert.equal(empty.data.daily.length, 30); assert.deepEqual(empty.data.models, []);
 });
 
+test('榜单每人和本人都带用量最多的模型', async t => {
+  const f = fixture(t);
+  const day = beijingDay();
+  seedDay(f,1,day,{tokens:300,requests:2,models:[['model-small',100],['model-big',200]]});
+  seedDay(f,2,day,{tokens:900,requests:3,models:[['model-other',900]]});
+  const board = (await f.request('/api/leaderboard?period=day')).data;
+  assert.deepEqual(board.entries.map(e => e.top_model), ['model-other','model-big']);
+  assert.equal(board.me.top_model, 'model-big');
+});
+
 test('今日无用量也能看到已同步历史，今日趋势包含此前数据', async t => {
   const f = fixture(t);
   const yesterday = beijingDay(Date.now() - 86400000);

@@ -620,6 +620,7 @@ async function leaderboard(request, env, url) {
           .bind(mine.tokens, from, to, ...(scope === 'group' ? [group.id] : []), session.id).first();
       // 群榜时 me.rank 是群内名次，global_rank 是广场名次；全局榜两者相同
       me = { rank: ahead.c + 1, tokens: mine.tokens, requests: mine.requests,
+        top_model: topModel.get(session.id)?.model ?? null,
         global_rank: globalRankMap ? (globalRankMap.get(session.id) ?? null) : ahead.c + 1 };
     }
   }
