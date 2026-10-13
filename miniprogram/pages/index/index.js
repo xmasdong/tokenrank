@@ -2,6 +2,7 @@ const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
 const connectPrompt = require('../../utils/connect-prompt');
+const updatePrompt = require('../../utils/update-prompt');
 
 Page({
   data: { periods: flow.PERIODS, period: 'day', user: null, myGroups: [],
@@ -72,6 +73,7 @@ Page({
   promptConnect() {
     const { user, hasReported, myGroups } = this.data;
     connectPrompt.maybePrompt(wx, { user, hasReported, joined: myGroups.length > 0 }, () => this.goConnect());
+    updatePrompt.maybePrompt(wx, user);
   },
   openGroup(e) { wx.navigateTo({ url: flow.groupUrl(e.currentTarget.dataset.id) }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },

@@ -603,10 +603,9 @@ test('用量未变仍显示在线，失联、主动关闭、错误和旧版未�
   const {p}=page('connect',{getConnect:async()=>state});p.onLoad({});await p.onShow();
   assert.equal(p.data.connState,'live');assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/无新增用量/);
   assert.equal(p.data.syncTimes.length,3);
-  state.sync_health.client_version='0.2.12';await p.load();assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/有新版本/);
-  state.sync_health.client_version='0.2.13';await p.load();assert.match(p.data.connHint,/无新增用量/);
-  state.sync_health.client_version='0.3.0-beta.1';await p.load();assert.match(p.data.connHint,/无新增用量/);
-  state.sync_health.last_seen_at=now-16*60000;state.sync_health.client_version='0.2.12';await p.load();assert.equal(p.data.connState,'stale');assert.match(p.data.connHint,/休眠、断网/);
+  state.sync_health.update_available=true;await p.load();assert.equal(p.data.connText,'同步程序在线');assert.match(p.data.connHint,/有新版本/);
+  state.sync_health.update_available=false;await p.load();assert.match(p.data.connHint,/无新增用量/);
+  state.sync_health.last_seen_at=now-16*60000;state.sync_health.update_available=true;await p.load();assert.equal(p.data.connState,'stale');assert.match(p.data.connHint,/休眠、断网/);
   state.sync_health.state='stopped';state.sync_health.error_code='USER_DISABLED';await p.load();assert.equal(p.data.connText,'已主动关闭同步');
   state.sync_health={supported:true,state:'error',last_seen_at:now,error_code:'SOURCE_READ_FAILED'};await p.load();assert.match(p.data.connHint,/读取本机统计失败/);
   state.sync_health={supported:false,state:'unknown'};await p.load();assert.equal(p.data.connState,'unknown');
@@ -983,10 +982,10 @@ test('启动时监听新版本，下载完成后提示并应用更新', () => {
   const manager = { onUpdateReady: fn => { ready = fn; }, applyUpdate: () => applied++ };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), {
     App: v => app = v, wx: { getUpdateManager: () => manager, showModal: o => modal = o },
-    require: id => id === './utils/api' ? { accountState: () => '' } : id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : require(id) });
+    require: id => id === './utils/api' ? { accountState: () => '' } : id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : id === './utils/update-prompt' ? { arm: () => armed++ } : require(id) });
   app.onLaunch.call(app); ready(); assert.equal(modal.showCancel, false);
   modal.complete(); assert.equal(applied, 1);
-  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 4);
+  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 6);
 });
 
 test('已入群但从未接入电脑：每次进入小程序弹一次接入提示，确认后进入接入页', async () => {
@@ -1272,4 +1271,29 @@ test('群榜选择排行榜会生成新封面并保留真实群入口，原版�
   exports[2].options.success({ tempFilePath: 'legacy.png' }); await flush();
   exports[3].options.success({ tempFilePath: 'legacy-cover.png' }); await legacy;
   assert.equal(p.data.posterPath, 'legacy.png'); assert.equal(p.data.shareCardPath, 'legacy-cover.png');
+});
+
+test('电脑端同步程序版本低于服务端发布版本时自动提示，复制对应系统的更新命令，同一版本一天只提示一次', async () => {
+  const prompt = require(path.join(root, 'utils/update-prompt.js'));
+  const queue = require(path.join(root, 'utils/modal-queue.js'));
+  const health = { supported: true, state: 'online', update_available: true, client_version: '0.2.12', latest_client: '0.2.13', platform: 'win32', last_seen_at: Date.now() };
+  let user = { user_id: 1, nickname: '测试', avatar_url: 'https://rank.test/avatar.png', last_report_at: 10, sync_health: health };
+  const modals = [], copied = [];
+  const { p, wx } = page('index', { ensureLogin: async () => user, myRankings: async () => ({ groups: [{ id: 'g1', name: '本群', members: 3, my_rank: 1, my_tokens: 5 }] }) },
+    { showModal: o => modals.push(o), setClipboardData: o => { copied.push(o.data); o.success && o.success(); } });
+  queue._reset(); prompt._reset();
+  prompt.arm(); await p.load();
+  assert.equal(modals.length, 1); assert.equal(modals[0].title, '电脑端有新版本');
+  assert.match(modals[0].content, /0\.2\.12/); assert.match(modals[0].content, /0\.2\.13/); assert.match(modals[0].content, /PowerShell/);
+  modals[0].success({ confirm: true }); modals[0].complete({});
+  assert.deepEqual(copied, [prompt.COMMANDS.win]);
+  prompt.arm(); await p.load(); assert.equal(modals.length, 1, '同一天不重复打扰');
+  wx.setStorageSync(prompt.KEY, ''); prompt.arm(); user = { ...user, sync_health: { ...health, platform: 'darwin' } }; await p.load();
+  assert.equal(modals.length, 2); assert.doesNotMatch(modals[1].content, /PowerShell/);
+  modals[1].success({ confirm: true }); modals[1].complete({}); assert.equal(copied.at(-1), prompt.COMMANDS.mac);
+  wx.setStorageSync(prompt.KEY, ''); prompt.arm(); user = { ...user, sync_health: { ...health, update_available: false } }; await p.load();
+  assert.equal(modals.length, 2, '已是最新版不提示');
+  prompt.arm(); user = { ...user, sync_health: { ...health, state: 'stopped' } }; await p.load();
+  assert.equal(modals.length, 2, '主动关闭同步的电脑不提示');
+  queue._reset(); prompt._reset();
 });

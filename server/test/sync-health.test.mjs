@@ -2,7 +2,7 @@ import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
-import {heartbeat,syncHealth,STALE_AFTER_MS} from '../src/sync-health.js';
+import {heartbeat,syncHealth,STALE_AFTER_MS,LATEST_CLIENT,olderThan} from '../src/sync-health.js';
 import worker from '../src/worker.js';
 import {summarize} from '../../scripts/sync-status.mjs';
 
@@ -98,4 +98,15 @@ test('私有状态接口优先榜单来源设备，不泄漏到其他账号；�
   assert.equal(legacyReport.states.unknown,1);assert.equal(legacyReport.accounts[0].current,undefined);
   f.db.exec(readFileSync(new URL('../migrations/0010_sync_agents.sql',import.meta.url),'utf8'));
   assert.equal(f.db.prepare('SELECT COUNT(*) n FROM sync_agents').get().n,2);
+});
+
+test('older computer clients are flagged for an update against the released version',async t=>{
+  const f=fixture(t);
+  assert.equal(LATEST_CLIENT,JSON.parse(readFileSync(new URL('../../client/package.json',import.meta.url))).version);
+  await f.send();let state=await syncHealth(f.env,1,f.now);
+  assert.equal(state.update_available,true);assert.equal(state.latest_client,LATEST_CLIENT);assert.equal(state.agents[0].update_available,true);
+  await f.send({...f.body,client_version:LATEST_CLIENT,event_at:f.now+1});state=await syncHealth(f.env,1,f.now+1);
+  assert.equal(state.update_available,false);
+  assert.equal(olderThan('0.2.9','0.2.13'),true);assert.equal(olderThan('0.2.13','0.2.13'),false);
+  assert.equal(olderThan('0.3.0-beta.1','0.2.13'),false);assert.equal(olderThan('1.0.0','0.2.13'),false);assert.equal(olderThan('',' 0.2.13'),false);
 });

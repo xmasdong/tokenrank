@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const connectPrompt = require('../../utils/connect-prompt');
+const updatePrompt = require('../../utils/update-prompt');
 const { loadCodeImage } = require('../../utils/share-code');
 const { drawGroupPoster } = require('../../utils/group-poster');
 const { profileEditor } = require('../../utils/profile-editor');
@@ -167,6 +168,7 @@ Page({
     if (!this._visible || this.data.enterState !== 'ready') return;
     const { user, hasReported, joined } = this.data;
     connectPrompt.maybePrompt(wx, { user, hasReported, joined: joined === true }, () => this.goConnect());
+    updatePrompt.maybePrompt(wx, user);
   },
   async init(options = {}) {
     if (!this.data.id) return;

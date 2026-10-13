@@ -1,5 +1,6 @@
 const flow = require('../../utils/flow');
 const upstream = require('../../utils/upstream');
+const updatePrompt = require('../../utils/update-prompt');
 const AUDIT_PROMPT = `请审计这台电脑的 TokenRank 独立同步器 v0.2.13，并给出代码和文件证据：
 1. 入口为 tokenrank，运行文件仅 bin/tokenrank.js 与 sync/。日常同步不调用旧 fork Store 或扫描器；安装阶段可以检测、安装原版并调用原版 scan / 自启。
 2. 默认以 SQLite readOnly + query_only 读取 ~/.tokenmeter/tokenmeter.db，配置和同步进度写 ~/.tokenrank。确认原库及其 settings 未被改写。
@@ -16,8 +17,8 @@ Page({
     os: wx.getStorageSync('client_os') || 'mac',   // 与接入页共用同一份选择
     sourceGroup: '',
     updateCmds: [
-      { key: 'mac', label: 'macOS / Linux 终端', cmd: 'curl -fsSL https://tokenrank.xmasdong.cn/update.sh | sh' },
-      { key: 'win', label: 'Windows PowerShell', cmd: "& ([scriptblock]::Create((irm 'https://tokenrank.xmasdong.cn/update.ps1')))" },
+      { key: 'mac', label: 'macOS / Linux 终端', cmd: updatePrompt.COMMANDS.mac },
+      { key: 'win', label: 'Windows PowerShell', cmd: updatePrompt.COMMANDS.win },
     ],
   },
 

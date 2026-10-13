@@ -1,5 +1,6 @@
 const connectPrompt = require('./utils/connect-prompt');
 const privacyNotice = require('./utils/privacy-notice');
+const updatePrompt = require('./utils/update-prompt');
 const api = require('./utils/api');
 
 App({
@@ -13,7 +14,7 @@ App({
       if (pages[pages.length - 1]?.route !== 'pages/account/account') wx.reLaunch({ url: '/pages/account/account' });
       return;
     }
-    privacyNotice.arm(); connectPrompt.arm();
+    privacyNotice.arm(); connectPrompt.arm(); updatePrompt.arm();
   },
   // Old cached builds keep running until the next cold start; apply a
   // downloaded release immediately so fixes reach every user.

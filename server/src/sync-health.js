@@ -1,4 +1,15 @@
 import { bearerToken, jsonError } from './lib.js';
+import client from '../../client/package.json' with { type: 'json' };
+
+// The release being served from /dl. The mini program reads `update_available` from here, so a new
+// client release only needs a Worker deploy to start prompting older computers.
+export const LATEST_CLIENT = client.version;
+export function olderThan(version, target = LATEST_CLIENT) {
+  const a = String(version || '').split('-')[0].split('.').map(Number), b = target.split('.').map(Number);
+  if (a.length !== 3 || a.some(n => !Number.isInteger(n))) return false;
+  for (let i = 0; i < 3; i++) if (a[i] !== b[i]) return a[i] < b[i];
+  return false;
+}
 
 export const STALE_AFTER_MS = 15 * 60_000;
 const STATES = new Set(['starting', 'checking', 'idle', 'uploaded', 'error', 'stopped']);
@@ -66,6 +77,7 @@ export function presentAgent(row, now = Date.now()) {
     : row.state==='error' ? 'error' : row.state==='checking' || row.state==='starting' ? 'checking' : 'online';
   return { device_id:row.device_id, platform:row.platform, state, result:row.state,
     client_version:row.client_version, collector_version:row.collector_version, error_code:row.error_code,
+    latest_client:LATEST_CLIENT, update_available:olderThan(row.client_version),
     last_seen_at:row.last_seen_at, last_check_at:row.checked_at, check_started_at:row.check_started_at, source_day:row.source_day };
 }
 
