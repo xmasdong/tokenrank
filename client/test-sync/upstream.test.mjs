@@ -4,7 +4,7 @@ import { mkdtempSync, mkdirSync, writeFileSync, readFileSync, existsSync, rmSync
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { DatabaseSync } from 'node:sqlite';
-import { prepareUpstream, startPreparedUpstream, inspectUpstream, findUpstream, upstreamPrefix, UPSTREAM_VERSION, FIXED_SOURCE, collectorOutdated } from '../sync/upstream.js';
+import { prepareUpstream, startPreparedUpstream, inspectUpstream, findUpstream, upstreamPrefix, UPSTREAM_VERSION, FIXED_SOURCE, collectorOutdated, heapArgs, explainScanFailure } from '../sync/upstream.js';
 import { readConfig, writeConfig } from '../sync/config.js';
 
 function pkg(root, name='token-watcher', version='1.8.0') {
@@ -90,6 +90,29 @@ test('download and first scan failures can be retried without clobbering other i
   f.setFail('install',false);f.setFail('scan',true);await assert.rejects(()=>prepareUpstream(f.options),/scan failed/);
   const installs=f.calls.filter(x=>x.args.includes('install')).length;
   f.setFail('scan',false);await prepareUpstream(f.options);assert.equal(f.calls.filter(x=>x.args.includes('install')).length,installs);
+});
+
+test('first scan gets a larger heap and an out-of-memory abort is explained in Chinese', async t => {
+  const GB = 1024 ** 3;
+  assert.deepEqual(heapArgs({ total: 4 * GB, env: {} }), ['--max-old-space-size=4096']);
+  assert.deepEqual(heapArgs({ total: 16 * GB, env: {} }), ['--max-old-space-size=12288']);
+  assert.deepEqual(heapArgs({ total: 64 * GB, env: {} }), ['--max-old-space-size=16384']);
+  assert.deepEqual(heapArgs({ total: 16 * GB, env: { NODE_OPTIONS: '--max-old-space-size=30000' } }), []);
+  const plain = new Error('scan failed');
+  assert.equal(explainScanFailure(plain), plain);
+  for (const fields of [{ signal: 'SIGABRT' }, { status: 134 }, { status: 3221226505 }]) {
+    const err = explainScanFailure(Object.assign(new Error('Command failed'), fields), ['--max-old-space-size=6144']);
+    assert.match(err.message, /内存不足.*6144 MB/); assert.equal(err.cause.message, 'Command failed');
+  }
+  const f = fixture(t); let aborted = true;
+  const runner = (command, args) => {
+    if (args.includes('scan') && aborted) { f.calls.push({ command, args }); throw Object.assign(new Error('Command failed'), { signal: 'SIGABRT' }); }
+    return f.options.runner(command, args);
+  };
+  await assert.rejects(() => prepareUpstream({ ...f.options, runner }), /内存不足/);
+  const scan = f.calls.find(x => x.args.includes('scan'));
+  assert.match(scan.args[0], /^--max-old-space-size=\d+$/); assert.equal(scan.args.at(-1), 'scan');
+  aborted = false; await prepareUpstream({ ...f.options, runner });
 });
 
 test('unowned installation directory is never overwritten',async t=>{

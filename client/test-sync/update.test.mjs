@@ -84,7 +84,7 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   assert.equal(f.bodies[0].full, true); assert.equal(f.bodies[0].complete, true);
   assert.equal(f.bodies[0].days[0].tokens, 100); assert.equal(f.bodies[0].device_id, 'same-device');
   const c = readConfig(f.dir); assert.equal(c.token, 'a'.repeat(32)); assert.equal(c.last_update.status, 'complete');
-  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.14');
+  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.15');
   assert.equal(readFileSync(join(c.last_update.adapter_backup,'bin/tokenrank.js'),'utf8'),'// previous sync');
   const backup = new DatabaseSync(c.last_update.backup, { readOnly: true });
   assert.equal(backup.prepare('SELECT SUM(total_tokens) t FROM events').get().t, 200); backup.close();
@@ -305,6 +305,7 @@ test('maintenance rescans and remembers the active source checkout, leaving an o
       if (['plutil', 'launchctl'].includes(command)) return m.runner(command, args);
       if (args.some(arg => arg.endsWith('/rebuild-worker.js'))) {
         assert.equal(args.at(-2), realpathSync(root)); assert.notEqual(args.at(-1), realpathSync(f.dbPath));
+        assert.match(args[0], /^--max-old-space-size=\d+$/);
         f.actions.push('scan');
         const db = new DatabaseSync(args.at(-1)); db.exec('UPDATE events SET total_tokens=100'); db.close(); return '';
       }

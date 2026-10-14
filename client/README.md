@@ -1,6 +1,6 @@
 # TokenRank 独立同步器
 
-v0.2.14 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
+v0.2.15 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
 
 更换服务器、接入码或统计库后，会重新全量上传本机保留的历史用量，包含注销后重新接入的情况。上传中断可分批续传；重复执行同一账号的接入命令不会重传未变化的日期。
 
@@ -129,3 +129,7 @@ token-watcher 1.8 首次迁移 Codex 去重键时，会在统计库里留下一�
 ## 清理旧采集程序备份（0.2.14）
 
 更新时如需升级原版，旧的 token-watcher 程序会移到安装目录旁的 `token-watcher.tokenrank-backup-<时间>`，供失败时回滚。0.2.14 起，上次更新完成后，后台每天检查一次，删除创建满 7 天的这类备份；只处理已配置安装目录旁、名称完全匹配且确为 token-watcher 包的目录，更新未完成时不动。
+
+## 首次扫描内存上限（0.2.15）
+
+原版 token-watcher 首次扫描会把部分来源表（如 OpenCode 的 `part`）整表读入内存，历史很多的电脑会超过 Node 默认堆上限而崩溃。0.2.15 起，接入时的首次扫描和更新时的重算都以本机内存的 3/4 作为上限（最低 4096 MB，最高 16384 MB）；已在 `NODE_OPTIONS` 中自行设置 `--max-old-space-size` 时沿用用户设置。仍然内存不足时，显示中文说明而不是原生调用栈。根本修复需要原版改为逐行读取。

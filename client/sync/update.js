@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { SYNC_DIR, readConfig, writeConfig, normalizeUrl, normalizeToken, rejectSharedDirectory } from './config.js';
-import { findUpstream, findNpm, inspectUpstream, REGISTRY, UPSTREAM_VERSION as FIXED_VERSION, compareVersions, resolveUpdate } from './upstream.js';
+import { findUpstream, findNpm, inspectUpstream, REGISTRY, UPSTREAM_VERSION as FIXED_VERSION, compareVersions, resolveUpdate, heapArgs, explainScanFailure } from './upstream.js';
 import { updateServices, assertCollectorStopped } from './update-services.js';
 import { acquireLock } from './lock.js';
 import { readDays } from './source.js';
@@ -118,7 +118,9 @@ export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platfo
     const rebuilding = join(work,'working.db'), rebuilt = join(work,'ready.db');
     cpSync(backup,rebuilding);
     log('正在从现存原始日志重新计算，旧统计已备份；历史较多时需要几分钟…');
-    runner(process.execPath, ['--no-warnings', join(import.meta.dirname, 'rebuild-worker.js'), current.root, rebuilding], { stdio: 'inherit', timeout: 0 });
+    const heap = heapArgs();
+    try { runner(process.execPath, [...heap, '--no-warnings', join(import.meta.dirname, 'rebuild-worker.js'), current.root, rebuilding], { stdio: 'inherit', timeout: 0 }); }
+    catch (err) { throw explainScanFailure(err, heap); }
     readDays(rebuilding);
     backupSource(rebuilding,rebuilt);
     activateRebuild(rebuilt,dbPath,backupDir);

@@ -9,7 +9,7 @@ TMP=$(mktemp -d "$HOME/.tokenrank/update.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 mkdir "$TMP/stage"
 echo '下载更新工具，保留现有账号绑定…'
-curl --connect-timeout 20 --max-time 180 -fsSL https://tokenrank.xmasdong.cn/dl/tokenrank-client-0.2.14.tar.gz -o "$TMP/app.tar.gz"
+curl --connect-timeout 20 --max-time 180 -fsSL https://tokenrank.xmasdong.cn/dl/tokenrank-client-0.2.15.tar.gz -o "$TMP/app.tar.gz"
 tar -xzf "$TMP/app.tar.gz" -C "$TMP/stage"
-node -e 'const p=require(process.argv[1]); if(p.name!=="tokenrank-client"||p.version!=="0.2.14")process.exit(1)' "$TMP/stage/package.json"
+node -e 'const p=require(process.argv[1]); if(p.name!=="tokenrank-client"||p.version!=="0.2.15")process.exit(1)' "$TMP/stage/package.json"
 node --no-warnings "$TMP/stage/bin/tokenrank.js" update-and-resync

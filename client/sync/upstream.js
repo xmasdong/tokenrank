@@ -1,6 +1,6 @@
 import { existsSync, readFileSync, realpathSync, mkdirSync, writeFileSync, renameSync, lstatSync } from 'node:fs';
 import { join, dirname, resolve, delimiter } from 'node:path';
-import { homedir } from 'node:os';
+import { homedir, totalmem } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { readConfig, writeConfig, SYNC_DIR, rejectSharedDirectory } from './config.js';
 import { readDays } from './source.js';
@@ -13,6 +13,20 @@ export const FIXED_COMMIT = '7ed6f51aa64a80055169a82f91d569b2b0c200bf';
 export const FIXED_SOURCE = `https://codeload.github.com/luwill/token-watcher/tar.gz/${FIXED_COMMIT}`;
 export const REGISTRY = process.env.TOKENRANK_REGISTRY || 'https://registry.npmjs.org/';
 const OWNER = 'tokenrank-upstream-bootstrap-v1';
+
+// Upstream's first scan reads whole tables (e.g. OpenCode `part`) into memory, and
+// heavy histories exceed Node's default heap. Give the one-off scans up to 3/4 of RAM.
+export function heapArgs({ total = totalmem(), env = process.env } = {}) {
+  if (/--max-old-space-size/.test(env.NODE_OPTIONS || '')) return [];
+  return [`--max-old-space-size=${Math.max(4096, Math.min(16384, Math.floor(total / 1048576 * 0.75)))}`];
+}
+// V8 aborts on heap exhaustion: SIGABRT on macOS/Linux, 134 from shells, 0xC0000409 on Windows.
+export function explainScanFailure(err, args = heapArgs()) {
+  if (!(err?.signal === 'SIGABRT' || err?.status === 134 || err?.status === 3221226505)) return err;
+  const limit = args[0]?.split('=')[1];
+  return new Error(`原版 token-watcher 扫描时内存不足：本机 AI 工具的历史记录太大${limit ? `，内存上限已调到 ${limit} MB 仍不够` : ''}。`
+    + '这是原版采集器的已知问题，请关闭占用内存的程序后重试，或等待原版发布修复后再运行。', { cause: err });
+}
 const run = (cmd, args, options = {}) => execFileSync(cmd, args, { encoding: 'utf8', stdio: 'pipe', ...options });
 export const upstreamPrefix = (home = homedir(), platform = process.platform) => platform === 'win32'
   ? join(home, 'AppData', 'Local', 'TokenWatcher') : join(home, '.local', 'share', 'token-watcher');
@@ -137,7 +151,9 @@ export async function prepareUpstream({ home = homedir(), platform = process.pla
   if (!existsSync(db) || (managed && !state.scanned)) {
     if (!same(db, defaultDB)) throw new Error('自定义统计库不存在，请先确认原版采集器的数据路径');
     log('调用原版完成首次采集；统计库由原版自行维护，首次扫描可能需要几分钟…');
-    runner(process.execPath, ['--no-warnings', found.entry, 'scan'], { stdio: 'inherit' });
+    const heap = heapArgs();
+    try { runner(process.execPath, [...heap, '--no-warnings', found.entry, 'scan'], { stdio: 'inherit' }); }
+    catch (err) { throw explainScanFailure(err, heap); }
     if (managed) { state.scanned = true; saveState(prefix, state); }
   }
   readDays(db);
