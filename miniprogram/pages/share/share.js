@@ -46,7 +46,7 @@ Page({
       let record, ranking;
       if (style === 'ranking') {
         for (let attempt = 0; attempt < 2; attempt++) {
-          const pair = await Promise.all([api.createShare(period, 'usage'), api.fetchLeaderboard({ scope: 'global', period }, { force: true })]);
+          const pair = await Promise.all([api.createShare(period, 'usage', '', { force: attempt > 0 }), api.fetchLeaderboard({ scope: 'global', period }, { force: attempt > 0 })]);
           if (requestId !== this._requestId) return;
           record = pair[0];
           try { ranking = personalRanking(record, pair[1]); break; }

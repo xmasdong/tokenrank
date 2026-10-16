@@ -547,7 +547,7 @@ test('用量与榜单缓存区分周期和群，并发读取合并；过期和�
   assert.equal(calls.length, 4);
   now += 31_000;
   assert.equal(api.peekUsage('day'), null); await api.myUsage('day'); assert.equal(calls.length, 5);
-  now += 60_001;
+  now += 300_001;
   assert.equal(api.peekUsage('day'), null); await api.myUsage('day'); assert.equal(calls.length, 6);
 });
 
@@ -1213,7 +1213,7 @@ test('新增排行榜类型生成真码海报和封面，点开仍是作者的�
   const { p } = page('share', {
     createShare: async (period, style) => { calls.push([period, style]); return { id: 'd'.repeat(24), user: { nickname: '作者' }, usage }; },
     fetchLeaderboard: async (query, options) => {
-      assert.equal(query.period, 'week'); assert.equal(options.force, true);
+      assert.equal(query.period, 'week'); assert.equal(options.force, false);
       return { entries: Array.from({ length: 8 }, (_, i) => ({ rank: i + 1, nickname: '成员' + i, tokens: 500000000 - i })), me: { rank: 52, tokens: 258000000 }, total: 123 };
     },
   }, canvasWx(exports));
@@ -1595,4 +1595,27 @@ test('趋势切换口径或离开时，迟到响应不得覆盖新选项',async(
 test('趋势榜作为公开入口，注销账号也能先看内容，无接入弹窗',()=>{
   let app,armed=0,redirects=0;vm.runInNewContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),{App:v=>app=v,getCurrentPages:()=>[],wx:{reLaunch:()=>redirects++},require:id=>id==='./utils/api'?{accountState:()=> 'deleted',clearAvatarFiles(){}}:{arm:()=>armed++}});
   app.onShow({path:'pages/trends/trends'});assert.equal(armed,0);assert.equal(redirects,0);
+});
+
+test('缓存命中的日历不进入加载占位，返回保留已选日期；下拉刷新仍强制请求',async()=>{
+  const raw={month:'2026-10',today:'2026-10-16',daily:[{day:'2026-10-01',tokens:100,requests:1,reported:true},{day:'2026-10-02',tokens:0,requests:0,reported:true}],summary:{reported_days:2,tokens:100},first_day:'2026-10-01'};
+  let calls=0,force=false;const {p}=page('calendar',{peekCalendar:()=>raw,calendar:async(month,options)=>{calls++;force=options.force;return raw;}});
+  const patches=[],setData=p.setData;p.setData=function(patch){patches.push(patch);setData.call(this,patch);};p.onLoad({});await p.onShow();p.selectDay({currentTarget:{dataset:{day:'2026-10-01'}}});p.onHide();await p.onShow();
+  assert.equal(calls,0);assert.equal(p.data.selected.day,'2026-10-01');assert.ok(!patches.some(p=>p.loading===true||p.report===null));
+  await p.onPullDownRefresh();assert.equal(calls,1);assert.equal(force,true);
+});
+test('同页周报返回不重建分享或图片；数据刷新绕过缓存，图片返回保留现有结果',async()=>{
+  const raw=historyWeek(),user={nickname:'本人',avatar_url:null};let shares=0,loads=0,forced=false;
+  const {p}=page('weekly',{peekMe:()=>user,peekWeekly:()=>raw,weekly:async()=>{loads++;return raw;},createWeeklyShare:async(data,options)=>{shares++;forced=options.force;return{id:'a'.repeat(24),style:'weekly',user,usage:raw};}});
+  const patches=[],setData=p.setData;p.setData=function(patch){patches.push(patch);setData.call(this,patch);};p.onLoad({});await p.onShow();p.setData({socialCoverPath:'cover.png',socialPosterPath:'poster.png'});patches.length=0;
+  p.onHide();await p.onShow();assert.equal(shares,1);assert.equal(loads,0);assert.equal(p.data.socialPosterPath,'poster.png');assert.ok(!patches.some(p=>p.loading===true||p.report===null||p.socialPosterPath===''));
+  assert.match(p.onShareAppMessage().path,/id=aaaaaaaa/);await p.onPullDownRefresh();assert.equal(loads,1);assert.equal(shares,2);assert.equal(forced,true);
+});
+test('缓存趋势返回保留已展开条目；缓存分析返回保留名单，均不闪加载状态',async()=>{
+  const raw=trendData();let calls=0;const trend=page('trends',{peekTrends:()=>raw,trends:async()=>{calls++;return raw;}}).p;trend.onLoad({});await trend.onShow();trend.setData({report:{...trend.data.report,entries:[...trend.data.report.entries,{name:'page2'}]}});
+  const patches=[],set=trend.setData;trend.setData=function(patch){patches.push(patch);set.call(this,patch);};trend.onHide();await trend.onShow();assert.equal(trend.data.report.entries.length,2);assert.equal(calls,0);assert.ok(!patches.some(p=>p.loading===true||p.report===null));
+  const analysis=analysisData('public'),own=page('analysis',{peekAnalysis:()=>analysis,analysis:async()=>assert.fail('cached analysis must not request')}).p;own.onLoad({scope:'public'});await own.onShow();own.setData({audience:[{nickname:'已展开'}],audienceTotal:1});own.onHide();await own.onShow();assert.equal(own.data.audience.length,1);assert.equal(own.data.loading,false);
+});
+test('广场已缓存的工具分布直接展示，不清空已展示内容或请求接口',async()=>{
+  const raw=analysisData('public'),{p}=page('square',{peekAnalysis:()=>raw,analysis:async()=>assert.fail('no request')});p.data.mode='tools';const patches=[],set=p.setData;p.setData=function(patch){patches.push(patch);set.call(this,patch);};await p.onShow();assert.ok(p.data.insights);assert.ok(!patches.some(p=>p.loading===true||p.insights===null));
 });

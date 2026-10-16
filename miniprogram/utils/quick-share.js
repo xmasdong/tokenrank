@@ -27,7 +27,7 @@ function quickShare(api, wx) {
         try {
           let record;
           for (let attempt = 0; attempt < 2; attempt++) {
-            try { record = await api.createShare(period, 'usage', groupId); break; }
+            try { record = await api.createShare(period, 'usage', groupId, { force: attempt > 0 }); break; }
             catch (err) { if (err.statusCode !== 409 || attempt) throw err; }
             if (!current()) return null;
           }

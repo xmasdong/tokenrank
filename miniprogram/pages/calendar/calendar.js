@@ -9,6 +9,8 @@ Page({
   async onPullDownRefresh() { try { await this.load({ force: true }); } finally { wx.stopPullDownRefresh(); } },
   async load(options = {}) {
     const request = this._requestId = (this._requestId || 0) + 1, epoch = api.accountEpoch();
+    const cached = options.force === true ? null : api.peekCalendar?.(this.data.month);
+    if (cached) { this.showReport(cached); return; }
     this.setData({ loading: true, error: '', report: null, selected: null });
     try {
       if (api.accountState()) { wx.navigateTo({ url: '/pages/account/account' }); return; }
@@ -16,9 +18,14 @@ Page({
       if (request !== this._requestId || epoch !== api.accountEpoch()) return;
       const result = await api.calendar(this.data.month, options);
       if (request !== this._requestId || epoch !== api.accountEpoch()) return;
-      const report = calendarView(result), selected = report.days.find(day => day.day === result.today) || [...report.days].reverse().find(day => day.reported) || report.days[0];
-      this.setData({ month: result.month, report, selected, loading: false });
+      this.showReport(result);
     } catch (error) { if (request === this._requestId) this.setData({ loading: false, error: error.message || '日历暂不可用，请重试' }); }
+  },
+  showReport(result) {
+    if (this._raw === result && this.data.report) { this.setData({ loading: false, error: '' }); return; }
+    const report = calendarView(result), selected = report.days.find(day => day.day === this.data.selected?.day) || report.days.find(day => day.day === result.today) || [...report.days].reverse().find(day => day.reported) || report.days[0];
+    this._raw = result;
+    this.setData({ month: result.month, report, selected, loading: false, error: '' });
   },
   switchMonth(e) {
     const month = e.currentTarget.dataset.month;

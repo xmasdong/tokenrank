@@ -17,11 +17,12 @@ let accountState = ['pending', 'deleted'].includes(wx.getStorageSync(ACCOUNT_STA
 let authEpoch = 0;
 let loginPromise = null;
 let deletionPromise = null;
-const READ_TTL = 60_000;
+const READ_TTL = 5 * 60_000;
 const readCache = new Map();
 const pendingReads = new Map();
 let readEpoch = 0;
 let readDay = '';
+let readRevision = 0;
 
 function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
@@ -56,22 +57,22 @@ function cacheKey(path) {
 }
 function peek(path) {
   const item = readCache.get(cacheKey(path));
-  return item && Date.now() - item.at < READ_TTL ? item.value : null;
+  return item && Date.now() - item.at < READ_TTL && (!item.value.expires_at || item.value.expires_at > Date.now()) ? item.value : null;
 }
-function read(path, options = {}, requestOptions = {}) {
-  const key = cacheKey(path);
+function read(path, options = {}, requestOptions = {}, cachePath = path) {
+  const key = cacheKey(cachePath);
   if (options.force !== true) {
-    const value = peek(path);
+    const value = peek(cachePath);
     if (value) return Promise.resolve(value);
   } else readCache.delete(key);
   if (pendingReads.has(key)) return pendingReads.get(key);
   const epoch = readEpoch;
   const task = request(path, requestOptions).then(value => {
-    const currentKey = cacheKey(path);
+    const currentKey = cacheKey(cachePath);
     if (epoch === readEpoch && key === currentKey) {
       // Bound memory when a user opens many groups in one session.
       if (readCache.size >= 100) readCache.delete(readCache.keys().next().value);
-      readCache.set(key, { value, at: Date.now() });
+      readCache.set(key, { value, at: Date.now(), revision: ++readRevision });
     }
     return value;
   }).finally(() => { if (pendingReads.get(key) === task) pendingReads.delete(key); });
@@ -95,12 +96,30 @@ const audiencePath = ({ period = 'day', dimension = 'tools', tool = '', name, of
   `/api/insights/users?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&name=${encodeURIComponent(name)}` +
   (tool ? '&tool=' + encodeURIComponent(tool) : '') +
   (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
-const calendarPath = month => '/api/my/calendar' + (month ? '?month=' + encodeURIComponent(month) : '');
-const weeklyPath = week => '/api/my/weekly' + (week ? '?week=' + encodeURIComponent(week) : '');
+const beijingDate = () => new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+const defaultWeek = () => {
+  const day = new Date(beijingDate() + 'T00:00:00Z');
+  day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7 - 7);
+  return day.toISOString().slice(0, 10);
+};
+const calendarPath = month => '/api/my/calendar?month=' + encodeURIComponent(month || beijingDate().slice(0, 7));
+const weeklyPath = week => '/api/my/weekly?week=' + encodeURIComponent(week || defaultWeek());
 const trendsPath = ({ period = 'week', dimension = 'tools', metric = 'users', end = '', offset = 0, snapshot = '' } = {}) =>
   `/api/insights/trends?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&metric=${encodeURIComponent(metric)}` + (end ? '&end=' + encodeURIComponent(end) : '') +
   (offset ? '&offset=' + encodeURIComponent(offset) + '&snapshot=' + encodeURIComponent(snapshot) : '');
 
+// Derived records are reusable too: creating the same card must not repeat D1
+// reads/writes on every navigation. Source revisions change after a fresh read,
+// so a manual refresh cannot keep sharing an older cached summary.
+function derived(path, data, options = {}, sources = []) {
+  const revision = sources.map(source => readCache.get(cacheKey(source))?.revision || 0);
+  return read(path, options, { method: 'POST', data }, 'derived:' + path + ':' + JSON.stringify([data, revision]));
+}
+function usageShare(period, style = 'usage', groupId = '', options = {}) {
+  return derived('/api/shares', { period, style, ...(groupId ? { group_id: groupId } : {}) }, options,
+    ['/api/me', usagePath(period), rankingsPath(period), boardPath({ period }),
+      ...(groupId ? [groupPath(groupId), boardPath({ scope: 'group', id: groupId, period })] : [])]);
+}
 function rawRequest(path, { method = 'GET', data = null, auth = true, header = {}, timeout = 15000, deleting = false } = {}) {
   const epoch = authEpoch;
   if (auth && !deleting) { try { assertActive(); } catch (err) { return Promise.reject(err); } }
@@ -147,7 +166,7 @@ function login() {
             invalidateReads();
             wx.setStorageSync(KEY, sessionToken);
             wx.setStorageSync(KNOWN_ACCOUNT_KEY, true);
-            readCache.set(cacheKey('/api/me'), { value: data.user, at: Date.now() });
+            readCache.set(cacheKey('/api/me'), { value: data.user, at: Date.now(), revision: ++readRevision });
             loginPromise = null;
             resolve(data.user);
           })
@@ -349,15 +368,18 @@ module.exports = {
   analysis: (query, options) => read(analysisPath(query), options, { auth: query.scope !== 'public' }),
   insightUsers: (query, options = {}) => read(audiencePath(query), options, { auth: false,
     ...(options.grant ? { header: { 'x-insight-grant': options.grant } } : {}) }),
-  createShare: (period, style = 'usage', groupId = '') => request('/api/shares', { method: 'POST', data: { period, style, ...(groupId ? { group_id: groupId } : {}) } }),
+  createShare: usageShare,
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
-  compareShare: id => request('/api/shares/' + encodeURIComponent(id) + '/compare', { method: 'POST' }),
-  groupComparison: (id, data) => request('/api/groups/' + encodeURIComponent(id) + '/compare', { method: 'POST', data }),
+  compareShare: (id, options) => derived('/api/shares/' + encodeURIComponent(id) + '/compare', null, options, ['/api/me', ...['day','week','month','all'].map(usagePath)]),
+  groupComparison: (id, data, options) => derived('/api/groups/' + encodeURIComponent(id) + '/compare', data, options, ['/api/me', groupPath(id)]),
+  peekCalendar: month => peek(calendarPath(month)),
+  peekWeekly: week => peek(weeklyPath(week)),
+  peekTrends: query => peek(trendsPath(query)),
   calendar: (month, options) => read(calendarPath(month), options),
   weekly: (week, options) => read(weeklyPath(week), options),
-  createWeeklyShare: data => request('/api/shares', { method: 'POST', data: { ...data, style: 'weekly' } }),
+  createWeeklyShare: (data, options) => derived('/api/shares', { ...data, style: 'weekly' }, options, ['/api/me']),
   trends: (query, options) => read(trendsPath(query), options, { auth: false }),
-  revokeShare: id => request('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
+  revokeShare: id => mutate('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
 
   /** 个人用量：不依赖群成员身份或榜单名次。 */
   myUsage: (period = 'day', options) => read(usagePath(period), options),

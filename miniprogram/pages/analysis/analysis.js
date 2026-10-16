@@ -27,6 +27,16 @@ Page({
   async load(options = {}) {
     const request = this._requestId = (this._requestId || 0) + 1, epoch = api.accountEpoch();
     const query = { scope: this.data.scope, period: this.data.period, dimension: this.data.dimension, ...(this.data.tool ? { tool: this.data.tool } : {}) };
+    const cached = options.force === true ? null : api.peekAnalysis?.(query);
+    const user = query.scope === 'public' ? null : api.peekMe?.();
+    if (cached && (query.scope === 'public' || (user && !api.accountState()))) {
+      if (this._raw !== cached || !this.data.report) {
+        this.resetAudience(); this._raw = cached;
+        if (!cached.items.some(item => !item.unclassified && item.name === this.data.focusName)) this.setData({ focusName: '' });
+        this.render();
+      }
+      this.setData({ loading: false, error: '', ...(user ? { hasReported: !!user.last_report_at } : {}) }); return;
+    }
     this.resetAudience(); this.setData({ loading: true, error: '', selectedDay: null, visibleCount: 8, report: null });
     try {
       if (query.scope === 'mine') {
@@ -35,7 +45,7 @@ Page({
         if (request !== this._requestId || epoch !== api.accountEpoch()) return;
         this.setData({ hasReported: !!user.last_report_at });
       }
-      const result = api.peekAnalysis?.(query) && options.force !== true ? api.peekAnalysis(query) : await api.analysis(query, options);
+      const result = cached || await api.analysis(query, options);
       if (request !== this._requestId || (query.scope === 'mine' && epoch !== api.accountEpoch())) return;
       this._raw = result;
       if (!result.items.some(item => !item.unclassified && item.name === this.data.focusName)) this.setData({ focusName: '' });

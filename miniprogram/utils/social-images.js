@@ -9,6 +9,7 @@ function socialImages(wx, api) {
     async buildSocialImages() {
       const record = this._socialRecord;
       if (!record || !this._socialCanvasReady || !this._socialVisible) return;
+      if (this.data.socialCoverPath && (this._socialCoverOnly || this.data.socialPosterPath)) return;
       if (this._socialDrawing) { this._socialPending = true; return; }
       this._socialDrawing = true;
       const version = this._socialVersion, epoch = api.accountEpoch();

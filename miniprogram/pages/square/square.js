@@ -77,9 +77,11 @@ Page({
   async loadInsights(options = {}) {
     const requestId = this._requestId = (this._requestId || 0) + 1;
     const query = { scope: 'public', period: this.data.period, dimension: this.data.mode };
+    const cached = options.force === true ? null : api.peekAnalysis?.(query);
+    if (cached) { this.setData({ insights: presentAnalysis(cached), loading: false, error: '', me: null, updated_fmt: api.fmtRelTime(cached.updated_at) }); return; }
     this.setData({ loading: true, error: '', me: null, insights: null });
     try {
-      const result = api.peekAnalysis?.(query) && options.force !== true ? api.peekAnalysis(query) : await api.analysis(query, options);
+      const result = await api.analysis(query, options);
       if (requestId !== this._requestId) return;
       this.setData({ insights: presentAnalysis(result), loading: false, updated_fmt: api.fmtRelTime(result.updated_at) });
     } catch (err) { if (requestId === this._requestId) this.setData({ loading: false, error: err.message }); }

@@ -11,12 +11,19 @@ Page({
   query() { return { period: this.data.period, dimension: this.data.dimension, metric: this.data.metric, end: this.data.end }; },
   async load(options = {}) {
     const request = this._requestId = (this._requestId || 0) + 1;
+    const cached = options.force === true ? null : api.peekTrends?.(this.query());
+    if (cached) { this.showReport(cached); return; }
     this.setData({ loading: true, error: '', report: null, loadingMore: false, moreError: '' });
     try {
       const report = await api.trends(this.query(), options);
       if (request !== this._requestId) return;
-      this.setData({ report: trendsView(report), loading: false });
+      this.showReport(report);
     } catch (error) { if (request === this._requestId) this.setData({ loading: false, error: error.message || '趋势榜暂不可用，请重试' }); }
+  },
+  showReport(report) {
+    // Keep expanded continuation pages when the same first-page snapshot is reused.
+    if (this._raw !== report || !this.data.report) this.setData({ report: trendsView(report) });
+    this._raw = report; this.setData({ loading: false, error: '', loadingMore: false, moreError: '' });
   },
   switchOption(e) {
     const { field, value } = e.currentTarget.dataset;
