@@ -101,7 +101,31 @@ async function route(request, env, url, path) {
       if (group instanceof Response) return withCors(group);
       usage.group_standing = group;
     }
-    return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage, body?.style === 'receipt' ? 'receipt' : 'usage'));
+    return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage,
+      ['receipt', 'tools'].includes(body?.style) ? body.style : 'usage'));
+  }
+  if (method === 'POST' && /^\/api\/shares\/[0-9a-f]{24}\/compare$/.test(path)) {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    let source = await readShare(env, path.split('/')[3]);
+    if (source?.style === 'comparison') source = await readShare(env, source.comparison.source_id);
+    if (!source) return withCors(jsonError(404, '分享记录已失效或已被取消'));
+    const owner = await env.DB.prepare('SELECT user_id FROM usage_shares WHERE id=?1').bind(source.id).first();
+    if (owner?.user_id === user.id) return withCors(Response.json({ error: '这是你自己的用量记录', code: 'SELF_COMPARISON' }, { status: 409 }));
+    if (source.usage.token_basis !== 'upstream_total' || source.usage.timezone !== 'Asia/Shanghai')
+      return withCors(Response.json({ error: '这份记录的统计口径较早，请使用新分享卡对比', code: 'INCOMPATIBLE_USAGE' }, { status: 409 }));
+    if (!['day', 'week', 'month', 'all'].includes(source.usage.period) ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(source.usage.from) || !/^\d{4}-\d{2}-\d{2}$/.test(source.usage.to) ||
+      source.usage.from > source.usage.to || source.usage.to > beijingDay())
+      return withCors(jsonError(400, '这份记录的日期范围无效'));
+    const usageUrl = new URL(request.url);
+    usageUrl.searchParams.set('period', source.usage.period);
+    const result = await myUsage(request, env, usageUrl, source.usage);
+    if (!result.ok) return withCors(result);
+    const usage = await result.json();
+    if (!usage.reported_days) return withCors(Response.json({ error: '这段日期还没有同步记录', code: 'NO_PERIOD_USAGE',
+      from: source.usage.from, to: source.usage.to }, { status: 422 }));
+    return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage, 'comparison', source));
   }
   if (method === 'GET' && path.startsWith('/api/shares/')) {
     const shared = await readShare(env, path.slice('/api/shares/'.length));
@@ -646,7 +670,7 @@ async function leaderboard(request, env, url) {
 
 // ================= 杂项 =================
 
-async function myUsage(request, env, url) {
+async function myUsage(request, env, url, sharedRange = null) {
   const user = await sessionUser(request, env);
   if (!user) return jsonError(401, '请先登录');
   const initialized = await env.DB.prepare('SELECT 1 AS ready FROM usage_sync_state WHERE user_id=?1').bind(user.id).first();
@@ -654,8 +678,8 @@ async function myUsage(request, env, url) {
     const legacy = await env.DB.prepare('SELECT 1 AS found FROM daily_stats WHERE user_id=?1 LIMIT 1').bind(user.id).first();
     if (legacy) return jsonError(409, '请到管理电脑接入重新运行安装命令，以同步含缓存的总用量');
   }
-  const now = Date.now();
-  const range = usageWindow(url.searchParams.get('period'), now);
+  const now = sharedRange ? Math.min(Date.now(), Date.parse(sharedRange.to + 'T23:59:59.999+08:00')) : Date.now();
+  const range = sharedRange ? { period: sharedRange.period, from: sharedRange.from, to: sharedRange.to } : usageWindow(url.searchParams.get('period'), now);
   // 今日页也返回最近 7 天趋势，趋势范围不改变今日总量。
   const readFrom = range.period === 'day' ? daysAgo(6, now) : range.from;
   const rowsTask = env.DB.prepare(`SELECT day, tokens, input_tokens, output_tokens, requests, cache_read, cache_write,
@@ -668,6 +692,7 @@ async function myUsage(request, env, url) {
     .bind(user.id, range.to).all();
   const [rows, history, activityRows] = await Promise.all([rowsTask, historyTask, activityTask]);
   const usage = buildUsage(rows.results, range.period, now);
+  if (sharedRange) { usage.from = range.from; usage.to = range.to; }
   const ranking = await env.DB.prepare(`SELECT COUNT(*) AS participants,
     SUM(CASE WHEN total > ?3 OR (total = ?3 AND user_id < ?4) THEN 1 ELSE 0 END) AS ahead
     FROM (SELECT user_id, SUM(tokens) AS total FROM public_usage WHERE day >= ?1 AND day <= ?2
@@ -675,7 +700,7 @@ async function myUsage(request, env, url) {
   return Response.json({ ...usage, activity: buildActivity(activityRows.results, now),
     standing: { rank: usage.summary.tokens > 0 && !user.rank_hidden ? (ranking.ahead || 0) + 1 : null,
       participants: ranking.participants || 0, hidden: !!user.rank_hidden },
-    has_history: history.days > 0, first_day: history.first_day,
+    has_history: history.days > 0, reported_days: rows.results.filter(r => r.day >= range.from && r.day <= range.to).length, first_day: history.first_day,
     lifetime_tokens: history.tokens || 0, last_report_at: history.updated_at || null });
 }
 

@@ -55,3 +55,4 @@
 .account-delete { color: var(--danger); }
 .share-options { display: flex; gap: 16px; }
 .share-options .text-button { margin: 0; padding: 4px 0; }
+.tools-share { float: right; margin: 0; padding: 0 0 0 12px; min-height: 32px; font-size: 13px; }

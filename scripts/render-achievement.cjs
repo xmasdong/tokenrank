@@ -2,6 +2,7 @@
 // CANVAS_MODULE=/path/to/@napi-rs/canvas CARD_FONT=/path/to/PingFang.ttc node scripts/render-achievement.cjs <share-id> [output-dir]
 const fs = require('node:fs'), path = require('node:path');
 const { drawAchievementPoster, ACHIEVEMENT_HEIGHT } = require('../miniprogram/utils/achievement-poster');
+const { drawToolsPoster, drawComparisonPoster, SOCIAL_HEIGHT } = require('../miniprogram/utils/social-poster');
 const API = 'https://tokenrank.xmasdong.cn';
 async function main() {
   const id = process.argv[2];
@@ -16,16 +17,18 @@ async function main() {
   const out = path.resolve(process.argv[3] || `artifacts/achievement-previews/${id}`);
   fs.mkdirSync(out, { recursive: true });
   const codeImage = await loadImage(path.resolve(__dirname, '../miniprogram/assets/mini-program-code.jpg'));
-  let avatarImage;
-  if (record.user.avatar_url?.startsWith(API + '/avatars/')) {
+  const avatarImages = {};
+  for (const url of [...new Set([record.user.avatar_url, record.comparison?.source.user.avatar_url].filter(Boolean))]) {
+    if (!url.startsWith(API + '/avatars/')) continue;
     try {
-      const avatar = await fetch(record.user.avatar_url, { signal: AbortSignal.timeout(10000) });
-      if (avatar.ok) avatarImage = await loadImage(Buffer.from(await avatar.arrayBuffer()));
+      const avatar = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      if (avatar.ok) avatarImages[url] = await loadImage(Buffer.from(await avatar.arrayBuffer()));
     } catch { /* Match the mini-program's initials fallback if the avatar is unavailable. */ }
   }
   for (const cover of [true, false]) {
-    const canvas = createCanvas(1000, cover ? 800 : ACHIEVEMENT_HEIGHT);
-    drawAchievementPoster(canvas.getContext('2d'), { ...record, cover, codeImage, avatarImage });
+    const canvas = createCanvas(1000, cover ? 800 : ['tools', 'comparison'].includes(record.style) ? SOCIAL_HEIGHT : ACHIEVEMENT_HEIGHT);
+    const draw = record.style === 'tools' ? drawToolsPoster : record.style === 'comparison' ? drawComparisonPoster : drawAchievementPoster;
+    draw(canvas.getContext('2d'), { ...record, cover, codeImage, avatarImages, avatarImage: avatarImages[record.user.avatar_url] });
     fs.writeFileSync(path.join(out, cover ? 'share-cover.png' : 'share-poster.png'), canvas.toBuffer('image/png'));
   }
   fs.writeFileSync(path.join(out, 'record.json'), JSON.stringify(record, null, 2));

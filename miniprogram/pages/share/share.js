@@ -6,6 +6,8 @@ const { presentCost, receiptTitle } = require('../../utils/cost');
 const { loadCodeImage } = require('../../utils/share-code');
 const { loadAvatarImage } = require('../../utils/share-avatar');
 const { shareTitle } = require('../../utils/share-story');
+const { drawToolsPoster, SOCIAL_HEIGHT } = require('../../utils/social-poster');
+const { toolsTitle } = require('../../utils/social-share');
 const { drawRankingPoster, personalRanking, rankingAvatarUrls, rankingPosterHeight } = require('../../utils/ranking-poster');
 Page({
   data: { period: 'day', style: 'receipt', theme: 'paper', cost: null, loading: true, error: '', generating: false,
@@ -15,7 +17,7 @@ Page({
     const period = usage.PERIODS.some(p => p.key === options.period) ? options.period : 'day';
     const theme = wx.getStorageSync('usage_card_theme') === 'ink' ? 'ink' : 'paper';
     const selected = options.style || wx.getStorageSync('usage_card_style');
-    const style = ['usage', 'receipt', 'ranking'].includes(selected) ? selected : 'receipt';
+    const style = ['usage', 'receipt', 'ranking', 'tools'].includes(selected) ? selected : 'receipt';
     this.setData({ period, theme, style, periodLabel: usage.PERIODS.find(p => p.key === period).label });
   },
   onShow() {
@@ -62,11 +64,11 @@ Page({
   },
   switchStyle(e) {
     const style = e.currentTarget.dataset.style;
-    if (!['usage','receipt','ranking'].includes(style) || style === this.data.style) return;
+    if (!['usage','receipt','ranking','tools'].includes(style) || style === this.data.style) return;
     wx.setStorageSync('usage_card_style', style); this.setData({ style }); return this.load();
   },
   switchTheme(e) {
-    if (this.data.style === 'ranking') return;
+    if (['ranking','tools'].includes(this.data.style)) return;
     const theme = e.currentTarget.dataset.theme;
     if (!['paper', 'ink'].includes(theme) || theme === this.data.theme) return;
     wx.setStorageSync('usage_card_theme', theme);
@@ -96,13 +98,13 @@ Page({
       const exportImage = (height, cover) => {
         canvas.width = 1000; canvas.height = height;
         if (style === 'ranking') drawRankingPoster(canvas.getContext('2d'), { data: ranking, cover, codeImage, avatarImages });
-        else (style === 'receipt' ? drawReceiptPoster : drawUsagePoster)(canvas.getContext('2d'), { ...snapshot, theme, cover, codeImage, avatarImage });
+        else (style === 'tools' ? drawToolsPoster : style === 'receipt' ? drawReceiptPoster : drawUsagePoster)(canvas.getContext('2d'), { ...snapshot, theme, cover, codeImage, avatarImage });
         return new Promise((resolve, reject) => wx.canvasToTempFilePath({
           canvas, destWidth: 1000, destHeight: height, fileType: 'png',
           success: r => resolve(r.tempFilePath), fail: () => reject(new Error('图片生成失败，请重试')),
         }));
       };
-      const posterPath = await exportImage(style === 'ranking' ? rankingPosterHeight(ranking) : style === 'receipt' ? RECEIPT_HEIGHT : 1400, false);
+      const posterPath = await exportImage(style === 'ranking' ? rankingPosterHeight(ranking) : style === 'tools' ? SOCIAL_HEIGHT : style === 'receipt' ? RECEIPT_HEIGHT : 1400, false);
       if (version !== this._imageVersion) return;
       const coverPath = await exportImage(800, true);
       if (version === this._imageVersion) {
@@ -156,7 +158,7 @@ Page({
   },
   onShareAppMessage() {
     const snapshot = this._snapshot;
-    return { title: snapshot ? (this.data.style === 'receipt' ? receiptTitle : shareTitle)(snapshot.user, snapshot.usage) : 'Token 用量统计',
+    return { title: snapshot ? (this.data.style === 'receipt' ? receiptTitle : this.data.style === 'tools' ? toolsTitle : shareTitle)(snapshot.user, snapshot.usage) : 'Token 用量统计',
       path: this.data.shareId ? '/pages/record/record?id=' + this.data.shareId : '/pages/index/index',
       imageUrl: this.data.coverPath || '/assets/share-cover.png' };
   },

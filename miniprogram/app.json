@@ -8,6 +8,7 @@
     "pages/share/share",
     "pages/about/about",
     "pages/record/record",
+    "pages/compare/compare",
     "pages/account/account"
   ],
   "window": {

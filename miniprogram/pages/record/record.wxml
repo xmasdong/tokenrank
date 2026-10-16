@@ -1,7 +1,10 @@
+<import src="../../templates/comparison.wxml" />
 <view class="page">
   <view wx:if="{{loading}}" class="state">正在加载用量…</view>
   <view wx:elif="{{error}}" class="state"><view>{{error}}</view><button class="btn btn-ghost" bindtap="load">重试</button></view>
   <block wx:else>
+    <template wx:if="{{comparison}}" is="comparison" data="{{comparison}}" />
+    <block wx:else>
     <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">截至 {{record.usage.to}}</view></view></view>
     
     <view wx:if="{{record.style === 'receipt'}}" class="receipt">
@@ -16,11 +19,14 @@
     <view wx:else class="total"><view>{{story.label}}用量</view><view class="number num-font">{{story.value}}<text class="number-unit">{{story.unit}}</text></view><view class="exact num-font">{{exact}} tokens</view></view>
     <view wx:if="{{group}}" class="shared-group"><view class="group-title">{{group.name}}</view><view class="muted">{{group.members}} 人已加入 · {{group.participants}} 人上榜</view></view>
     <view class="metrics"><view class="metric"><view class="metric-label">{{group ? '群内排名' : '全站排名'}}</view><view class="metric-value">{{group ? groupRank : story.rankText}}</view><view class="metric-note">{{group ? '全站 ' + story.rankText : story.rankNote}}</view></view><view class="metric"><view class="metric-label">{{story.streakLabel}}</view><view class="metric-value">{{story.streakValue}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.streakNote}}</view></view><view class="metric"><view class="metric-label">累计活跃</view><view class="metric-value">{{story.days}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.firstDay ? '自 ' + story.firstDay + ' 起' : '暂无活跃记录'}}</view></view></view>
-    <view class="partner"><view class="muted">最常用工具</view><view class="partner-name">{{story.top.name || '暂无工具明细'}}<text class="partner-percent" wx:if="{{story.top}}">{{story.top.percent}}%</text></view></view>
+    <view wx:if="{{record.style === 'tools'}}" class="partner"><view class="muted">工具偏好 · 按 Token 占比</view><view wx:for="{{tools}}" wx:key="name" class="tool-row"><view class="tool-head"><text>{{item.name}}</text><text>{{item.percent}}%</text></view><view class="tool-track"><view class="tool-fill" style="width:{{item.percent}}%;"></view></view></view><view wx:if="{{!tools.length}}" class="muted">暂无工具明细</view></view>
+    <view wx:else class="partner"><view class="muted">最常用工具</view><view class="partner-name">{{story.top.name || '暂无工具明细'}}<text class="partner-percent" wx:if="{{story.top}}">{{story.top.percent}}%</text></view></view>
     <view class="note"><view>{{record.usage.from}} — {{record.usage.to}} · {{story.timezoneLabel}}自然日</view><view>{{story.basisLabel}}。数据为分享时的记录。</view></view>
+    </block>
     <view wx:if="{{fromGroup}}" class="group-invite"><view class="group-title">本群排名</view><button class="btn btn-ghost" bindtap="goGroup">查看本群排名</button></view>
     <view class="connect-entry"><text>电脑用量同步</text><button class="btn btn-ghost" bindtap="goConnect">接入电脑</button></view>
   </block>
 </view>
 
-<view class="bottom-action"><button class="btn btn-primary" bindtap="goMine" loading="{{openingMine}}" disabled="{{openingMine}}">去看我的用量</button></view>
+<view class="bottom-action"><button class="btn {{record ? 'btn-ghost' : 'btn-primary'}}" bindtap="goMine" loading="{{openingMine}}" disabled="{{openingMine}}">去看我的用量</button><button wx:if="{{record}}" class="btn btn-primary" bindtap="goCompare">{{comparison ? '参与对比' : '和 TA 比一下'}}</button></view>
+<canvas type="2d" id="socialCanvas" class="export-canvas"></canvas>

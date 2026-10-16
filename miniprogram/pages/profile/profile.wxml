@@ -26,7 +26,7 @@
       <view class="section-head"><text class="section-title display">工具与模型</text><text class="section-meta">{{usage.periodLabel}}</text></view>
       <view class="note" wx:if="{{!usage.summary.tokens}}">这个周期没有明细</view>
       <block wx:else>
-        <view class="breakdown-label">使用工具</view>
+        <view class="breakdown-label">使用工具<button class="text-button tools-share" bindtap="goTools">分享工具偏好</button></view>
         <view wx:for="{{usage.tools}}" wx:key="name" class="detail-row" wx:if="{{expanded || 5 > index}}"><view class="detail-head"><text class="detail-name">{{item.name}}</text><text class="detail-number">{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;" class="fill tool-fill"></view></view></view>
         <view class="breakdown-label model-label">使用模型</view>
         <view wx:for="{{usage.models}}" wx:key="name" class="detail-row" wx:if="{{expanded || 5 > index}}"><view class="detail-head"><text class="detail-name">{{item.name}}</text><text class="detail-number">{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;" class="fill"></view></view></view>

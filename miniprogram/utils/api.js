@@ -336,6 +336,7 @@ module.exports = {
   peekLeaderboard: query => peek(boardPath(query)),
   createShare: (period, style = 'usage', groupId = '') => request('/api/shares', { method: 'POST', data: { period, style, ...(groupId ? { group_id: groupId } : {}) } }),
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
+  compareShare: id => request('/api/shares/' + encodeURIComponent(id) + '/compare', { method: 'POST' }),
   revokeShare: id => request('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
 
   /** 个人用量：不依赖群成员身份或榜单名次。 */

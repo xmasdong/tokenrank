@@ -385,6 +385,111 @@ function seedUsage(f, uid, offset, tokens = 100, requests = 1) {
   const day=beijingDay(Date.now()+offset*86400000);seedDay(f,uid,day,{tokens,requests});return day;
 }
 
+test('工具偏好只从本人同期明细计算，保留未分类份额，不公开被折叠的名称', async t => {
+  const f = fixture(t); seedUsage(f, 1, 0, 10000);
+  f.db.prepare('UPDATE daily_totals SET tools_json=? WHERE user_id=1').run(JSON.stringify([
+    ['Codex', 3000], ['Claude Code', 2000], ['Gemini CLI', 1000], ['Cursor', 1000], ['private-tool', 500],
+  ]));
+  const old = (await f.request('/api/shares', { period: 'day' })).data;
+  const result = await f.request('/api/shares', { period: 'day', style: 'tools', tools: [['forged', 999999]] });
+  assert.equal(result.status, 200); const card = result.data;
+  assert.equal(card.style, 'tools'); assert.notEqual(card.id, old.id);
+  assert.deepEqual(card.usage.tools.map(row => [row.name, row.percent]), [
+    ['Codex', 30], ['Claude Code', 20], ['Cursor', 10], ['Gemini CLI', 10], ['其他工具 / 未分类', 30],
+  ]);
+  assert.equal(card.usage.tools.reduce((sum, row) => sum + row.tokens, 0), 10000);
+  assert.doesNotMatch(JSON.stringify(card), /private-tool|forged|private-model|device_id|user_id|openid/);
+  assert.deepEqual((await f.request('/api/shares/' + old.id, null, 0)).data, old);
+  assert.deepEqual((await f.request('/api/shares/' + card.id, null, 0)).data, card);
+});
+
+test('同期对比要求真实登录，拒绝自比和伪造数据，不创建群成员关系', async t => {
+  const f = fixture(t); seedUsage(f, 1, 0, 100); seedUsage(f, 2, 0, 250);
+  const source = (await f.request('/api/shares', { period: 'day' })).data;
+  const url = `/api/shares/${source.id}/compare`;
+  assert.equal((await f.request(url, {}, 0)).status, 401);
+  assert.equal((await f.request(url, {})).data.code, 'SELF_COMPARISON');
+  const result = await f.request(url, { user_id: 1, summary: { tokens: 999999 }, from: '1900-01-01' }, 2);
+  assert.equal(result.status, 200); const card = result.data;
+  assert.equal(card.style, 'comparison'); assert.equal(card.user.nickname, '用户2');
+  assert.equal(card.usage.summary.tokens, 250); assert.equal(card.comparison.source.usage.summary.tokens, 100);
+  assert.equal(card.usage.from, source.usage.from); assert.equal(card.usage.to, source.usage.to);
+  assert.equal(card.expires_at, source.expires_at);
+  assert.deepEqual((await f.request('/api/shares/' + card.id, null, 0)).data, card);
+  assert.equal((await f.request(url, {}, 2)).data.id, card.id);
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM rank_group_members').get().n, 0);
+  const stored = JSON.parse(f.db.prepare('SELECT snapshot_json FROM usage_shares WHERE id=?').get(card.id).snapshot_json);
+  assert.deepEqual(stored.comparison, { source_id: source.id });
+  assert.doesNotMatch(JSON.stringify(stored), /用户1|user_id|device_id|openid|private-model/);
+  f.db.prepare('UPDATE daily_totals SET tokens=500 WHERE user_id=2').run();
+  assert.equal((await f.request('/api/shares/' + card.id, null, 0)).data.usage.summary.tokens, 250);
+});
+
+test('过去的分享按原日期比较，累计分享也不混入对方更早的历史', async t => {
+  const f = fixture(t), yesterday = beijingDay(Date.now() - 86400000);
+  seedUsage(f, 1, 0, 100); seedUsage(f, 1, -1, 100);
+  seedUsage(f, 2, 0, 999); seedUsage(f, 2, -1, 222); seedUsage(f, 2, -10, 888);
+  const source = (await f.request('/api/shares', { period: 'day' })).data;
+  const snapshot = JSON.parse(f.db.prepare('SELECT snapshot_json FROM usage_shares WHERE id=?').get(source.id).snapshot_json);
+  snapshot.usage.from = yesterday; snapshot.usage.to = yesterday;
+  f.db.prepare('UPDATE usage_shares SET snapshot_json=? WHERE id=?').run(JSON.stringify(snapshot), source.id);
+  const historical = await f.request(`/api/shares/${source.id}/compare`, {}, 2);
+  assert.equal(historical.status, 200); assert.equal(historical.data.usage.summary.tokens, 222);
+  assert.equal(historical.data.usage.from, yesterday); assert.equal(historical.data.usage.to, yesterday);
+  const all = (await f.request('/api/shares', { period: 'all' })).data;
+  const compared = await f.request(`/api/shares/${all.id}/compare`, {}, 2);
+  assert.equal(compared.status, 200); assert.equal(compared.data.usage.summary.tokens, 1221);
+  assert.equal(compared.data.usage.from, all.usage.from);
+});
+
+test('无同期上报不伪装成零用量；已上报的真实零值可以比较', async t => {
+  const f = fixture(t); seedUsage(f, 1, 0, 100); seedUsage(f, 2, -2, 200);
+  const source = (await f.request('/api/shares', { period: 'day' })).data;
+  const path = `/api/shares/${source.id}/compare`;
+  const missing = await f.request(path, {}, 2);
+  assert.equal(missing.status, 422); assert.equal(missing.data.code, 'NO_PERIOD_USAGE');
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM usage_shares WHERE user_id=2').get().n, 0);
+  seedUsage(f, 2, 0, 0, 0);
+  const zero = await f.request(path, {}, 2);
+  assert.equal(zero.status, 200); assert.equal(zero.data.usage.summary.tokens, 0);
+  assert.equal(zero.data.usage.summary.active_days, 0);
+});
+
+test('重转对比继续使用原作者，原卡关闭、过期或注销后派生对比不可读', async t => {
+  for (const change of ['revoke', 'expire', 'delete']) {
+    const f = fixture(t); seedUsage(f, 1, 0, 100); seedUsage(f, 2, 0, 250); seedUsage(f, 3, 0, 400);
+    const source = (await f.request('/api/shares', { period: 'day' })).data;
+    const pair = (await f.request(`/api/shares/${source.id}/compare`, {}, 2)).data;
+    const next = await f.request(`/api/shares/${pair.id}/compare`, {}, 3);
+    assert.equal(next.status, 200); assert.equal(next.data.comparison.source_id, source.id);
+    assert.equal(next.data.comparison.source.user.nickname, '用户1');
+    if (change === 'revoke') await f.request(`/api/shares/${source.id}/revoke`, {});
+    if (change === 'expire') f.db.prepare('UPDATE usage_shares SET expires_at=1 WHERE id=?').run(source.id);
+    if (change === 'delete') {
+      const { deleteAccount } = await import('../src/account.js');
+      await deleteAccount(f.env, 1);
+    }
+    assert.equal((await f.request('/api/shares/' + pair.id, null, 0)).status, 404);
+    assert.equal((await f.request('/api/shares/' + next.data.id, null, 0)).status, 404);
+    assert.equal((await f.request(`/api/shares/${source.id}/compare`, {}, 3)).status, 404);
+    assert.equal(f.db.prepare('SELECT tokens FROM daily_totals WHERE user_id=2').get().tokens, 250);
+  }
+});
+
+test('旧统计口径不能混用；关闭自己对比卡不改变原作者记录', async t => {
+  const f = fixture(t); seedUsage(f, 1, 0, 100); seedUsage(f, 2, 0, 250);
+  const source = (await f.request('/api/shares', { period: 'day' })).data;
+  const pair = (await f.request(`/api/shares/${source.id}/compare`, {}, 2)).data;
+  assert.equal((await f.request(`/api/shares/${pair.id}/revoke`, {}, 1)).status, 404);
+  await f.request(`/api/shares/${pair.id}/revoke`, {}, 2);
+  assert.equal((await f.request('/api/shares/' + source.id, null, 0)).status, 200);
+  const row = JSON.parse(f.db.prepare('SELECT snapshot_json FROM usage_shares WHERE id=?').get(source.id).snapshot_json);
+  row.usage.token_basis = 'input_output';
+  f.db.prepare('UPDATE usage_shares SET snapshot_json=? WHERE id=?').run(JSON.stringify(row), source.id);
+  const old = await f.request(`/api/shares/${source.id}/compare`, {}, 2);
+  assert.equal(old.status, 409); assert.equal(old.data.code, 'INCOMPATIBLE_USAGE');
+});
+
 async function largeGroup(t) {
   const f = fixture(t), group = (await f.resolve('large-group')).data;
   const now = Date.now();

@@ -78,6 +78,7 @@ Page({
     this.prepareQuickShare({ stamp: `${result.summary.tokens}:${result.last_report_at || ''}` });
   },
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
+  goTools() { wx.navigateTo({ url: usage.shareUrl(this.data.period) + '&style=tools' }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },

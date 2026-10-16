@@ -23,6 +23,7 @@ function page(name, overrides = {}, wxOverrides = {}) {
     ensureLogin: async () => ({ user_id: 1, nickname: '测试', avatar_url: 'https://rank.test/avatar.png', connected: true, last_report_at: null }),
     ensureSession: async () => {}, sessionFresh: async () => false, peekMe: () => null, peekUsage: () => null, peekRankings: () => null,
     accountState: () => '',
+    accountEpoch: () => 0,
     peekGroup: () => null, peekLeaderboard: () => null,
     relogin: async () => ({}), resolveGroup: async () => ({ id: 'actual-group', name: '本群', joined:true }),
     groupInfo: async () => ({ name: '本群', members: 1, joined: true, owner_id: 1 }),
@@ -1365,4 +1366,78 @@ test('访客主动查看本人用量后才登录；新用户直达设备选择�
   const { p, navigation } = page('record', { ensureLogin: () => new Promise(resolve => finish = resolve) });
   const pending = p.goMine(); p.onHide(); finish({last_report_at:null}); await pending;
   assert.equal(navigation.length, 0);
+});
+
+const socialSource = () => ({ id: 'a'.repeat(24), user: { nickname: '原作者' }, usage: {
+  ...usageData('week', 100000000), token_basis: 'upstream_total', timezone: 'Asia/Shanghai',
+} });
+const comparedRecord = () => {
+  const source = socialSource();
+  return { id: 'b'.repeat(24), style: 'comparison', user: { nickname: '参与者' }, usage: { ...source.usage, summary: { ...source.usage.summary, tokens: 250000000 } },
+    comparison: { source_id: source.id, source } };
+};
+
+test('公开分享只展示原作者，点击对比才打开独立流程，不提前登录或读取本人用量', async () => {
+  const calls = [];
+  const { p, navigation } = page('record', { sharedRecord: async () => socialSource(),
+    ensureLogin: async () => calls.push('login'), compareShare: async () => calls.push('compare') });
+  p.onLoad({ id: 'a'.repeat(24) }); await p.onShow();
+  assert.equal(p.data.record.user.nickname, '原作者'); assert.deepEqual(calls, []);
+  p.goCompare(); assert.deepEqual(calls, []);
+  assert.equal(navigation.at(-1)[1], '/pages/compare/compare?id=' + 'a'.repeat(24));
+});
+
+test('对比在主动进入后读取真实接口，图片尚未生成也可转发正确的双人记录', async () => {
+  const order = [], result = comparedRecord();
+  const { p } = page('compare', { sharedRecord: async () => { order.push('source'); return socialSource(); },
+    ensureLogin: async () => { order.push('login'); return {}; }, compareShare: async id => { order.push('compare'); assert.equal(id, 'a'.repeat(24)); return result; } });
+  p.onLoad({ id: 'a'.repeat(24) }); await p.onShow();
+  assert.deepEqual(order, ['source', 'login', 'compare']);
+  assert.equal(p.data.comparison.left.value, '1.00'); assert.equal(p.data.comparison.right.value, '2.50');
+  assert.equal(p.data.socialCoverPath, '');
+  assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + result.id);
+  assert.match(p.onShareAppMessage().title, /原作者.*参与者/);
+  p.onHide(); assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + 'a'.repeat(24));
+});
+
+test('同期数据缺失保留待同步状态，不生成零值对比；自己的卡片给出个人入口', async () => {
+  for (const code of ['NO_PERIOD_USAGE', 'SELF_COMPARISON']) {
+    const { p, navigation } = page('compare', { sharedRecord: async () => socialSource(), compareShare: async () => {
+      const error = new Error('真实接口拒绝'); error.code = code; throw error;
+    } });
+    p.onLoad({ id: 'a'.repeat(24) }); await p.onShow();
+    assert.equal(p.data.errorCode, code); assert.equal(p.data.record, null); assert.equal(p.data.comparison, null);
+    if (code === 'NO_PERIOD_USAGE') { p.goConnect(); assert.equal(navigation.at(-1)[1], '/pages/connect/connect'); }
+    else { p.goMine(); assert.equal(navigation.at(-1)[1], '/pages/profile/profile'); p.goTools(); assert.match(navigation.at(-1)[1], /period=week/); }
+  }
+});
+
+test('离开或注销后的迟到对比响应不能恢复分享内容', async () => {
+  for (const cancel of ['leave', 'epoch']) {
+    let release, epoch = 0;
+    const { p } = page('compare', { sharedRecord: async () => socialSource(), accountEpoch: () => epoch,
+      compareShare: () => new Promise(resolve => release = resolve) });
+    p.onLoad({ id: 'a'.repeat(24) }); const pending = p.onShow(); await flush();
+    if (cancel === 'leave') p.onHide(); else epoch++;
+    release(comparedRecord()); await pending;
+    assert.equal(p.data.record, null); assert.equal(p.data.comparison, null);
+    assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + 'a'.repeat(24));
+  }
+});
+
+test('接收双人卡片免登录展示两人摘要，重转保留双人记录与原作者', async () => {
+  let privateCalls = 0;
+  const pair = comparedRecord();
+  const { p } = page('record', { sharedRecord: async () => pair, ensureLogin: async () => { privateCalls++; }, compareShare: async () => { privateCalls++; } });
+  p.onLoad({ id: pair.id }); await p.onShow();
+  assert.equal(privateCalls, 0); assert.equal(p.data.comparison.left.nickname, '原作者'); assert.equal(p.data.comparison.right.nickname, '参与者');
+  assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + pair.id);
+});
+
+test('个人工具明细直接打开工具偏好分享，已有主题不会覆盖白底工具卡', async () => {
+  const { p, navigation } = page('profile'); p.data.period = 'month'; p.goTools();
+  assert.equal(navigation.at(-1)[1], '/pages/share/share?period=month&style=tools');
+  const share = page('share').p; share.onLoad({ period: 'month', style: 'tools' });
+  assert.equal(share.data.style, 'tools'); const theme = share.data.theme;
+  share.switchTheme({ currentTarget: { dataset: { theme: 'ink' } } }); assert.equal(share.data.theme, theme);
 });

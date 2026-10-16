@@ -1,0 +1,19 @@
+.comparison-range { padding: 20px 0 0; font-size: 12px; color: var(--text-secondary); text-align: center; }
+.comparison-people { display: flex; padding: 24px 0; border-bottom: 1rpx solid var(--separator); }
+.comparison-person { flex: 1; min-width: 0; padding: 0 8px; text-align: center; }
+.comparison-avatar { width: 52px; height: 52px; border-radius: 50%; margin: 0 auto 12px; }
+.comparison-initial { background: var(--surface-muted); color: var(--text-secondary); line-height: 52px; font-size: 20px; }
+.comparison-name { font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }
+.comparison-caption { color: var(--text-secondary); font-size: 11px; margin-top: 6px; }
+.comparison-label { padding: 22px 0 8px; font-size: 12px; color: var(--text-secondary); text-align: center; }
+.comparison-row { display: flex; gap: 16px; text-align: center; }
+.comparison-row > view { flex: 1; min-width: 0; width: 0; overflow-wrap: anywhere; }
+.comparison-amounts { color: var(--amount); font-size: 32px; line-height: 1.4; }
+.comparison-amounts text { margin-left: 4px; font-size: 20px; }
+.comparison-exacts { color: var(--text-secondary); font-size: 11px; margin-top: 6px; }
+.comparison-values { font-size: 22px; }
+.comparison-values text { font-size: 12px; }
+.comparison-tools { font-size: 15px; line-height: 1.6; }
+.comparison-tools text { display: block; margin-top: 6px; color: var(--text-secondary); font-size: 12px; }
+.comparison-common { margin-top: 24px; padding-top: 20px; border-top: 1rpx solid var(--separator); font-size: 14px; text-align: center; }
+.comparison-note { padding: 20px 0; color: var(--text-secondary); text-align: center; font-size: 11px; line-height: 1.8; }

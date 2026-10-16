@@ -1,0 +1,18 @@
+<import src="../../templates/comparison.wxml" />
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在读取同期用量…</view>
+  <view wx:elif="{{error}}" class="state"><view wx:if="{{sourceName}}" class="source-name">{{sourceName}}</view><view wx:if="{{from}}" class="source-range">{{from}} — {{to}}</view><view>{{error}}</view>
+    <button wx:if="{{errorCode === 'NO_PERIOD_USAGE'}}" class="btn btn-primary" bindtap="goConnect">查看电脑同步</button>
+    <block wx:elif="{{errorCode === 'SELF_COMPARISON'}}"><button class="btn btn-primary" bindtap="goMine">查看我的用量</button><button class="btn btn-ghost" bindtap="goTools">工具偏好</button></block>
+    <button wx:elif="{{errorCode !== 'REVOKED' && errorCode !== 'INCOMPATIBLE_USAGE'}}" class="btn btn-ghost" bindtap="load">重试</button>
+  </view>
+  <block wx:elif="{{comparison}}">
+    <template is="comparison" data="{{comparison, mine: true}}" />
+    <button wx:if="{{socialPosterPath}}" class="text-button" bindtap="preview">预览分享图</button>
+    <view wx:if="{{socialImageError}}" class="image-error">{{socialImageError}}<button class="text-button" bindtap="buildSocialImages">重新生成</button></view>
+    <view class="note">转发卡片展示双方头像、昵称和本期摘要，其他人可继续与原作者对比。</view>
+    <button class="text-button revoke" bindtap="revoke" disabled="{{revoking}}">关闭这张对比卡的链接</button>
+  </block>
+</view>
+<view wx:if="{{record}}" class="actions"><button class="btn btn-ghost" bindtap="savePoster" disabled="{{!socialPosterPath || saving || revoking}}" loading="{{saving}}">保存图片</button><button class="btn btn-primary" open-type="share" disabled="{{revoking}}">转发对比</button></view>
+<canvas type="2d" id="socialCanvas" class="export-canvas"></canvas>

@@ -1,0 +1,18 @@
+<template name="comparison">
+  <view class="comparison-range">{{comparison.from}} — {{comparison.to}} · 北京时间</view>
+  <view class="comparison-people">
+    <view class="comparison-person"><image wx:if="{{comparison.left.avatar_url && !comparison.left.avatarFailed}}" class="comparison-avatar" src="{{comparison.left.avatar_url}}" mode="aspectFill" binderror="comparisonAvatarError" data-side="left" /><view wx:else class="comparison-avatar comparison-initial">{{comparison.left.initial}}</view><view class="comparison-name">{{comparison.left.nickname}}</view><view class="comparison-caption">原作者</view></view>
+    <view class="comparison-person"><image wx:if="{{comparison.right.avatar_url && !comparison.right.avatarFailed}}" class="comparison-avatar" src="{{comparison.right.avatar_url}}" mode="aspectFill" binderror="comparisonAvatarError" data-side="right" /><view wx:else class="comparison-avatar comparison-initial">{{comparison.right.initial}}</view><view class="comparison-name">{{comparison.right.nickname}}</view><view class="comparison-caption">{{mine ? '我' : '参与者'}}</view></view>
+  </view>
+  <view class="comparison-label">Token 用量</view>
+  <view class="comparison-row comparison-amounts"><view>{{comparison.left.value}}<text>{{comparison.left.unit}}</text></view><view>{{comparison.right.value}}<text>{{comparison.right.unit}}</text></view></view>
+  <view class="comparison-row comparison-exacts"><view>{{comparison.left.exact}}</view><view>{{comparison.right.exact}}</view></view>
+  <view class="comparison-label">同期活跃</view>
+  <view class="comparison-row comparison-values"><view>{{comparison.left.activeDays}}<text> 天</text></view><view>{{comparison.right.activeDays}}<text> 天</text></view></view>
+  <view class="comparison-label">调用次数</view>
+  <view class="comparison-row comparison-values"><view>{{comparison.left.requests}}</view><view>{{comparison.right.requests}}</view></view>
+  <view class="comparison-label">最常用工具</view>
+  <view class="comparison-row comparison-tools"><view>{{comparison.left.top ? comparison.left.top.name : '暂无工具明细'}}<text wx:if="{{comparison.left.top}}">{{comparison.left.top.percent}}%</text></view><view>{{comparison.right.top ? comparison.right.top.name : '暂无工具明细'}}<text wx:if="{{comparison.right.top}}">{{comparison.right.top.percent}}%</text></view></view>
+  <view wx:if="{{comparison.commonTool}}" class="comparison-common">共同工具 · {{comparison.commonTool}}</view>
+  <view class="comparison-note">总用量含缓存 · 分享时的记录 · 用量不代表产出</view>
+</template>

@@ -1,13 +1,13 @@
 <view class="page {{!loading && !error && hasHistory ? 'has-actions' : ''}}">
-  <view class="page-title display">{{style === 'ranking' ? '排行榜' : style === 'receipt' ? 'AI 用量账单' : '我的 Token 用量'}}</view>
+  <view class="page-title display">{{style === 'tools' ? '工具偏好' : style === 'ranking' ? '排行榜' : style === 'receipt' ? 'AI 用量账单' : '我的 Token 用量'}}</view>
   <view class="subtitle">{{periodLabel}} · {{basisLabel}}</view>
-  <view class="tabs style-picker"><view class="tab {{style === 'receipt' ? 'tab-active' : ''}}" data-style="receipt" bindtap="switchStyle">用量账单</view><view class="tab {{style === 'usage' ? 'tab-active' : ''}}" data-style="usage" bindtap="switchStyle">Token 卡片</view><view class="tab {{style === 'ranking' ? 'tab-active' : ''}}" data-style="ranking" bindtap="switchStyle">排行榜</view></view>
-  <view wx:if="{{style !== 'ranking'}}" class="theme-picker"><button class="theme {{theme === 'paper' ? 'selected' : ''}}" data-theme="paper" bindtap="switchTheme"><text class="swatch paper {{style === 'receipt' ? 'receipt-paper' : ''}}"></text>{{style === 'receipt' ? '白纸' : '宣纸'}}</button><button class="theme {{theme === 'ink' ? 'selected' : ''}}" data-theme="ink" bindtap="switchTheme"><text class="swatch ink"></text>墨金</button></view>
+  <view class="tabs style-picker"><view class="tab {{style === 'receipt' ? 'tab-active' : ''}}" data-style="receipt" bindtap="switchStyle">用量账单</view><view class="tab {{style === 'usage' ? 'tab-active' : ''}}" data-style="usage" bindtap="switchStyle">Token 卡片</view><view class="tab {{style === 'ranking' ? 'tab-active' : ''}}" data-style="ranking" bindtap="switchStyle">排行榜</view><view class="tab {{style === 'tools' ? 'tab-active' : ''}}" data-style="tools" bindtap="switchStyle">工具偏好</view></view>
+  <view wx:if="{{style !== 'ranking' && style !== 'tools'}}" class="theme-picker"><button class="theme {{theme === 'paper' ? 'selected' : ''}}" data-theme="paper" bindtap="switchTheme"><text class="swatch paper {{style === 'receipt' ? 'receipt-paper' : ''}}"></text>{{style === 'receipt' ? '白纸' : '宣纸'}}</button><button class="theme {{theme === 'ink' ? 'selected' : ''}}" data-theme="ink" bindtap="switchTheme"><text class="swatch ink"></text>墨金</button></view>
   <view wx:if="{{loading}}" class="state">加载中…</view>
   <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重新加载</button></view>
   <block wx:else>
     <view wx:if="{{!hasHistory}}" class="empty-note">还没有用量记录。<text class="connect-link" bindtap="goConnect">接入电脑</text></view>
-    <view wx:if="{{hasHistory}}" class="poster-frame {{style === 'ranking' ? 'ranking' : theme}}">
+    <view wx:if="{{hasHistory}}" class="poster-frame {{style === 'ranking' || style === 'tools' ? 'ranking' : theme}}">
       <image wx:if="{{posterPath}}" class="poster" src="{{posterPath}}" mode="widthFix" bindtap="preview" show-menu-by-longpress="{{true}}" />
       <view wx:else class="poster-placeholder"><text class="display">{{generating ? '生成中…' : '我的 Token 用量'}}</text><text wx:if="{{imageError}}">{{imageError}}</text><button wx:if="{{imageError}}" class="btn btn-ghost" bindtap="buildImages">重新生成</button></view>
     </view>
@@ -16,7 +16,7 @@
     <view wx:if="{{hasHistory && style === 'ranking'}}" class="footnote">图片展示全站前 5 名和自己的排名，转发封面展示前 3 名。</view>
     <button wx:if="{{shareId}}" class="record-preview" disabled="{{revoking}}" bindtap="previewRecord">预览分享页</button>
     <view wx:if="{{shareId}}" class="footnote">从群里点开卡片可以加入本群排名。</view>
-    <view class="footnote">卡片会公开头像、昵称和本次用量{{style === 'receipt' ? '、估算金额及模型明细' : ''}}，链接 90 天内有效，不公开完整历史。</view>
+    <view class="footnote">卡片会公开头像、昵称和本次用量{{style === 'receipt' ? '、估算金额及模型明细' : style === 'tools' ? '、工具用量及占比' : ''}}，链接 90 天内有效，不公开完整历史。</view>
     <button wx:if="{{shareId}}" class="revoke" loading="{{revoking}}" disabled="{{revoking}}" bindtap="revoke">关闭这张卡片的链接</button>
   </block>
 </view>
