@@ -11,7 +11,8 @@
     </block>
     <block wx:elif="{{usage}}">
       <view class="own-number num-font" bindtap="goProfile">{{usage.value}}<text class="own-unit">{{usage.unit}}</text><text class="own-tokens"> tokens</text></view>
-      <view class="own-meta"><text>{{usage.periodLabel}} · {{usage.requestsText}} 次调用</text><button class="own-share" wx:if="{{usage.has_history}}" bindtap="goShare">分享</button></view>
+      <view class="own-meta"><text>{{usage.periodLabel}} · {{usage.requestsText}} 次调用</text><button class="own-share" wx:if="{{usage.has_history}}" open-type="share" data-kind="personal" disabled="{{!quickShareReady}}">{{quickSharePreparing ? '准备中' : '转发'}}</button></view>
+      <view wx:if="{{usage.has_history}}" class="own-note"><text class="own-link" bindtap="goShare">分享图片</text><text wx:if="{{quickShareError}}" class="own-link" bindtap="retryQuickShare"> 转发重试</text></view>
     </block>
   </view>
   <view class="conn-strip status-line status-{{connState}}" wx:if="{{user && hasReported}}" bindtap="goConnect">
@@ -40,4 +41,5 @@
   </block>
   <view class="legal">数据由用户电脑上报，仅供参考</view>
 </view>
+<canvas type="2d" id="quickShareCanvas" class="export-canvas"></canvas>
 <privacy-notice />

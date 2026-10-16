@@ -14,7 +14,7 @@ Page({
     this.setData({id:/^[0-9a-f]{24}$/.test(id)?id:'',mode:['achievement','streak','tool'].includes(mode)?mode:'achievement'});
   },
   onShow(){this.setData({fromGroup:flow.enteredFromGroup()});return this.load();},
-  onHide(){this._requestId=(this._requestId||0)+1;},
+  onHide(){this._requestId=(this._requestId||0)+1;this.setData({openingMine:false});},
   onUnload(){this.onHide();},
   async load(){
     wx.hideShareMenu();
@@ -22,12 +22,26 @@ Page({
     const requestId=this._requestId=(this._requestId||0)+1;
     this.setData({loading:true,error:'',record:null});
     try{const record=await api.sharedRecord(this.data.id);if(requestId!==this._requestId)return;
-      this.setData({record,cost:presentCost(record.usage.cost),issuedAt:issuedAt(record.created_at),initial:[...(record.user.nickname||'记')][0],story:story(record.usage,this.data.mode),exact:integer(record.usage.summary.tokens),loading:false});
+      const group=record.usage.group_standing;
+      this.setData({record,group:group||null,groupRank:group?.rank ? '#' + integer(group.rank) : group?.hidden ? '未参与排名' : '未上榜',cost:presentCost(record.usage.cost),issuedAt:issuedAt(record.created_at),initial:[...(record.user.nickname||'记')][0],story:story(record.usage,this.data.mode),exact:integer(record.usage.summary.tokens),loading:false});
       wx.showShareMenu({menus:['shareAppMessage'],withShareTicket:true});
     }catch(err){if(requestId===this._requestId)this.setData({loading:false,error:err.message});}
   },
   avatarError(){this.setData({avatarFailed:true});},
-  goMine(){if(api.accountState()){wx.navigateTo({url:'/pages/account/account'});return;}wx.switchTab({url:'/pages/profile/profile'});},
+  async goMine(){
+    if(api.accountState()){wx.navigateTo({url:'/pages/account/account'});return;}
+    if(this.data.openingMine)return;
+    const requestId=this._requestId;
+    this.setData({openingMine:true});
+    try{
+      const user=api.peekMe()||await api.ensureLogin();
+      if(requestId!==this._requestId)return;
+      if(user.last_report_at)wx.switchTab({url:'/pages/profile/profile'});
+      else wx.navigateTo({url:'/pages/connect/connect'});
+    }catch(err){if(requestId===this._requestId)wx.showToast({title:err.message||'暂时无法打开，请重试',icon:'none'});}
+    finally{if(requestId===this._requestId)this.setData({openingMine:false});}
+  },
+  goConnect(){wx.navigateTo({url:api.accountState()?'/pages/account/account':'/pages/connect/connect'});},
   goGroup(){wx.navigateTo({url:api.accountState()?'/pages/account/account':'/pages/group/group?enter=1'});},
   onShareAppMessage(){
     const record=this.data.record;

@@ -1,6 +1,7 @@
 const api = require('../../utils/api');
+const { quickShare } = require('../../utils/quick-share');
+const { drawAchievementPoster, ACHIEVEMENT_HEIGHT } = require('../../utils/achievement-poster');
 const flow = require('../../utils/flow');
-const connectPrompt = require('../../utils/connect-prompt');
 const updatePrompt = require('../../utils/update-prompt');
 const { loadCodeImage } = require('../../utils/share-code');
 const { drawGroupPoster } = require('../../utils/group-poster');
@@ -10,6 +11,7 @@ const { loadAvatarImage } = require('../../utils/share-avatar');
 const { drawRankingPoster, rankingAvatarUrls, rankingPosterHeight } = require('../../utils/ranking-poster');
 
 Page({
+  ...quickShare(api, wx),
   ...profileEditor(api, wx, { requireAvatar: true, onSaved(user) {
     this._continueProfile = true;
     if (this._visible) return this.continueProfile(user);
@@ -20,16 +22,17 @@ Page({
     nickname: '', avatarUrl: '', avatarDraft: '', saving: false, profileError: '',
     nicknameReady: false, nicknameFocus: false, privacyBusy: false, avatarNative: true, sourceName: '', draftName: '', named: true, canRename: false, myHidden: false, visibilitySaving: false,
     enterState: 'idle', enterError: '', joining: false, groupExists: false, owner_id: null, posterPath: '', shareCardPath: '', posterError: '',
-    posterStyles: ['排行榜', 'Token 榜单'], posterStyleIndex: 0, posterStyle: 'ranking', posterGenerating: false,
+    posterStyles: ['我的群内成绩', '完整排行榜', 'Token 榜单'], posterStyleIndex: 0, posterStyle: 'achievement', posterGenerating: false,
     connState: 'pending', connText: '', hasReported: false, updated_fmt: '' },
   onLoad(options) {
     const id = options.g || options.id || '';
     // 从已加入的群列表或接入页返回时保留群上下文；卡片进入必须识别当前真实微信群。
     this._needsResolve = !['mine', 'connect'].includes(options.from) || !id;
     const missing = !id && options.enter !== '1' && options.create !== '1';
-    const originalPoster = wx.getStorageSync('group_poster_style') === 'original';
+    const savedStyle = wx.getStorageSync('group_poster_style');
+    const styleIndex = savedStyle === 'original' ? 2 : savedStyle === 'ranking' ? 1 : 0;
     this.setData({ id, missing, sourceName: flow.sourceName(options), enterState: this._needsResolve ? 'idle' : 'ready',
-      posterStyle: originalPoster ? 'original' : 'ranking', posterStyleIndex: originalPoster ? 1 : 0 });
+      posterStyle: ['achievement', 'ranking', 'original'][styleIndex], posterStyleIndex: styleIndex });
   },
   onShow() {
     wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true });
@@ -43,7 +46,9 @@ Page({
     }
     return this._needsResolve ? this.tryEnterGroup() : this.init();
   },
+  onReady() { this.buildQuickCover(); if (this._quickRecord) this.buildPoster(); },
   onHide() {
+    this.clearQuickShare();
     this._visible = false;
     this._enterRequest = (this._enterRequest || 0) + 1;
     this._entering = false;
@@ -120,6 +125,7 @@ Page({
     else this.goHome();
   },
   beginProfile(user, mode) {
+    this.clearQuickShare();
     this._profileMode = mode;
     this._requestId = (this._requestId || 0) + 1;
     this._boardSnapshot = null;
@@ -161,14 +167,15 @@ Page({
       me: presentMe(lb.me),
       updated_fmt: api.fmtRelTime(lb.updated_at), loading: false, error: '',
     });
+    if (this.data.hasReported || lb.me) {
+      this.prepareQuickShare({ groupId: this.data.id, stamp: `${lb.snapshot || lb.updated_at}:${lb.me?.tokens}:${this.data.name}` });
+    } else this.clearQuickShare();
     if (changed || !this.data.posterPath) this.buildPoster();
     this.promptConnect();
   },
   promptConnect() {
     if (!this._visible || this.data.enterState !== 'ready') return;
-    const { user, hasReported, joined } = this.data;
-    connectPrompt.maybePrompt(wx, { user, hasReported, joined: joined === true }, () => this.goConnect());
-    updatePrompt.maybePrompt(wx, user);
+    updatePrompt.maybePrompt(wx, this.data.user);
   },
   async init(options = {}) {
     if (!this.data.id) return;
@@ -183,6 +190,7 @@ Page({
       this.showBoard(cachedBoard);
       return;
     }
+    this.clearQuickShare();
     this._posterVersion = (this._posterVersion || 0) + 1;
     this._boardSnapshot = null;
     this.setData({ loading: true, error: '', me: null, posterPath: '', shareCardPath: '',
@@ -268,17 +276,19 @@ Page({
       },
     });
   },
+  onQuickShareReady() { if (this.data.posterStyle === 'achievement') this.buildPoster(); },
   async buildPoster() {
+    if (this.data.posterStyle === 'achievement' && !this._quickRecord) return;
     if (this._posterBusy) { this._posterPending = true; return; }
     this._posterBusy = true;
     const version = this._posterVersion;
-    const data = { ...this.data, scope: 'group', day: this._boardSnapshot?.day };
+    const data = { ...this.data, scope: 'group', day: this._boardSnapshot?.day, achievement: this._quickRecord };
     this.setData({ posterError: '', posterGenerating: true });
     try {
       const node = await new Promise(resolve => wx.createSelectorQuery().in(this)
         .select('#poster').fields({ node: true, size: true }).exec(res => resolve(res && res[0] && res[0].node)));
       if (!node || version !== this._posterVersion) return;
-      const urls = data.posterStyle === 'ranking' ? rankingAvatarUrls(data) : [];
+      const urls = data.posterStyle === 'achievement' ? [data.achievement.user.avatar_url].filter(Boolean) : data.posterStyle === 'ranking' ? rankingAvatarUrls(data) : [];
       const [codeImage, images] = await Promise.all([loadCodeImage(node), Promise.all(urls.map(url => loadAvatarImage(node, url)))]);
       if (version !== this._posterVersion) return;
       const avatarImages = Object.fromEntries(urls.map((url, index) => [url, images[index]]));
@@ -287,9 +297,9 @@ Page({
         canvas: node, destWidth: width, destHeight: height, fileType: 'png',
         success: r => resolve(r.tempFilePath), fail: reject,
       }));
-      const width = data.posterStyle === 'ranking' ? 1000 : 750;
-      const height = data.posterStyle === 'ranking' ? rankingPosterHeight(data) : 1150;
-      const coverHeight = data.posterStyle === 'ranking' ? 800 : 600;
+      const width = data.posterStyle !== 'original' ? 1000 : 750;
+      const height = data.posterStyle === 'achievement' ? ACHIEVEMENT_HEIGHT : data.posterStyle === 'ranking' ? rankingPosterHeight(data) : 1150;
+      const coverHeight = data.posterStyle !== 'original' ? 800 : 600;
       node.width = width; node.height = height;
       this.drawPoster(ctx, width, height, codeImage, avatarImages, data);
       const posterPath = await exportImage(width, height);
@@ -309,17 +319,19 @@ Page({
     }
   },
   drawShareCard(ctx, W, H, codeImage, avatarImages = {}, data = this.data) {
-    if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, cover: true, codeImage, avatarImages });
+    if (data.posterStyle === 'achievement') drawAchievementPoster(ctx, { ...data.achievement, cover: true, codeImage, avatarImage: avatarImages[data.achievement.user.avatar_url] });
+    else if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, cover: true, codeImage, avatarImages });
     else drawGroupPoster(ctx, { data, cover: true, codeImage });
   },
   drawPoster(ctx, W, H, codeImage, avatarImages = {}, data = this.data) {
-    if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, codeImage, avatarImages });
+    if (data.posterStyle === 'achievement') drawAchievementPoster(ctx, { ...data.achievement, codeImage, avatarImage: avatarImages[data.achievement.user.avatar_url] });
+    else if (data.posterStyle === 'ranking') drawRankingPoster(ctx, { data, codeImage, avatarImages });
     else drawGroupPoster(ctx, { data, codeImage });
   },
   changePosterStyle(e) {
     const index = Number(e.detail.value);
-    if (![0, 1].includes(index) || index === this.data.posterStyleIndex) return;
-    const posterStyle = index === 0 ? 'ranking' : 'original';
+    if (![0, 1, 2].includes(index) || index === this.data.posterStyleIndex) return;
+    const posterStyle = ['achievement', 'ranking', 'original'][index];
     wx.setStorageSync('group_poster_style', posterStyle);
     this._posterVersion = (this._posterVersion || 0) + 1;
     this.setData({ posterStyle, posterStyleIndex: index, posterPath: '', shareCardPath: '' });
@@ -332,6 +344,7 @@ Page({
   switchPeriod(e) {
     const period = e.currentTarget.dataset.key;
     if (period === this.data.period) return;
+    this.clearQuickShare();
     this.setData({ period });
     return this.init();
   },
@@ -339,7 +352,11 @@ Page({
   goHome() { wx.switchTab({ url: '/pages/index/index' }); },
   goMine() { wx.switchTab({ url: '/pages/profile/profile' }); },
   goSquare() { wx.switchTab({ url: '/pages/square/square' }); },
-  onShareAppMessage() {
+  onShareAppMessage(options = {}) {
+    if (options.target?.dataset?.kind !== 'board') {
+      const personal = this.quickShareCard();
+      if (personal) return personal;
+    }
     const card = flow.shareCard();
     const named = this.data.joined === true && this.data.name;
     // The card opens the recipient's own group; carry the source name so that page can say where the card came from.

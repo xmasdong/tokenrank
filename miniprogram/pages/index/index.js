@@ -1,14 +1,15 @@
 const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
-const connectPrompt = require('../../utils/connect-prompt');
+const { quickShare } = require('../../utils/quick-share');
 const updatePrompt = require('../../utils/update-prompt');
 
 Page({
+  ...quickShare(api, wx),
   data: { periods: flow.PERIODS, period: 'day', user: null, myGroups: [],
     loading: true, error: '', connState: 'pending', connText: '', hasReported: false, usage: null, usageLoading: true, usageError: '' },
   onShow() { wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); return this.load(); },
-  onHide() { this._requestId = (this._requestId || 0) + 1; },
+  onHide() { this.clearQuickShare(); this._requestId = (this._requestId || 0) + 1; },
   onUnload() { this.onHide(); },
   async onPullDownRefresh() { try { await this.load({ force: true }); } finally { wx.stopPullDownRefresh(); } },
   async load(options = {}) {
@@ -21,6 +22,7 @@ Page({
       this.setData({ user: cachedUser, ...flow.connection(cachedUser), error: '', usageError: '' });
       this.showGroups(cachedGroups);
       this.setData({ usage: usage.present(cachedUsage), usageLoading: false });
+      this.prepareUsageShare(cachedUsage);
       this.promptConnect();
       return;
     }
@@ -59,7 +61,10 @@ Page({
   async loadUsage(period, requestId, options) {
     try {
       const result = await api.myUsage(period, options);
-      if (requestId === this._requestId) this.setData({ usage: usage.present(result), usageLoading: false });
+      if (requestId === this._requestId) {
+        this.setData({ usage: usage.present(result), usageLoading: false });
+        this.prepareUsageShare(result);
+      }
     } catch (err) {
       if (requestId === this._requestId) this.setData({ usageError: err.message, usageLoading: false });
     }
@@ -67,19 +72,23 @@ Page({
   switchPeriod(e) {
     const period = e.currentTarget.dataset.key;
     if (period === this.data.period) return;
+    this.clearQuickShare();
     this.setData({ period });
     return this.load();
   },
   promptConnect() {
-    const { user, hasReported, myGroups } = this.data;
-    connectPrompt.maybePrompt(wx, { user, hasReported, joined: myGroups.length > 0 }, () => this.goConnect());
-    updatePrompt.maybePrompt(wx, user);
+    updatePrompt.maybePrompt(wx, this.data.user);
   },
   openGroup(e) { wx.navigateTo({ url: flow.groupUrl(e.currentTarget.dataset.id) }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goProfile() { wx.switchTab({ url: '/pages/profile/profile' }); },
+  onReady() { this.buildQuickCover(); },
+  prepareUsageShare(result) {
+    if (!result.has_history) { this.clearQuickShare(); return; }
+    this.prepareQuickShare({ stamp: `${result.summary.tokens}:${result.last_report_at || ''}` });
+  },
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
   goSquare() { wx.switchTab({ url: '/pages/square/square' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },
-  onShareAppMessage() { return flow.shareCard(); },
+  onShareAppMessage(options = {}) { return options.target?.dataset?.kind === 'personal' ? this.quickShareCard() || flow.shareCard() : flow.shareCard(); },
 });

@@ -53,3 +53,5 @@
 .menu-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; box-sizing: border-box; border-top: 1rpx solid var(--separator); font-size: 15px; }
 .menu-arrow { color: var(--text-muted); font-size: 22px; }
 .account-delete { color: var(--danger); }
+.share-options { display: flex; gap: 16px; }
+.share-options .text-button { margin: 0; padding: 4px 0; }

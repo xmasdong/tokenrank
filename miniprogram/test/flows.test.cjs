@@ -158,13 +158,13 @@ test('确认时群变化失败，需要重新识别；不把原群或分享路�
 
 test('群中个人分享保留作者展示和我的用量，入群入口仅跳转识别页不自动加入',async()=>{
   let groups=0,logins=0,shareOptions;
-  const {p,navigation}=page('record',{sharedRecord:async()=>({user:{nickname:'作者'},usage:usageData()}),resolveGroup:async()=>groups++,relogin:async()=>logins++},
+  const {p,navigation}=page('record',{peekMe:()=>({last_report_at:1}),sharedRecord:async()=>({user:{nickname:'作者'},usage:usageData()}),resolveGroup:async()=>groups++,relogin:async()=>logins++},
     {getEnterOptionsSync:()=>({scene:1044}),showShareMenu:options=>shareOptions=options});
   p.onLoad({id:'a'.repeat(24)});await p.onShow();
   assert.equal(p.data.fromGroup,true);assert.equal(p.data.record.user.nickname,'作者');
   assert.equal(shareOptions.withShareTicket,true);
   p.goGroup();assert.deepEqual(navigation[0],['to','/pages/group/group?enter=1']);
-  assert.equal(groups,0);assert.equal(logins,0);p.goMine();assert.deepEqual(navigation[1],['tab','/pages/profile/profile']);
+  assert.equal(groups,0);assert.equal(logins,0);await p.goMine();assert.deepEqual(navigation[1],['tab','/pages/profile/profile']);
 });
 
 test('从我的群进入不重新识别其他微信群；非成员不会按 ID 直接加入', async () => {
@@ -924,10 +924,10 @@ test('取消公开后返回页面不会重新开放记录，用户明确重新�
 test('个人卡片及旧码展示作者数据，再次转发保留作者，底部跳转访问者自己的用量', async () => {
   let logins=0,groups=0,reads=0;
   for(const options of [{id:'a'.repeat(24),mode:'streak'},{scene:encodeURIComponent('s='+'a'.repeat(24)+'&m=s')}]){
-    const {p,navigation}=page('record',{ensureLogin:async()=>logins++,resolveGroup:async()=>groups++,sharedRecord:async id=>{
+    const {p,navigation}=page('record',{peekMe:()=>({last_report_at:1}),ensureLogin:async()=>logins++,resolveGroup:async()=>groups++,sharedRecord:async id=>{
       reads++;assert.equal(id,'a'.repeat(24));return{user:{nickname:'作者'},usage:{...usageData(),activity:{current_streak:21,active_days:30,streak_as_of:'2026-09-28'}}};}});
     p.onLoad(options);await p.onShow();assert.equal(p.data.mode,'streak');assert.equal(p.data.story.streakValue,21);
-    p.goMine();assert.deepEqual(navigation[0],['tab','/pages/profile/profile']);
+    await p.goMine();assert.deepEqual(navigation[0],['tab','/pages/profile/profile']);
     assert.equal(p.data.record.user.nickname,'作者');
     assert.equal(p.onShareAppMessage().path,'/pages/record/record?id='+'a'.repeat(24));
     assert.match(p.onShareAppMessage().title,/^作者 ·/);
@@ -948,7 +948,7 @@ test('无效码不请求摘要；过期与页面离开时不泄漏旧记录', as
 test('群榜小程序码不可用时不导出无真码海报，保留群内原生卡片入口和重试', async () => {
   const exports=[];
   const {p}=page('group',{loadCodeImage:async()=>{throw new Error('微信小程序码暂时获取失败');}},canvasWx(exports));
-  await p.buildPoster();assert.equal(exports.length,0);assert.match(p.data.posterError,/小程序码/);
+  p.setData({posterStyle:'ranking',posterStyleIndex:1}); await p.buildPoster();assert.equal(exports.length,0);assert.match(p.data.posterError,/小程序码/);
   assert.equal(p.onShareAppMessage().path,'/pages/group/group?enter=1');
 });
 
@@ -988,20 +988,21 @@ test('启动时监听新版本，下载完成后提示并应用更新', () => {
   app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 6);
 });
 
-test('已入群但从未接入电脑：每次进入小程序弹一次接入提示，确认后进入接入页', async () => {
+test('未接入成员先看内容，不弹接入提示；主动点击才进入设备选择页', async () => {
   const prompt = require(path.join(root, 'utils/connect-prompt.js'));
-  const modals = [];
-  const unreported = { user_id: 1, nickname: '测试', avatar_url: 'https://rank.test/avatar.png', last_report_at: null };
-  const { p, navigation } = page('index', { ensureLogin: async () => unreported,
-    myRankings: async () => ({ groups: [{ id: 'g1', name: '本群', members: 3, my_rank: null, my_tokens: 0 }] }) },
-    { showModal: o => modals.push(o) });
-  prompt.arm(); await p.load();
-  assert.equal(modals.length, 1); assert.equal(modals[0].title, '还没有接入电脑');
-  modals[0].success({ confirm: true }); modals[0].complete();
-  assert.deepEqual(navigation.at(-1), ['to', '/pages/connect/connect']);
-  await p.load(); assert.equal(modals.length, 1);
-  prompt.arm(); await p.load(); assert.equal(modals.length, 2);
-  modals[1].success({ confirm: false }); modals[1].complete(); assert.equal(navigation.length, 1);
+  for (const name of ['index', 'group']) {
+    const modals = [];
+    const { p, navigation } = page(name, {
+      ensureLogin: async () => ({ user_id: 1, nickname: '测试', avatar_url: 'https://rank.test/a.png', last_report_at: null }),
+      myRankings: async () => ({ groups: [{ id: 'g1', name: '本群', members: 3, my_rank: null, my_tokens: 0 }] }),
+    }, { showModal: o => modals.push(o) });
+    p.buildPoster = () => {};
+    if (name === 'group') { p.onLoad({g:'g1',from:'mine'}); p._visible = true; }
+    prompt.arm(); await (name === 'index' ? p.load() : p.init());
+    assert.equal(modals.length, 0, name);
+    assert.equal(navigation.length, 0, name);
+    p.goConnect(); assert.match(navigation.at(-1)[1], /^\/pages\/connect\/connect/);
+  }
 });
 
 test('接入提示不打扰：未入群、已有用量或弹窗未关闭时不再弹', async () => {
@@ -1257,8 +1258,8 @@ test('群榜选择排行榜会生成新封面并保留真实群入口，原版�
   p._visible = true; p.onLoad({ g: 'current', from: 'mine' });
   p.setData({ joined: true, name: '实际群', members: 138, total: 123, user: { nickname: '我' },
     entries: Array.from({ length: 5 }, (_, i) => ({ rank: i + 1, nickname: '成员' + i, tokens: 500000000 - i })), me: { rank: 52, tokens: 258000000 },
-    posterPath: 'old.png', shareCardPath: 'old-cover.png', posterStyle: 'original', posterStyleIndex: 1 });
-  const build = p.changePosterStyle({ detail: { value: '0' } }); await flush();
+    posterPath: 'old.png', shareCardPath: 'old-cover.png', posterStyle: 'original', posterStyleIndex: 2 });
+  const build = p.changePosterStyle({ detail: { value: '1' } }); await flush();
   assert.equal(p.data.shareCardPath, ''); assert.equal(p.data.posterGenerating, true);
   exports[0].options.success({ tempFilePath: 'new-ranking.png' }); await flush();
   assert.equal(exports[1].height, 800);
@@ -1266,7 +1267,7 @@ test('群榜选择排行榜会生成新封面并保留真实群入口，原版�
   const card = p.onShareAppMessage();
   assert.equal(card.imageUrl, 'new-ranking-cover.png'); assert.match(card.path, /^\/pages\/group\/group\?enter=1&src=/);
   assert.match(card.title, /138 人已加入/); assert.equal(p.data.posterGenerating, false);
-  const legacy = p.changePosterStyle({ detail: { value: '1' } }); await flush();
+  const legacy = p.changePosterStyle({ detail: { value: '2' } }); await flush();
   assert.equal(exports[2].height, 1150);
   exports[2].options.success({ tempFilePath: 'legacy.png' }); await flush();
   exports[3].options.success({ tempFilePath: 'legacy-cover.png' }); await legacy;
@@ -1296,4 +1297,72 @@ test('电脑端同步程序版本低于服务端发布版本时自动提示，�
   prompt.arm(); user = { ...user, sync_health: { ...health, state: 'stopped' } }; await p.load();
   assert.equal(modals.length, 2, '主动关闭同步的电脑不提示');
   queue._reset(); prompt._reset();
+});
+
+test('首页与我的原生按钮直接打开本人的公开记录，不经过模板选择页', async () => {
+  for (const name of ['index', 'profile']) {
+    const { p, navigation } = page(name);
+    await p.load(); await flush();
+    assert.equal(p.data.quickShareReady, true, name);
+    const card = p.onShareAppMessage({ target: { dataset: { kind: 'personal' } } });
+    assert.equal(card.path, '/pages/record/record?id=' + 'a'.repeat(24));
+    assert.equal(navigation.length, 0);
+    p.onHide(); assert.equal(p.quickShareCard(), null);
+  }
+});
+
+test('群默认转发本人成绩，完整榜单仍保留独立真实群入口', async () => {
+  const { p } = page('group', { ensureLogin: async () => ({user_id:1,nickname:'本人',avatar_url:'avatar.png',last_report_at:1}), createShare: async (period, style, groupId) => {
+    assert.equal(groupId, 'g');
+    return { id: 'c'.repeat(24), user: { nickname: '本人' }, usage: { ...usageData(period, 258000000),
+      group_standing: { name: '本群', rank: 52, participants: 123, members: 138 } } };
+  } });
+  p.buildPoster = () => {};
+  p.onLoad({ g: 'g', from: 'mine' }); await p.onShow(); await flush();
+  const own = p.onShareAppMessage();
+  assert.match(own.title, /本人.*2.58 亿.*群内 #52/);
+  assert.equal(own.path, '/pages/record/record?id=' + 'c'.repeat(24));
+  const invite = p.onShareAppMessage({ target: { dataset: { kind: 'board' } } });
+  assert.match(invite.path, /^\/pages\/group\/group\?enter=1&src=/);
+});
+
+test('成绩接收页免登录先展示原作者群内成绩，再转发保留作者，接入与参榜仅由点击触发', async () => {
+  let login = 0, groups = 0;
+  const { p, navigation } = page('record', {
+    sharedRecord: async () => ({ id: 'c'.repeat(24), user: { nickname: '原作者' }, usage: { ...usageData(), group_standing: { name: '来源群', rank: 52, members: 138, participants: 123 } } }),
+    ensureLogin: async () => login++, resolveGroup: async () => groups++,
+  }, { getEnterOptionsSync: () => ({ scene: 1044 }) });
+  p.onLoad({ id: 'c'.repeat(24) }); await p.onShow();
+  assert.equal(p.data.groupRank, '#52'); assert.equal(p.data.record.user.nickname, '原作者');
+  assert.equal(login, 0); assert.equal(groups, 0); assert.equal(navigation.length, 0);
+  assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + 'c'.repeat(24));
+  p.goConnect(); assert.deepEqual(navigation[0], ['to', '/pages/connect/connect']);
+  p.goGroup(); assert.deepEqual(navigation[1], ['to', '/pages/group/group?enter=1']);
+  assert.equal(groups, 0);
+});
+
+test('从分享记录打开小程序时不准备首次接入和项目介绍弹窗', () => {
+  let app, armed = 0;
+  vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), { App: value => app = value,
+    getCurrentPages: () => [], wx: {}, require: id => id === './utils/api' ? { accountState: () => '' } : { arm: () => armed++ } });
+  app.onShow({ path: 'pages/record/record' });
+  assert.equal(armed, 0);
+  assert.doesNotMatch(fs.readFileSync(path.join(root, 'pages/record/record.wxml'), 'utf8'), /<privacy-notice/);
+});
+
+test('访客主动查看本人用量后才登录；新用户直达设备选择，已上传用户进入本人用量', async () => {
+  for (const last of [null, 123]) {
+    let logins = 0;
+    const { p, navigation } = page('record', {
+      sharedRecord: async () => ({ user: { nickname: '作者' }, usage: usageData() }),
+      ensureLogin: async () => { logins++; return { last_report_at: last }; },
+    });
+    p.onLoad({id:'a'.repeat(24)}); await p.onShow(); assert.equal(logins, 0);
+    await p.goMine(); assert.equal(logins, 1);
+    assert.deepEqual(navigation[0], last ? ['tab','/pages/profile/profile'] : ['to','/pages/connect/connect']);
+  }
+  let finish;
+  const { p, navigation } = page('record', { ensureLogin: () => new Promise(resolve => finish = resolve) });
+  const pending = p.goMine(); p.onHide(); finish({last_report_at:null}); await pending;
+  assert.equal(navigation.length, 0);
 });

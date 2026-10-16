@@ -70,15 +70,19 @@
       <picker wx:if="{{joined === true}}" class="poster-style-picker" range="{{posterStyles}}" value="{{posterStyleIndex}}" bindchange="changePosterStyle"><view class="poster-style-label">分享图：{{posterStyles[posterStyleIndex]}}</view></picker>
       <button wx:if="{{joined === true && (posterPath || posterGenerating)}}" class="text-action" bindtap="previewPoster" disabled="{{posterGenerating}}">{{posterGenerating ? '生成中…' : '预览图片'}}</button>
       <button wx:elif="{{joined === true && posterError}}" class="text-action" bindtap="buildPoster">重新生成图片</button>
+      <button wx:if="{{joined === true && posterStyle !== 'achievement'}}" class="text-action" open-type="share" data-kind="board">转发完整榜单</button>
+      <button wx:if="{{joined === true && quickShareError}}" class="text-action" bindtap="retryQuickShare">转发重试</button>
       <button class="text-action other-groups" bindtap="goHome">我的群榜</button>
     </view>
     <view wx:if="{{joined === true && posterError}}" class="poster-note">{{posterError}}</view>
-    <view wx:if="{{joined === true}}" class="share-note">转发到其他群会打开那个群的榜单。</view>
+    <view wx:if="{{joined === true && quickShareError}}" class="poster-note">{{quickShareError}}</view>
+    <view wx:if="{{joined === true}}" class="share-note">成绩卡展示本次用量与群内名次。</view>
     <view wx:if="{{joined === true}}" class="lb-own-dock share-dock">
       <template is="leaderboard-me" data="{{me, user, rankLabel: '我的群内排名', showGlobal: true, emptyLabel: loading ? '加载中…' : error ? '暂时无法获取' : user && user.rank_hidden ? '已关闭排名' : myHidden ? '已在本群隐藏' : hasReported ? '本周期未上榜' : '接入电脑后上榜'}}" />
-      <view class="dock-actions"><button class="btn btn-primary dock-share" open-type="share" disabled="{{posterGenerating}}">分享到微信群</button></view>
+      <view class="dock-actions"><button wx:if="{{hasReported || quickShareReady}}" class="btn btn-primary dock-share" open-type="share" disabled="{{!quickShareReady}}">{{quickSharePreparing ? '准备中' : '转发我的群内成绩'}}</button><button wx:else class="btn btn-primary dock-share" open-type="share" data-kind="board">邀请群友参与</button></view>
     </view>
   </block>
 </view>
 <canvas type="2d" id="poster" class="poster-canvas"></canvas>
+<canvas type="2d" id="quickShareCanvas" class="export-canvas"></canvas>
 <privacy-notice />

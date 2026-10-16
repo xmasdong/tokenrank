@@ -32,3 +32,6 @@
 .receipt-row text:first-child { min-width: 0; overflow-wrap: anywhere; }
 .receipt-row text:last-child { flex: none; }
 .receipt-heading { margin-top: 16px; color: var(--text-secondary); }
+.shared-group { padding: 20px 0 0; }
+.connect-entry { margin-top: 24px; padding-top: 16px; border-top: 1rpx solid var(--separator); font-size: 13px; color: var(--text-secondary); }
+.connect-entry .btn { width: 100%; margin-top: 12px; }

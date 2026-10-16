@@ -14,6 +14,9 @@ App({
       if (pages[pages.length - 1]?.route !== 'pages/account/account') wx.reLaunch({ url: '/pages/account/account' });
       return;
     }
+    // Public records show the author's content before any onboarding notice.
+    const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
+    if ((options.path || pages[pages.length - 1]?.route) === 'pages/record/record') return;
     privacyNotice.arm(); connectPrompt.arm(); updatePrompt.arm();
   },
   // Old cached builds keep running until the next cold start; apply a

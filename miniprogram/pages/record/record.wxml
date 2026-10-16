@@ -14,12 +14,13 @@
       <view class="muted">生成于 {{issuedAt}} · 北京时间</view>
     </view>
     <view wx:else class="total"><view>{{story.label}}用量</view><view class="number num-font">{{story.value}}<text class="number-unit">{{story.unit}}</text></view><view class="exact num-font">{{exact}} tokens</view></view>
-    <view class="metrics"><view class="metric"><view class="metric-label">全站排名</view><view class="metric-value">{{story.rankText}}</view><view class="metric-note">{{story.rankNote}}</view></view><view class="metric"><view class="metric-label">{{story.streakLabel}}</view><view class="metric-value">{{story.streakValue}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.streakNote}}</view></view><view class="metric"><view class="metric-label">累计活跃</view><view class="metric-value">{{story.days}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.firstDay ? '自 ' + story.firstDay + ' 起' : '暂无活跃记录'}}</view></view></view>
+    <view wx:if="{{group}}" class="shared-group"><view class="group-title">{{group.name}}</view><view class="muted">{{group.members}} 人已加入 · {{group.participants}} 人上榜</view></view>
+    <view class="metrics"><view class="metric"><view class="metric-label">{{group ? '群内排名' : '全站排名'}}</view><view class="metric-value">{{group ? groupRank : story.rankText}}</view><view class="metric-note">{{group ? '全站 ' + story.rankText : story.rankNote}}</view></view><view class="metric"><view class="metric-label">{{story.streakLabel}}</view><view class="metric-value">{{story.streakValue}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.streakNote}}</view></view><view class="metric"><view class="metric-label">累计活跃</view><view class="metric-value">{{story.days}}<text class="metric-unit"> 天</text></view><view class="metric-note">{{story.firstDay ? '自 ' + story.firstDay + ' 起' : '暂无活跃记录'}}</view></view></view>
     <view class="partner"><view class="muted">最常用工具</view><view class="partner-name">{{story.top.name || '暂无工具明细'}}<text class="partner-percent" wx:if="{{story.top}}">{{story.top.percent}}%</text></view></view>
     <view class="note"><view>{{record.usage.from}} — {{record.usage.to}} · {{story.timezoneLabel}}自然日</view><view>{{story.basisLabel}}。数据为分享时的记录。</view></view>
     <view wx:if="{{fromGroup}}" class="group-invite"><view class="group-title">本群排名</view><button class="btn btn-ghost" bindtap="goGroup">查看本群排名</button></view>
+    <view class="connect-entry"><text>电脑用量同步</text><button class="btn btn-ghost" bindtap="goConnect">接入电脑</button></view>
   </block>
 </view>
 
-<view class="bottom-action"><button class="btn btn-primary" bindtap="goMine">去看我的用量</button></view>
-<privacy-notice />
+<view class="bottom-action"><button class="btn btn-primary" bindtap="goMine" loading="{{openingMine}}" disabled="{{openingMine}}">去看我的用量</button></view>

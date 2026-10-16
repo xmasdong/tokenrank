@@ -16,6 +16,7 @@ function story(usage) {
 }
 function shareTitle(user, usage) {
   const s = story(usage);
-  return `${nameOf(user)} · ${s.label} ${formatTokens(usage.summary.tokens)} Tokens${usage.standing?.rank ? ` · 全站 #${usage.standing.rank}` : ''}`;
+  const group = usage.group_standing;
+  return `${nameOf(user)} · ${s.label} ${formatTokens(usage.summary.tokens)} Tokens${group?.rank ? ` · 群内 #${group.rank}` : usage.standing?.rank ? ` · 全站 #${usage.standing.rank}` : ''}`;
 }
 module.exports = { story, shareTitle, nameOf };

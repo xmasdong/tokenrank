@@ -694,3 +694,65 @@ test('按群隐藏排名：只在该群榜单消失，其他群和广场照常�
   await f.request(`/api/groups/${f.group.id}/visibility`, { hidden: false }, 2);
   assert.equal((await f.request(f.path)).data.total, 123);
 });
+
+test('群成绩分享只公开本人成绩：服务端计算群内名次，访客免登录且不自动入群', async t => {
+  const f = fixture(t);
+  const group = (await f.resolve('achievement-group')).data;
+  await f.resolve('achievement-group', 2);
+  seedUsage(f, 1, 0, 258000000); seedUsage(f, 2, 0, 500000000); seedUsage(f, 3, 0, 900000000);
+  const shared = await f.request('/api/shares', { period: 'day', group_id: group.id,
+    group_standing: { rank: 1, members: 999 }, user_id: 2, summary: { tokens: 999 } });
+  assert.equal(shared.status, 200);
+  assert.equal(shared.data.usage.summary.tokens, 258000000);
+  assert.deepEqual(shared.data.usage.group_standing, { name: group.name, rank: 2, participants: 2, members: 2, hidden: false });
+  assert.equal(shared.data.usage.standing.rank, 3);
+  assert.doesNotMatch(JSON.stringify(shared.data), /group_id|group_ref|group_openid|session|device_id|用户2|用户3/);
+  const before = f.db.prepare('SELECT COUNT(*) n FROM rank_group_members').get().n;
+  const anonymous = await f.request('/api/shares/' + shared.data.id, null, 0);
+  assert.deepEqual(anonymous.data, shared.data);
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM rank_group_members').get().n, before);
+  assert.equal((await f.request('/api/shares', { period: 'day', group_id: group.id }, 3)).status, 403);
+  assert.equal((await f.request('/api/shares', { period: 'day', group_id: {} })).status, 400);
+  f.db.prepare('UPDATE rank_groups SET name=? WHERE id=?').run('改名后的群', group.id);
+  f.db.prepare('UPDATE daily_totals SET tokens=1 WHERE user_id=2').run();
+  assert.deepEqual((await f.request('/api/shares/' + shared.data.id, null, 0)).data, shared.data);
+});
+
+test('群成绩累计排名覆盖本人首日之前的群友用量；隐藏与零用量不生成名次', async t => {
+  const f = fixture(t);
+  const group = (await f.resolve('achievement-all')).data;
+  await f.resolve('achievement-all', 2);
+  seedUsage(f, 1, 0, 100); seedUsage(f, 2, -20, 1000);
+  const all = (await f.request('/api/shares', { period: 'all', group_id: group.id })).data;
+  assert.equal(all.usage.group_standing.rank, 2);
+  f.db.prepare('UPDATE rank_group_members SET hidden=1 WHERE group_id=? AND user_id=1').run(group.id);
+  const hidden = (await f.request('/api/shares', { period: 'all', group_id: group.id })).data;
+  assert.equal(hidden.usage.group_standing.rank, null); assert.equal(hidden.usage.group_standing.hidden, true);
+  assert.equal(hidden.usage.group_standing.participants, 1);
+  f.db.prepare('UPDATE rank_group_members SET hidden=0 WHERE group_id=? AND user_id=1').run(group.id);
+  f.db.prepare('UPDATE daily_totals SET tokens=0 WHERE user_id=1').run();
+  const zero = (await f.request('/api/shares', { period: 'day', group_id: group.id })).data;
+  assert.equal(zero.usage.group_standing.rank, null);
+  assert.equal(zero.usage.group_standing.participants, 0);
+});
+
+test('群名次读取期间用量发生变化时拒绝生成混合快照', async t => {
+  const f = fixture(t);
+  const group = (await f.resolve('achievement-race')).data;
+  seedUsage(f, 1, 0, 100);
+  const prepare = f.env.DB.prepare;
+  f.env.DB.prepare = sql => {
+    const stmt = prepare(sql);
+    if (sql.includes('SELECT user_id AS uid, SUM(tokens) AS tokens FROM public_usage')) {
+      const all = stmt.all;
+      stmt.all = async () => {
+        f.db.prepare('UPDATE daily_totals SET tokens=200 WHERE user_id=1').run();
+        return all();
+      };
+    }
+    return stmt;
+  };
+  const shared = await f.request('/api/shares', { period: 'day', group_id: group.id });
+  assert.equal(shared.status, 409);
+  assert.equal(f.db.prepare('SELECT COUNT(*) n FROM usage_shares').get().n, 0);
+});

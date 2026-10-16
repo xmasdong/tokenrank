@@ -1,8 +1,10 @@
 const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
+const { quickShare } = require('../../utils/quick-share');
 const { profileEditor } = require('../../utils/profile-editor');
 Page({
+  ...quickShare(api, wx),
   ...profileEditor(api, wx),
   data: { user: null, nickname: '', avatarUrl: '', avatarDraft: '', saving: false, loading: true, error: '', profileError: '',
     periods: usage.PERIODS, period: 'day', usage: null, usageLoading: true, usageError: '',
@@ -21,7 +23,7 @@ Page({
       if (!this._unloaded) { this.setData({ user: { ...this.data.user } }); wx.showToast({ title: err.message || '设置失败，请重试', icon: 'none' }); }
     } finally { if (!this._unloaded) this.setData({ rankingSaving: false }); }
   },
-  onHide() { this._requestId = (this._requestId || 0) + 1; this.setData({ nicknameFocus: false }); },
+  onHide() { this.clearQuickShare(); this._requestId = (this._requestId || 0) + 1; this.setData({ nicknameFocus: false }); },
   onUnload() { this._unloaded = true; this._privacyCheck = (this._privacyCheck || 0) + 1; this.onHide(); },
   async onPullDownRefresh() { try { await this.load({ force: true }); } finally { wx.stopPullDownRefresh(); } },
   showUser(user, profileRevision) {
@@ -39,6 +41,7 @@ Page({
     if (cachedUser && cachedUsage) {
       this.showUser(cachedUser, profileRevision);
       this.setData({ usage: usage.present(cachedUsage), usageLoading: false, error: '', usageError: '' });
+      this.prepareUsageShare(cachedUsage);
       return;
     }
     this.setData({ loading: !cachedUser, error: '', usageLoading: !cachedUsage, usageError: '',
@@ -50,7 +53,10 @@ Page({
       await Promise.all([
         api.ensureLogin(options).then(user => { if (requestId === this._requestId) this.showUser(user, profileRevision); }),
         api.myUsage(period, options).then(result => {
-          if (requestId === this._requestId) this.setData({ usage: usage.present(result), usageLoading: false });
+          if (requestId === this._requestId) {
+            this.setData({ usage: usage.present(result), usageLoading: false });
+            this.prepareUsageShare(result);
+          }
         }).catch(err => { if (requestId === this._requestId) this.setData({ usageLoading: false, usageError: err.message }); }),
       ]);
     } catch (err) {
@@ -60,14 +66,21 @@ Page({
   switchPeriod(e) {
     const period = e.currentTarget.dataset.key;
     if (!usage.PERIODS.some(p => p.key === period) || period === this.data.period) return;
+    this.clearQuickShare();
     this.setData({ period, expanded: false, selectedDay: null });
     return this.load();
   },
   selectDay(e) { this.setData({ selectedDay: this.data.usage.daily[e.currentTarget.dataset.index] }); },
   toggleDetails() { this.setData({ expanded: !this.data.expanded }); },
+  onReady() { this.buildQuickCover(); },
+  prepareUsageShare(result) {
+    if (!result.has_history) { this.clearQuickShare(); return; }
+    this.prepareQuickShare({ stamp: `${result.summary.tokens}:${result.last_report_at || ''}` });
+  },
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },
+  onShareAppMessage() { return this.quickShareCard() || { title: 'Token 用量统计', path: '/pages/index/index' }; },
   goAccount() { wx.navigateTo({ url: '/pages/account/account' }); },
 });

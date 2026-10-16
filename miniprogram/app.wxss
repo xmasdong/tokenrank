@@ -50,3 +50,4 @@ page {
 
 .sk { background: #EDEDED; border-radius: 4px; animation: sk-breathe 1.4s ease-in-out infinite; }
 @keyframes sk-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+.export-canvas { position: fixed; left: -2000px; top: 0; width: 1000px; height: 800px; pointer-events: none; }

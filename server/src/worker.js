@@ -5,7 +5,7 @@ import {
 import { storeTotalReport } from './report.js';
 import { usageWindow, buildUsage, buildActivity } from './usage.js';
 import { shareCode } from './wx-code.js';
-import { readShare, createShare } from './shares.js';
+import { readShare, createShare, groupShareStanding } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
 import { deleteAccount } from './account.js';
 import { heartbeat, syncHealth } from './sync-health.js';
@@ -94,6 +94,13 @@ async function route(request, env, url, path) {
     if (!result.ok) return withCors(result);
     const usage = await result.json();
     if (!usage.has_history) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
+    if (body?.group_id !== undefined) {
+      if (typeof body.group_id !== 'string' || !body.group_id || body.group_id.length > 128)
+        return withCors(jsonError(400, '群榜参数无效'));
+      const group = await groupShareStanding(env, user, usage, body.group_id);
+      if (group instanceof Response) return withCors(group);
+      usage.group_standing = group;
+    }
     return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage, body?.style === 'receipt' ? 'receipt' : 'usage'));
   }
   if (method === 'GET' && path.startsWith('/api/shares/')) {

@@ -7,6 +7,24 @@ export async function readShare(env, id) {
     .bind(id, Date.now()).first();
   return row ? { id: row.id, ...JSON.parse(row.snapshot_json), created_at: row.created_at, expires_at: row.expires_at } : null;
 }
+export async function groupShareStanding(env, user, usage, groupId) {
+  const group = await env.DB.prepare(`SELECT g.name, m.hidden,
+    (SELECT COUNT(*) FROM rank_group_members WHERE group_id=g.id) AS members
+    FROM rank_groups g JOIN rank_group_members m ON m.group_id=g.id AND m.user_id=?2
+    WHERE g.id=?1`).bind(groupId, user.id).first();
+  if (!group) return jsonError(403, '请先加入这个群榜');
+  const rows = await env.DB.prepare(`SELECT user_id AS uid, SUM(tokens) AS tokens FROM public_usage
+    WHERE day>=?1 AND day<=?2 AND user_id IN
+      (SELECT user_id FROM rank_group_members WHERE group_id=?3 AND hidden=0)
+    GROUP BY user_id HAVING tokens>0 ORDER BY tokens DESC, uid ASC`)
+    .bind(usage.period === 'all' ? '0000-01-01' : usage.from, usage.to, groupId).all();
+  const hidden = !!(user.rank_hidden || group.hidden);
+  const index = rows.results.findIndex(row => row.uid === user.id);
+  if (!hidden && usage.summary.tokens > 0 && (index < 0 || rows.results[index].tokens !== usage.summary.tokens))
+    return jsonError(409, '榜单已有更新，请重新分享');
+  return { name: group.name, rank: !hidden && index >= 0 ? index + 1 : null,
+    participants: rows.results.length, members: group.members, hidden };
+}
 export async function createShare(env, user, usage, style = 'usage') {
   // Whitelist only what the card displays. No private daily history, IDs or credentials.
   const snapshot = {
@@ -15,6 +33,11 @@ export async function createShare(env, user, usage, style = 'usage') {
       summary: { tokens: usage.summary.tokens, requests: usage.summary.requests, active_days: usage.summary.active_days },
       tools: usage.tools.filter(t => !t.unclassified).slice(0, 1), activity: usage.activity, standing: usage.standing },
   };
+  if (usage.group_standing) {
+    const group = usage.group_standing;
+    snapshot.usage.group_standing = { name: group.name, rank: group.rank, participants: group.participants,
+      members: group.members, hidden: group.hidden };
+  }
   if (style === 'receipt') {
     snapshot.style = 'receipt';
     for (const key of ['input_tokens','output_tokens','cache_read','cache_write']) snapshot.usage.summary[key] = usage.summary[key];
