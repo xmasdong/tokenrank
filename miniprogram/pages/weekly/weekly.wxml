@@ -1,0 +1,18 @@
+<import src="../../templates/weekly.wxml" />
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在读取周报…</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
+  <block wx:elif="{{report}}">
+    <view class="week-nav"><button data-week="{{report.previous_week}}" bindtap="switchWeek" disabled="{{!report.previous_week}}">上一周</button><text>{{report.weekly.complete ? '完整自然周' : '本周进行中'}}</text><button data-week="{{report.next_week}}" bindtap="switchWeek" disabled="{{!report.next_week}}">下一周</button></view>
+    <template is="weekly-summary" data="{{weeklyReport: report, weeklyUser: user, initial, avatarFailed}}" />
+    <view class="week-chart"><view class="chart-label">{{selectedDay ? selectedDay.day + ' · ' + selectedDay.exact : '每日用量 · 点柱条查看数值'}}</view><view class="week-bars"><button wx:for="{{report.daily}}" wx:key="day" class="bar-slot {{item.reported ? 'reported' : 'missing'}}" data-index="{{index}}" bindtap="selectDay" aria-label="{{item.day + '，' + item.exact}}"><view class="bar-area"><view wx:if="{{item.tokens > 0}}" class="bar" style="height:{{item.height}}%;"></view><text wx:else>{{item.future ? '' : item.reported ? '0' : '—'}}</text></view><text>{{item.label}}</text></button></view></view>
+    <view wx:if="{{report.has_history && groupOptions.length > 1}}" class="group-picker"><text>周报群排名</text><picker mode="selector" range="{{groupOptions}}" value="{{groupIndex}}" bindchange="selectGroup"><view>{{groupOptions[groupIndex]}}</view></picker></view>
+    <view class="footnote">北京时间周一至周日，含缓存总量，工具／模型按 Token 占比。记录不齐全或本周未结束时不计算环比；周报图片只展示摘要。群排名按当前成员和所选周的记录计算。</view>
+    <view wx:if="{{shareError}}" class="error-note">{{shareError}}<button class="text-button" bindtap="retryShare">重试分享</button></view>
+    <button wx:if="{{socialPosterPath}}" class="text-button preview" bindtap="preview">预览周报图片</button>
+    <view wx:if="{{socialImageError}}" class="error-note">{{socialImageError}}<button class="text-button" bindtap="buildSocialImages">重试图片</button></view>
+    <button wx:if="{{!report.has_history}}" class="btn btn-ghost connect" bindtap="goConnect">查看电脑同步</button>
+  </block>
+</view>
+<view wx:if="{{report && report.has_history}}" class="actions"><button class="btn btn-ghost" bindtap="savePoster" disabled="{{!socialPosterPath || saving}}">保存图片</button><button class="btn btn-primary" open-type="share" disabled="{{!record || sharePreparing}}" loading="{{sharePreparing}}">转发周报</button></view>
+<canvas type="2d" id="socialCanvas" class="export-canvas"></canvas>

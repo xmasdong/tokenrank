@@ -127,3 +127,17 @@ test('注销清理持久化头像文件；迟到的头像下载不能重新留�
   reply(f.requests[0],new ArrayBuffer(1));assert.equal(await avatar,null);
   assert.deepEqual(removed,['/sandbox/tokenrank-card-avatar-private.png']);
 });
+
+test('日历周报按日期缓存并隔离周期，公开趋势匿名读取且固定结束日和续页快照',async()=>{
+  const f=fixture();const first=f.api.calendar('2026-10'),same=f.api.calendar('2026-10');assert.equal(f.requests.length,1);
+  reply(f.requests[0],{month:'2026-10'});await first;await same;await f.api.calendar('2026-10');assert.equal(f.requests.length,1);
+  const previous=f.api.calendar('2026-09');assert.match(f.requests.at(-1).url,/month=2026-09/);reply(f.requests.at(-1),{month:'2026-09'});await previous;
+  const week=f.api.weekly('2026-10-05');assert.match(f.requests.at(-1).url,/week=2026-10-05/);reply(f.requests.at(-1),{from:'2026-10-05'});await week;
+  const trend=f.api.trends({dimension:'models',end:'2026-10-15',offset:50,snapshot:'a'.repeat(64)},{force:true});const req=f.requests.at(-1);
+  assert.equal(req.header.authorization,undefined);assert.match(req.url,/end=2026-10-15&offset=50&snapshot=/);reply(req,{entries:[]});await trend;
+  const share=f.api.createWeeklyShare({week:'2026-10-05',week_snapshot:'b'.repeat(64)});assert.equal(f.requests.at(-1).data.style,'weekly');assert.equal(f.requests.at(-1).header.authorization,'Bearer old-session');reply(f.requests.at(-1),{id:'test'});await share;
+});
+test('注销后的匿名趋势不静默重建账号，自己的日历和周报保持禁止访问',async()=>{
+  const f=fixture([['account_state','deleted']]);await assert.rejects(f.api.calendar(),/重新登录/);await assert.rejects(f.api.weekly(),/重新登录/);
+  const result=f.api.trends({});assert.equal(f.requests.length,1);assert.equal(f.requests[0].header.authorization,undefined);reply(f.requests[0],{entries:[]});await result;assert.equal(f.logins.length,0);
+});

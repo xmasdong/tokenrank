@@ -1,9 +1,11 @@
 <import src="../../templates/comparison.wxml" />
+<import src="../../templates/weekly.wxml" />
 <view class="page">
   <view wx:if="{{loading}}" class="state">正在加载用量…</view>
   <view wx:elif="{{error}}" class="state"><view>{{error}}</view><button class="btn btn-ghost" bindtap="load">重试</button></view>
   <block wx:else>
-    <template wx:if="{{comparison}}" is="comparison" data="{{comparison}}" />
+    <block wx:if="{{weeklyReport}}"><template is="weekly-summary" data="{{weeklyReport, weeklyUser: record.user, initial, avatarFailed}}" /><view class="note">{{weeklyReport.from}} — {{weeklyReport.to}} · 北京时间 · 含缓存总量。数据为分享时的记录。群排名按分享时的当前成员计算。</view></block>
+    <template wx:elif="{{comparison}}" is="comparison" data="{{comparison}}" />
     <block wx:else>
     <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">截至 {{record.usage.to}}</view></view></view>
     

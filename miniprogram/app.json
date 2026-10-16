@@ -10,6 +10,9 @@
     "pages/record/record",
     "pages/compare/compare",
     "pages/analysis/analysis",
+    "pages/calendar/calendar",
+    "pages/weekly/weekly",
+    "pages/trends/trends",
     "pages/account/account"
   ],
   "window": {

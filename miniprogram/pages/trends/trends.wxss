@@ -1,0 +1,29 @@
+.page { padding-bottom: calc(28px + env(safe-area-inset-bottom)); }
+.metric-tabs { display: flex; padding: 12px 16px 4px; gap: 12px; }
+.metric-tabs button { flex: 1; min-width: 0; width: 0; min-height: 44px; margin: 0; padding: 10px; background: transparent; color: var(--text-secondary); font-size: 14px; line-height: 24px; font-weight: 400; }
+.metric-tabs .selected { background: var(--surface-muted); color: var(--text); }
+.metric-tabs button::after, .text-button::after { border: none; }
+.state { padding: 32px 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+.state .btn { margin-top: 16px; }
+.ranges { padding: 16px; font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
+.ranges > view:first-child { color: var(--text); font-size: 14px; }
+.sample { margin-top: 8px; }
+.table-head { display: flex; justify-content: space-between; padding: 8px 16px; background: var(--surface-muted); color: var(--text-muted); font-size: 12px; }
+.trend-row { display: flex; gap: 12px; padding: 18px 16px; border-bottom: 1rpx solid var(--separator); }
+.trend-rank { width: 22px; flex: none; color: var(--text-secondary); font-size: 14px; line-height: 30px; }
+.trend-main { min-width: 0; flex: 1; }
+.trend-heading { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+.trend-name { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.trend-value { flex: none; color: var(--amount); font-size: 23px; font-variant-numeric: tabular-nums; }
+.trend-value text { margin-left: 4px; font-size: 14px; }
+.track { height: 3px; background: var(--surface-muted); margin: 12px 0 8px; }
+.fill { height: 3px; background: var(--amount); }
+.trend-meta { display: flex; justify-content: space-between; gap: 8px; color: var(--text-secondary); font-size: 11px; line-height: 1.7; }
+.trend-meta text:first-child { min-width: 0; overflow-wrap: anywhere; }
+.trend-meta text:last-child { flex: none; }
+.trend-meta .up { color: #21824E; }
+.pagination { text-align: center; padding: 20px 16px; font-size: 12px; color: var(--text-muted); }
+.text-button { width: 100%; min-height: 44px; padding: 10px 0; margin: 0; background: transparent; color: var(--link); font-size: 14px; line-height: 24px; font-weight: 400; }
+.error-note { color: var(--danger); }
+.footnote { margin: 0 16px; font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
+.page .share { width: calc(100% - 32px); margin: 20px 16px 0; }

@@ -1,0 +1,16 @@
+<view class="page">
+  <view class="tabs"><view class="tab {{dimension === 'tools' ? 'tab-active' : ''}}" data-field="dimension" data-value="tools" bindtap="switchOption">工具</view><view class="tab {{dimension === 'models' ? 'tab-active' : ''}}" data-field="dimension" data-value="models" bindtap="switchOption">模型</view></view>
+  <view class="tabs"><view class="tab {{period === 'week' ? 'tab-active' : ''}}" data-field="period" data-value="week" bindtap="switchOption">近 7 天</view><view class="tab {{period === 'month' ? 'tab-active' : ''}}" data-field="period" data-value="month" bindtap="switchOption">近 30 天</view></view>
+  <view class="metric-tabs"><button class="{{metric === 'users' ? 'selected' : ''}}" data-field="metric" data-value="users" bindtap="switchOption">使用人数</button><button class="{{metric === 'tokens' ? 'selected' : ''}}" data-field="metric" data-value="tokens" bindtap="switchOption">Token 用量</button></view>
+  <view wx:if="{{loading}}" class="state">正在读取趋势榜…</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
+  <block wx:elif="{{report}}">
+    <view class="ranges"><view>{{report.from}} — {{report.to}}</view><view>对比 {{report.previous_from}} — {{report.previous_to}}</view><view class="sample">本期 {{report.summary.users}} 位公开用户 · 上期 {{report.previous_summary.users}} 位</view></view>
+    <view class="table-head"><text>{{dimension === 'tools' ? '工具' : '模型'}}</text><text>{{metric === 'users' ? '使用人数' : '含缓存总量'}}</text></view>
+    <view wx:if="{{!report.entries.length}}" class="state">本期暂无可分类的{{dimension === 'tools' ? '工具' : '模型'}}记录。</view>
+    <view wx:for="{{report.entries}}" wx:key="name" class="trend-row"><view class="trend-rank">{{item.rank}}</view><view class="trend-main"><view class="trend-heading"><text class="trend-name">{{item.name}}</text><view class="trend-value">{{metric === 'users' ? item.users : item.amount.value}}<text>{{metric === 'users' ? '人' : item.amount.unit}}</text></view></view><view class="track"><view style="width:{{item.width}}%;" class="fill"></view></view><view class="trend-meta"><text>{{metric === 'users' ? item.amount.value + ' ' + item.amount.unit + ' tokens' : item.users + ' 人使用'}} · 上期 {{item.previousValue}}</text><text class="{{item.changeClass}}">{{item.rankText}}</text></view></view></view>
+    <view class="pagination"><view wx:if="{{moreError}}" class="error-note">{{moreError}}</view><button wx:if="{{report.has_more}}" class="text-button" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loadingMore}}">加载更多 · {{report.entries.length}} / {{report.total}}</button><view wx:else>共 {{report.total}} 项</view></view>
+    <view class="footnote">北京时间完整日区间，不含今日。使用人数按每项分别去重，同一人可使用多项。仅代表公开上报样本，按已上报明细统计；未分类用量不参与各项排名。上期位次按当前记录重算。</view>
+    <button class="btn btn-primary share" open-type="share">转发趋势榜</button>
+  </block>
+</view>

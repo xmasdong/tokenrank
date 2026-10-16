@@ -1,5 +1,6 @@
 const { compact, usageBasis, PERIODS } = require('./usage');
 const { drawCodeBadge } = require('./share-code');
+const { weeklyView } = require('./history');
 const { comparisonView, toolRows } = require('./social-share');
 const SOCIAL_HEIGHT = 1280;
 function painter(ctx, height) {
@@ -90,4 +91,39 @@ function drawComparisonPoster(ctx, record) {
   }
   p.text(`${usageBasis(record.usage).shortNote} · 用量不代表产出`, 60, H - 20, 20, p.soft);
 }
-module.exports = { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster };
+function drawWeeklyPoster(ctx, { user, usage, cover = false, codeImage, avatarImage }) {
+  if (!codeImage) throw new Error('小程序码尚未就绪，请重试');
+  const H = cover ? 800 : SOCIAL_HEIGHT, p = painter(ctx, H), v = weeklyView(usage);
+  if (!v.amount) throw new Error('本周暂无同步记录');
+  p.text('个人周报', 60, 52, 28);
+  p.text(v.weekly.complete ? '周一至周日' : '本周进行中', 940, 52, 24, p.soft, 400, 'right');
+  p.avatar(user, avatarImage, 108, 130, 96);
+  p.text(user.nickname || 'AI 玩家', 180, 124, 38, p.ink, 760);
+  p.text(`${v.from} — ${v.to}`, 180, 166, 26, p.soft, 760); p.rule(208);
+  p.text('已同步用量 · Tokens', 60, 262, 26, p.soft);
+  p.text(`${v.amount.value}${v.amount.unit}`, 60, 354, 92, p.orange);
+  p.text(`${v.exact} tokens`, 60, 396, 24, p.soft);
+  [[String(v.summary.active_days), '活跃天数'], [v.requestsText, '调用次数'], [`${v.weekly.reported_days} / 7`, '已同步天数']].forEach(([value, label], i) => {
+    const x = 60 + i * 306;
+    p.text(value, x, 470, 40, p.ink, 270); p.text(label, x, 510, 24, p.soft, 270);
+  });
+  p.rule(544);
+  const groupText = v.group ? `${v.group.name} · ${v.group.hidden ? '未参与排名' : v.group.rankText}` : '';
+  if (cover) {
+    p.text(`较上周 · ${v.changeText}`, 60, 610, 30, p.ink, 660);
+    p.text(groupText || `单日峰值 · ${v.peak ? v.peak.day.slice(5) + ' · ' + v.peak.amount.value + v.peak.amount.unit : '—'}`, 60, 670, 28, p.ink, 660);
+    p.text(`上周同步 ${v.weekly.previous_reported_days} / 7 天`, 60, 724, 24, p.soft, 660);
+    drawCodeBadge(ctx, codeImage, 748, 580, 192);
+  } else {
+    const line = (label, value, y, width = 660) => { p.text(label, 60, y, 26, p.soft, width); p.text(value, 60, y + 48, 36, p.ink, width); };
+    line(`较上周 · 上周同步 ${v.weekly.previous_reported_days} / 7 天`, v.changeText, 600, 880);
+    line('单日峰值', v.peak ? `${v.peak.day.slice(5)} · ${v.peak.amount.value}${v.peak.amount.unit}` : '—', 714, 880);
+    line('最常用工具', v.topTool ? `${v.topTool.name} · ${v.topTool.percent}%` : '暂无工具明细', 828, 880);
+    line('最常用模型', v.topModel ? `${v.topModel.name} · ${v.topModel.percent}%` : '暂无模型明细', 942, 600);
+    if (v.group) line(`本期 ${v.group.participants} 人上榜 · 当前成员`, groupText, 1070, 600);
+    drawCodeBadge(ctx, codeImage, 688, 950, 252);
+    p.text('长按识别小程序码', 814, 1230, 24, p.soft, 310, 'center');
+  }
+  p.text(`${usageBasis(usage).shortNote} · 分享时的记录`, 60, H - 20, 20, p.soft);
+}
+module.exports = { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster };

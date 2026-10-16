@@ -59,6 +59,12 @@ export async function createShare(env, user, usage, style = 'usage', source = nu
       tools: style === 'tools' ? shareTools(usage) : usage.tools.filter(t => !t.unclassified).slice(0, 1), activity: usage.activity, standing: usage.standing },
   };
   if (style === 'tools') snapshot.style = 'tools';
+  if (style === 'weekly') {
+    snapshot.style = 'weekly';
+    const week = usage.weekly;
+    snapshot.usage.weekly = Object.fromEntries(['week_start', 'week_end', 'complete', 'reported_days', 'previous_from', 'previous_to',
+      'previous_reported_days', 'previous_tokens', 'comparison_status', 'change_tokens', 'change_percent', 'peak', 'top_model'].map(key => [key, week[key]]));
+  }
   if (style === 'comparison') {
     if (!source || source.style === 'comparison') return jsonError(400, '对比来源无效');
     snapshot.style = 'comparison';

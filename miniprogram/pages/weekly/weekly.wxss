@@ -1,0 +1,27 @@
+@import "../../styles/weekly.wxss";
+.page { padding-bottom: calc(100px + env(safe-area-inset-bottom)); }
+.state { padding: 32px 16px; color: var(--text-secondary); font-size: 14px; }
+.state .btn { margin-top: 16px; }
+.week-nav { display: flex; align-items: center; justify-content: space-between; padding: 8px 16px; border-bottom: 1rpx solid var(--separator); }
+.week-nav > text { font-size: 13px; color: var(--text-secondary); }
+.week-nav button { width: auto; min-height: 44px; margin: 0; padding: 8px 0; color: var(--link); background: transparent; font-size: 14px; line-height: 28px; }
+.week-nav button[disabled] { color: #C8C8C8; }
+.week-nav button::after, .bar-slot::after, .text-button::after { border: none; }
+.week-chart { padding: 20px 16px; }
+.chart-label { margin-bottom: 12px; font-size: 12px; color: var(--text-secondary); }
+.week-bars { display: flex; gap: 8px; }
+.week-bars .bar-slot { flex: 1; min-width: 0; width: 0; margin: 0; padding: 0; background: transparent; color: var(--text-secondary); font-size: 11px; line-height: 20px; font-weight: 400; }
+.bar-area { display: flex; align-items: flex-end; justify-content: center; height: 100px; margin-bottom: 8px; border-bottom: 1rpx solid var(--separator); }
+.bar-area > text { color: var(--text-muted); font-size: 12px; }
+.bar { width: 100%; max-width: 28px; background: var(--amount); border-radius: 2px 2px 0 0; }
+.group-picker { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 12px 16px; border-top: 1rpx solid var(--separator); border-bottom: 1rpx solid var(--separator); font-size: 13px; }
+.group-picker picker { flex: 1; min-width: 0; padding: 8px 0; color: var(--link); text-align: right; }
+.group-picker picker view { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.footnote { margin: 20px 16px; color: var(--text-secondary); font-size: 12px; line-height: 1.8; }
+.error-note { margin: 16px; font-size: 12px; color: var(--danger); }
+.text-button { display: flex; align-items: center; justify-content: center; min-height: 44px; padding: 8px 12px; font-size: 14px; color: var(--link); background: transparent; font-weight: 400; line-height: 28px; }
+.preview, .connect { margin: 16px; }
+.actions { position: fixed; bottom: 0; left: 0; right: 0; z-index: 10; display: flex; gap: 12px; padding: 12px 16px calc(12px + env(safe-area-inset-bottom)); border-top: 1rpx solid var(--separator); background: var(--surface); }
+.actions .btn { flex: 1; min-width: 0; width: 0; margin: 0; }
+
+.page .connect { width: calc(100% - 32px); }

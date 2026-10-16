@@ -2,6 +2,7 @@
 <view class="page">
   <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
   <view class="tabs"><view class="tab {{mode === 'ranking' ? 'tab-active' : ''}}" data-key="ranking" bindtap="switchMode">总榜</view><view class="tab {{mode === 'tools' ? 'tab-active' : ''}}" data-key="tools" bindtap="switchMode">工具</view><view class="tab {{mode === 'models' ? 'tab-active' : ''}}" data-key="models" bindtap="switchMode">模型</view></view>
+  <button class="trends-entry" bindtap="goTrends"><text>工具／模型趋势榜</text><text aria-hidden="true">›</text></button>
   <view wx:if="{{loading}}" class="hint">加载中…</view>
   <view wx:elif="{{error}}" class="hint"><view class="hint-sub">{{error}}</view><button class="btn btn-ghost retry" bindtap="load">重新加载</button></view>
   <view wx:elif="{{mode !== 'ranking' && insights}}" class="insights">

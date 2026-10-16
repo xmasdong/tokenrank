@@ -79,6 +79,8 @@ Page({
   },
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
   goTools() { wx.navigateTo({ url: usage.shareUrl(this.data.period) + '&style=tools' }); },
+  goCalendar() { wx.navigateTo({ url: '/pages/calendar/calendar' }); },
+  goWeekly() { wx.navigateTo({ url: '/pages/weekly/weekly' }); },
   goAnalysis() { wx.navigateTo({ url: '/pages/analysis/analysis?scope=mine&period=' + this.data.period }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },

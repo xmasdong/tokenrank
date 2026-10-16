@@ -4,7 +4,7 @@ const updatePrompt = require('./utils/update-prompt');
 const api = require('./utils/api');
 function publicEntry(options, pages) {
   const page = pages[pages.length - 1], path = options.path || page?.route;
-  return path === 'pages/record/record' || (path === 'pages/analysis/analysis' &&
+  return path === 'pages/record/record' || path === 'pages/trends/trends' || (path === 'pages/analysis/analysis' &&
     (options.query?.scope || page?.options?.scope || page?.data?.scope) === 'public');
 }
 

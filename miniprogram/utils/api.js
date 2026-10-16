@@ -95,6 +95,11 @@ const audiencePath = ({ period = 'day', dimension = 'tools', tool = '', name, of
   `/api/insights/users?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&name=${encodeURIComponent(name)}` +
   (tool ? '&tool=' + encodeURIComponent(tool) : '') +
   (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
+const calendarPath = month => '/api/my/calendar' + (month ? '?month=' + encodeURIComponent(month) : '');
+const weeklyPath = week => '/api/my/weekly' + (week ? '?week=' + encodeURIComponent(week) : '');
+const trendsPath = ({ period = 'week', dimension = 'tools', metric = 'users', end = '', offset = 0, snapshot = '' } = {}) =>
+  `/api/insights/trends?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&metric=${encodeURIComponent(metric)}` + (end ? '&end=' + encodeURIComponent(end) : '') +
+  (offset ? '&offset=' + encodeURIComponent(offset) + '&snapshot=' + encodeURIComponent(snapshot) : '');
 
 function rawRequest(path, { method = 'GET', data = null, auth = true, header = {}, timeout = 15000, deleting = false } = {}) {
   const epoch = authEpoch;
@@ -348,6 +353,10 @@ module.exports = {
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
   compareShare: id => request('/api/shares/' + encodeURIComponent(id) + '/compare', { method: 'POST' }),
   groupComparison: (id, data) => request('/api/groups/' + encodeURIComponent(id) + '/compare', { method: 'POST', data }),
+  calendar: (month, options) => read(calendarPath(month), options),
+  weekly: (week, options) => read(weeklyPath(week), options),
+  createWeeklyShare: data => request('/api/shares', { method: 'POST', data: { ...data, style: 'weekly' } }),
+  trends: (query, options) => read(trendsPath(query), options, { auth: false }),
   revokeShare: id => request('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
 
   /** 个人用量：不依赖群成员身份或榜单名次。 */

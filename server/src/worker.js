@@ -12,6 +12,8 @@ import { heartbeat, syncHealth } from './sync-health.js';
 import { analyticsRows, aggregateAnalytics, communityAudience, analyticsQuery } from './analytics.js';
 import { insightPolicy, requireInsightAccess } from './insight-access.js';
 import { groupPk, rankSnapshot } from './group-pk.js';
+import { calendarReport, weeklyReport } from './history.js';
+import { trendQuery, trendReport } from './trends.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -88,6 +90,17 @@ async function route(request, env, url, path) {
     return withCors(await groupPk(env, user, path.split('/')[3], await readJson(request), userOrigin(env, request)));
   }
 
+  if (method === 'GET' && ['/api/my/calendar', '/api/my/weekly'].includes(path)) {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    return withCors(await (path === '/api/my/calendar' ? calendarReport(env, user.id, url.searchParams.get('month'))
+      : weeklyReport(env, user.id, url.searchParams.get('week'))));
+  }
+  if (method === 'GET' && path === '/api/insights/trends') {
+    const query = trendQuery(url);
+    return withCors(query ? await trendReport(env, query) : jsonError(400, '趋势榜参数无效'));
+  }
+
   if (method === 'GET' && ['/api/my/analysis', '/api/insights'].includes(path)) {
     const query = analyticsQuery(url);
     if (!query) return withCors(jsonError(400, '分析参数无效'));
@@ -126,9 +139,11 @@ async function route(request, env, url, path) {
     if (!user) return withCors(jsonError(401, '请先登录'));
     const body = await readJson(request);
     const usageUrl = new URL(request.url); usageUrl.searchParams.set('period', body?.period || 'day');
-    const result = await myUsage(request, env, usageUrl);
+    const result = body?.style === 'weekly' ? await weeklyReport(env, user.id, body.week) : await myUsage(request, env, usageUrl);
     if (!result.ok) return withCors(result);
     const usage = await result.json();
+    if (body?.style === 'weekly' && body.week_snapshot !== usage.snapshot)
+      return withCors(Response.json({ error: '周报数据已有更新，请刷新后重新分享', code: 'WEEK_CHANGED' }, { status: 409 }));
     if (!usage.has_history) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
     if (body?.group_id !== undefined) {
       if (typeof body.group_id !== 'string' || !body.group_id || body.group_id.length > 128)
@@ -138,7 +153,7 @@ async function route(request, env, url, path) {
       usage.group_standing = group;
     }
     return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage,
-      ['receipt', 'tools'].includes(body?.style) ? body.style : 'usage'));
+      ['receipt', 'tools', 'weekly'].includes(body?.style) ? body.style : 'usage'));
   }
   if (method === 'POST' && /^\/api\/shares\/[0-9a-f]{24}\/compare$/.test(path)) {
     const user = await sessionUser(request, env);

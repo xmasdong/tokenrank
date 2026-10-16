@@ -1547,3 +1547,52 @@ test('常用用户分页遇到快照变化，强制刷新首屏而不复用旧�
  p.onLoad({scope:'public'});await p.onShow();await p.openAudience({currentTarget:{dataset:{name:'A'}}});await p.moreAudience();
  assert.equal(calls.at(-1).options.force,true);assert.equal(p.data.audienceSnapshot,'new');assert.equal(p.data.audience[0].nickname,'新名单');
 });
+
+const historyWeek = () => ({...usageData('week',258000000),from:'2026-10-05',to:'2026-10-11',token_basis:'upstream_total',snapshot:'b'.repeat(64),groups:[{id:'g1',name:'本群'}],
+  weekly:{week_start:'2026-10-05',week_end:'2026-10-11',complete:true,reported_days:7,previous_reported_days:7,comparison_status:'comparable',change_percent:12.4},previous_week:'2026-09-28',next_week:'2026-10-12'});
+const trendData = (metric='users') => ({metric,period:'week',dimension:'tools',from:'2026-10-09',to:'2026-10-15',previous_from:'2026-10-02',previous_to:'2026-10-08',summary:{users:2},previous_summary:{users:1},
+  entries:[{name:'A',rank:1,tokens:100,users:2,previous_rank:1,previous_users:1,previous_tokens:60,rank_change:0}],has_more:false,total:1,snapshot:'c'.repeat(64)});
+test('个人日历、周报和广场趋势入口直接进入对应页面，保留模型及周期，无额外请求',()=>{
+  const own=page('profile');own.p.goCalendar();own.p.goWeekly();assert.equal(own.navigation[0][1],'/pages/calendar/calendar');assert.equal(own.navigation[1][1],'/pages/weekly/weekly');
+  const square=page('square');square.p.data.mode='models';square.p.data.period='month';square.p.goTrends();assert.match(square.navigation[0][1],/period=month&dimension=models/);
+});
+test('日历日期进入对应自然周，切换月份的旧响应与离开后响应不会覆盖当前页面',async()=>{
+  const pending=[];const {p,navigation}=page('calendar',{calendar:()=>new Promise(resolve=>pending.push(resolve))});
+  p.onLoad({});const first=p.onShow();await flush();const second=p.switchMonth({currentTarget:{dataset:{month:'2026-09'}}});await flush();
+  const data=month=>({month,today:'2026-10-16',daily:[{day:month+'-01',tokens:0,requests:0,reported:true}],summary:{reported_days:1,tokens:0},first_day:'2026-01-01'});
+  pending[1](data('2026-09'));await second;pending[0](data('2026-10'));await first;assert.equal(p.data.report.month,'2026-09');
+  p.goWeekly();assert.match(navigation.at(-1)[1],/week=2026-08-31/);
+  const third=p.load();await flush();p.onHide();pending[2](data('2026-08'));await third;assert.equal(p.data.report,null);
+});
+test('周报先准备真实记录，切换群复用周报不重取数据，快照变更仅强制刷新一次',async()=>{
+  let loads=0,shares=0,stale=false;const payloads=[];
+  const {p}=page('weekly',{weekly:async()=>{loads++;return historyWeek();},createWeeklyShare:async data=>{payloads.push(data);shares++;if(stale){const e=new Error('changed');e.statusCode=409;throw e;}return {id:'a'.repeat(24),style:'weekly',user:{nickname:'原作者'},usage:{...historyWeek(),...(data.group_id?{group_standing:{name:'本群',rank:2,participants:3}}:{})}};}});
+  p.onLoad({});await p.onShow();assert.equal(loads,1);assert.equal(p.data.sharePreparing,false);assert.ok(p.data.record);assert.equal(p.data.socialCoverPath,'');assert.match(p.onShareAppMessage().title,/2.58亿/);
+  await p.selectGroup({detail:{value:'1'}});assert.equal(loads,1);assert.equal(payloads.at(-1).group_id,'g1');assert.equal(p.data.report.group.rankText,'#2');
+  stale=true;await p.retryShare();assert.equal(loads,2);assert.equal(shares,4);assert.match(p.data.shareError,/changed/);assert.equal(p.data.record,null);
+});
+test('离开或注销后，迟到的周报分享不能恢复公开转发或图片',async()=>{
+  let release,epoch=0;const {p}=page('weekly',{weekly:async()=>historyWeek(),accountEpoch:()=>epoch,createWeeklyShare:()=>new Promise(r=>release=r)});
+  p.onLoad({});const pending=p.onShow();await flush();p.onHide();epoch++;
+  release({id:'a'.repeat(24),style:'weekly',user:{nickname:'甲'},usage:historyWeek()});await pending;assert.equal(p.data.record,null);assert.equal(p.data.socialCoverPath,'');assert.equal(p.onShareAppMessage().path,'/pages/index/index');
+});
+test('公开周报免登录显示作者、日期和固定快照，重转保留作者记录',async()=>{
+  const {p,navigation}=page('record',{sharedRecord:async()=>({id:'d'.repeat(24),style:'weekly',user:{nickname:'原作者'},usage:historyWeek()}),ensureLogin:async()=>assert.fail('public view must not login')});
+  p.onLoad({id:'d'.repeat(24)});await p.onShow();assert.equal(p.data.weeklyReport.amount.value,'2.58');assert.equal(p.data.record.user.nickname,'原作者');assert.equal(navigation.length,0);
+  assert.equal(p.onShareAppMessage().path,'/pages/record/record?id='+'d'.repeat(24));assert.match(p.onShareAppMessage().title,/原作者.*10-05/);
+});
+test('趋势页匿名读取，转发包含固定截止日，续页变更刷新首屏而不拼错版本',async()=>{
+  const calls=[];let continuation=false;
+  const {p}=page('trends',{trends:async(q,o)=>{calls.push({q,o});if(q.offset){continuation=true;throw Object.assign(new Error('changed'),{statusCode:409});}return {...trendData(q.metric),has_more:!continuation,next_offset:50};},ensureLogin:async()=>assert.fail('public must not login')});
+  p.onLoad({dimension:'models'});await p.onShow();assert.equal(p.data.report.entries[0].users,2);assert.match(p.onShareAppMessage().path,/dimension=models.*end=2026-10-15/);
+  await p.loadMore();assert.equal(p.data.report.entries.length,1);assert.equal(calls.at(-1).o.force,true);assert.equal(p.data.loadingMore,false);
+});
+test('趋势切换口径或离开时，迟到响应不得覆盖新选项',async()=>{
+  const pending=[];const {p}=page('trends',{trends:()=>new Promise(r=>pending.push(r))});p.onLoad({});const first=p.onShow();
+  const second=p.switchOption({currentTarget:{dataset:{field:'metric',value:'tokens'}}});pending[1](trendData('tokens'));await second;pending[0](trendData('users'));await first;
+  assert.equal(p.data.report.metric,'tokens');const third=p.load();p.onHide();pending[2](trendData('users'));await third;assert.equal(p.data.report,null);
+});
+test('趋势榜作为公开入口，注销账号也能先看内容，无接入弹窗',()=>{
+  let app,armed=0,redirects=0;vm.runInNewContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),{App:v=>app=v,getCurrentPages:()=>[],wx:{reLaunch:()=>redirects++},require:id=>id==='./utils/api'?{accountState:()=> 'deleted',clearAvatarFiles(){}}:{arm:()=>armed++}});
+  app.onShow({path:'pages/trends/trends'});assert.equal(armed,0);assert.equal(redirects,0);
+});

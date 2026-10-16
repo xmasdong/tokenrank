@@ -1,0 +1,17 @@
+.weekly-person { display: flex; align-items: center; gap: 12px; padding: 24px 16px 16px; }
+.weekly-person image, .weekly-avatar-ph { flex: none; width: 44px; height: 44px; border-radius: 50%; }
+.weekly-avatar-ph { display: flex; align-items: center; justify-content: center; background: var(--surface-muted); color: var(--text-secondary); }
+.weekly-name { min-width: 0; font-size: 16px; overflow-wrap: anywhere; }
+.weekly-range, .weekly-caption, .weekly-exact, .weekly-note { color: var(--text-secondary); font-size: 12px; line-height: 1.8; }
+.weekly-range { margin-top: 4px; }
+.weekly-total { padding: 16px; }
+.weekly-amount { margin: 8px 0; color: var(--amount); font-size: 42px; line-height: 1.4; }
+.weekly-amount text { font-size: 24px; margin-left: 4px; }
+.weekly-stats { display: flex; margin: 8px 16px 12px; padding-bottom: 20px; border-bottom: 1rpx solid var(--separator); }
+.weekly-stats > view { flex: 1; min-width: 0; }
+.weekly-stats text { font-size: 20px; overflow-wrap: anywhere; }
+.weekly-stats view > view { margin-top: 4px; font-size: 11px; color: var(--text-secondary); }
+.weekly-line { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 16px; padding: 16px 0; font-size: 14px; border-bottom: 1rpx solid var(--separator); }
+.weekly-line > view { min-width: 0; overflow-wrap: anywhere; }
+.weekly-line > text:last-child { flex: none; }
+.weekly-tool { text-align: right; max-width: 66%; }
