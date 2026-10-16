@@ -11,6 +11,7 @@ import { deleteAccount } from './account.js';
 import { heartbeat, syncHealth } from './sync-health.js';
 import { analyticsRows, aggregateAnalytics, communityAudience, analyticsQuery } from './analytics.js';
 import { insightPolicy, requireInsightAccess } from './insight-access.js';
+import { groupPk, rankSnapshot } from './group-pk.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -78,6 +79,13 @@ async function route(request, env, url, path) {
   if (method === 'GET' && path === '/healthz') {
     await env.DB.prepare('SELECT 1 FROM users LIMIT 1').first();
     return withCors(Response.json({ ok: true, day: beijingDay() }));
+  }
+
+  if (method === 'POST' && /^\/api\/groups\/[^/]+\/compare$/.test(path)) {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    if (!completeProfile(user)) return withCors(profileRequired());
+    return withCors(await groupPk(env, user, path.split('/')[3], await readJson(request), userOrigin(env, request)));
   }
 
   if (method === 'GET' && ['/api/my/analysis', '/api/insights'].includes(path)) {
@@ -639,8 +647,7 @@ async function leaderboard(request, env, url) {
   const globalRankMap = allRows ? new Map(allRows.results.map((r, i) => [r.uid, i + 1])) : null;
   // Group aggregates also supply the total and a stable fingerprint. Only one
   // page is returned to the phone; raw user IDs never leave the server.
-  const snapshot = await sha256Hex(JSON.stringify(group ? [group.id, group.name, group.members, period, today, rows.results]
-    : ['global', period, today, rows.results]));
+  const snapshot = await rankSnapshot(group, period, today, rows.results);
   if (offset > 0 && previousSnapshot !== snapshot) return jsonError(409, '榜单已有更新，请刷新后继续查看');
   const pageRows = rows.results.slice(offset, offset + LEADERBOARD_LIMIT);
   const nextOffset = offset + pageRows.length;

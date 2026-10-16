@@ -67,7 +67,7 @@ function drawComparisonPoster(ctx, record) {
     const cx = i ? 740 : 260;
     p.avatar(side, avatarImages[side.avatar_url], cx, 196, 96);
     p.text(side.nickname, cx, 288, 32, p.ink, 400, 'center');
-    p.text(i ? '参与者' : '原作者', cx, 326, 22, p.soft, 400, 'center');
+    p.text(i ? (record.transient ? '我' : '参与者') : (record.transient ? '群友' : '原作者'), cx, 326, 22, p.soft, 400, 'center');
     p.text(`${side.value}${side.unit}`, cx, 430, 64, p.orange, 420, 'center');
     p.text('Tokens', cx, 474, 24, p.soft, 400, 'center');
     if (cover) {
@@ -85,7 +85,7 @@ function drawComparisonPoster(ctx, record) {
   if (cover) drawCodeBadge(ctx, codeImage, 404, 578, 192);
   else {
     p.rule(904);
-    p.text(view.commonTool ? `共同工具 · ${view.commonTool}` : '同一日期范围 · 分享时的记录', 500, 958, 26, p.soft, 880, 'center');
+    p.text(view.commonTool ? `共同工具 · ${view.commonTool}` : `同一日期范围 · ${record.transient ? '本次读取的记录' : '分享时的记录'}`, 500, 958, 26, p.soft, 880, 'center');
     drawCodeBadge(ctx, codeImage, 374, 982, 252);
   }
   p.text(`${usageBasis(record.usage).shortNote} · 用量不代表产出`, 60, H - 20, 20, p.soft);

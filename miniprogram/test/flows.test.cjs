@@ -1393,6 +1393,7 @@ test('对比在主动进入后读取真实接口，图片尚未生成也可转�
     ensureLogin: async () => { order.push('login'); return {}; }, compareShare: async id => { order.push('compare'); assert.equal(id, 'a'.repeat(24)); return result; } });
   p.onLoad({ id: 'a'.repeat(24) }); await p.onShow();
   assert.deepEqual(order, ['source', 'login', 'compare']);
+  assert.equal(p.data.targetRank, 0);
   assert.equal(p.data.comparison.left.value, '1.00'); assert.equal(p.data.comparison.right.value, '2.50');
   assert.equal(p.data.socialCoverPath, '');
   assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + result.id);
@@ -1423,6 +1424,53 @@ test('离开或注销后的迟到对比响应不能恢复分享内容', async ()
     assert.equal(p.data.record, null); assert.equal(p.data.comparison, null);
     assert.equal(p.onShareAppMessage().path, '/pages/record/record?id=' + 'a'.repeat(24));
   }
+});
+
+test('群榜头像先确认 PK；取消不跳转，本人直达个人页，刷新后的旧提示失效', () => {
+  const modals = [];
+  const { p, navigation } = page('group', {}, { showModal: options => modals.push(options) });
+  p._visible = true; p._requestId = 1;
+  Object.assign(p.data, { id: 'g1', joined: true, loading: false, snapshot: 'a'.repeat(64), period: 'week',
+    entries: [{ rank: 1, nickname: '群友', tokens_fmt: '2.58 亿' }, { rank: 2, isMe: true }] });
+  const tap = rank => p.openPk({ currentTarget: { dataset: { rank } } });
+  tap(1); tap(1); assert.equal(modals.length, 1); assert.equal(navigation.length, 0);
+  assert.equal(modals[0].confirmText, '进入PK'); assert.match(modals[0].content, /群友.*\n近7天/s);
+  modals[0].success({ confirm: false }); assert.equal(navigation.length, 0);
+  tap(1); p._requestId++; modals[1].success({ confirm: true }); assert.equal(navigation.length, 0);
+  tap(1); modals[2].success({ confirm: true });
+  assert.equal(navigation.at(-1)[1], '/pages/compare/compare?g=g1&period=week&rank=1&snapshot=' + 'a'.repeat(64));
+  assert.equal(p._refreshAfterPk, true);
+  tap(2); assert.equal(navigation.at(-1)[1], '/pages/profile/profile');
+});
+
+test('群榜 PK 使用选中榜单与周期，不为群友生成公开分享；返回群榜强制刷新', async () => {
+  const calls = [], hidden = [];
+  const result = { ...comparedRecord(), transient: true }; delete result.id;
+  const { p, navigation } = page('compare', { groupComparison: async (id, query) => {
+    calls.push([id, query]); return result;
+  }, sharedRecord: async () => { throw new Error('不应读取分享记录'); }, compareShare: async () => { throw new Error('不应生成分享'); } },
+  { hideShareMenu: () => hidden.push('hide'), showShareMenu: () => { throw new Error('群内读取不开放公共链接'); } });
+  p.onLoad({ g: 'g1', rank: '52', period: 'week', snapshot: 'a'.repeat(64) }); await p.onShow();
+  assert.equal(calls.length, 1); assert.equal(calls[0][0], 'g1');
+  assert.equal(JSON.stringify(calls[0][1]), JSON.stringify({ period: 'week', rank: 52, snapshot: 'a'.repeat(64) }));
+  assert.equal(p.data.comparison.left.value, '1.00'); assert.equal(p.data.comparison.right.value, '2.50');
+  p.goBack(); assert.deepEqual(navigation.at(-1), ['back', 1]); assert.ok(hidden.length);
+  const group = page('group').p; group._refreshAfterPk = true; group._needsResolve = false;
+  let force; group.init = async options => { force = options.force; }; await group.onShow();
+  assert.equal(force, true); assert.equal(group._refreshAfterPk, false);
+});
+
+test('群榜 PK 的迟到响应在离开或换账号后失效，过期榜单保留重新选择入口', async () => {
+  for (const cancel of ['leave', 'epoch']) {
+    let release, epoch = 0;
+    const { p } = page('compare', { accountEpoch: () => epoch, groupComparison: () => new Promise(resolve => release = resolve) });
+    p.onLoad({ g: 'g1', rank: '1', period: 'day', snapshot: 'a'.repeat(64) }); const pending = p.onShow(); await flush();
+    if (cancel === 'leave') p.onHide(); else epoch++;
+    release(comparedRecord()); await pending; assert.equal(p.data.record, null);
+  }
+  const { p } = page('compare', { groupComparison: async () => { const error = new Error('榜单已更新'); error.code = 'BOARD_CHANGED'; throw error; } });
+  p.onLoad({ g: 'g1', rank: '1', snapshot: 'a'.repeat(64) }); await p.onShow();
+  assert.equal(p.data.errorCode, 'BOARD_CHANGED'); assert.equal(p.data.record, null);
 });
 
 test('接收双人卡片免登录展示两人摘要，重转保留双人记录与原作者', async () => {

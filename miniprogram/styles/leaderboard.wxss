@@ -5,6 +5,9 @@
 .lb-row-me { background: var(--surface-muted); }
 .lb-rank { flex: 0 0 24px; text-align: center; font-size: 15px; font-weight: 400; line-height: 1.5; color: var(--text-secondary); }
 .lb-avatar { flex: none; width: 40px; height: 40px; border-radius: 50%; }
+.lb-row .lb-avatar-action { flex: none; display: flex; align-items: center; justify-content: center; width: 44px; height: 44px; margin: -2px; padding: 0; border: 0; border-radius: 50%; background: transparent; line-height: 1; }
+.lb-avatar-action::after { border: none; }
+.lb-avatar-pressed { opacity: .6; }
 .lb-avatar.rank-avatar-ph { background: var(--separator); color: var(--text-muted); font-size: 16px; font-weight: 400; }
 .lb-person { flex: 1; min-width: 0; text-align: left; }
 .lb-name-line { display: flex; align-items: center; gap: 6px; }

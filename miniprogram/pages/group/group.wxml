@@ -55,8 +55,9 @@
     <block wx:elif="{{joined === true}}">
       <view wx:if="{{!entries.length}}" class="hint hint-sm"><view class="hint-title display">本周期暂无用量</view><view class="hint-sub">成员同步用量后会显示在这里。</view></view>
       <block wx:else>
+        <view wx:if="{{total > (me ? 1 : 0)}}" class="pk-hint">点头像，和 TA PK</view>
         <view class="lb-table-head"><text>群排名</text><text>Token 用量</text></view>
-        <template is="leaderboard-row" wx:for="{{entries}}" wx:key="rank" data="{{item}}" />
+        <template is="leaderboard-row" wx:for="{{entries}}" wx:key="rank" data="{{item, pkEnabled: true}}" />
         <view class="pagination">
           <view wx:if="{{moreError}}" class="pagination-error">{{moreError}}</view>
           <button wx:if="{{hasMore}}" class="load-more" bindtap="loadMore" loading="{{loadingMore}}" disabled="{{loadingMore}}">{{loadingMore ? '正在加载…' : moreError ? '重新加载' : '加载更多'}}<text wx:if="{{!loadingMore}}"> · {{entries.length}} / {{total}}</text></button>

@@ -3,9 +3,15 @@ const { comparisonView, comparisonTitle } = require('../../utils/social-share');
 const { socialImages } = require('../../utils/social-images');
 Page({
   ...socialImages(wx, api),
-  data: { id: '', loading: true, error: '', errorCode: '', record: null, comparison: null,
+  data: { id: '', groupMode: false, groupId: '', targetRank: 0, snapshot: '', period: 'day', loading: true, error: '', errorCode: '', record: null, comparison: null,
     sourceName: '', from: '', to: '', socialCoverPath: '', socialPosterPath: '', socialImageError: '', saving: false, revoking: false },
-  onLoad(options) { this.setData({ id: /^[0-9a-f]{24}$/.test(options.id || '') ? options.id : '' }); wx.hideShareMenu(); },
+  onLoad(options) {
+    this.setData({ id: /^[0-9a-f]{24}$/.test(options.id || '') ? options.id : '', groupMode: !!options.g,
+      groupId: String(options.g || '').slice(0, 128), targetRank: Number.isSafeInteger(Number(options.rank)) ? Number(options.rank) : 0, snapshot: options.snapshot || '',
+      period: options.period || 'day' });
+    if (options.g) wx.setNavigationBarTitle?.({ title: '群内 PK' });
+    wx.hideShareMenu();
+  },
   onShow() { this._socialVisible = true; return this.load(); },
   onReady() { this._socialCanvasReady = true; return this.buildSocialImages(); },
   onHide() { this._recordEpoch = null; this._socialVisible = false; this._requestId = (this._requestId || 0) + 1; this.resetSocialImages(); },
@@ -14,6 +20,7 @@ Page({
     const requestId = this._requestId = (this._requestId || 0) + 1;
     this.resetSocialImages(); wx.hideShareMenu();
     this.setData({ loading: true, error: '', errorCode: '', record: null, comparison: null });
+    if (this.data.groupMode) return this.loadGroup(requestId);
     if (!this.data.id) { this.setData({ loading: false, error: '链接无效，请重新打开分享卡片' }); return; }
     try {
       if (api.accountState()) { wx.navigateTo({ url: '/pages/account/account' }); return; }
@@ -35,6 +42,23 @@ Page({
       if (requestId === this._requestId) this.setData({ loading: false, error: err.message || '对比暂不可用，请重试', errorCode: err.code || '' });
     }
   },
+  async loadGroup(requestId) {
+    try {
+      if (api.accountState()) { wx.navigateTo({ url: '/pages/account/account' }); return; }
+      await api.ensureLogin();
+      if (requestId !== this._requestId) return;
+      const epoch = api.accountEpoch();
+      const record = await api.groupComparison(this.data.groupId, { period: this.data.period, rank: this.data.targetRank, snapshot: this.data.snapshot });
+      if (requestId !== this._requestId || epoch !== api.accountEpoch() || api.accountState()) return;
+      const comparison = comparisonView(record);
+      this._recordEpoch = epoch; this._socialRecord = record;
+      this.setData({ record, comparison, loading: false });
+      return this.buildSocialImages();
+    } catch (err) {
+      if (requestId === this._requestId) this.setData({ loading: false, error: err.message || '对比暂不可用，请重试', errorCode: err.code || '' });
+    }
+  },
+  goBack() { wx.navigateBack({ delta: 1, fail: () => wx.switchTab({ url: '/pages/index/index' }) }); },
   comparisonAvatarError(e) {
     const side = e.currentTarget.dataset.side;
     if (['left', 'right'].includes(side)) this.setData({ [`comparison.${side}.avatarFailed`]: true });
@@ -52,7 +76,7 @@ Page({
       complete: () => this.setData({ saving: false }) });
   },
   revoke() {
-    if (!this.data.record || this.data.revoking) return;
+    if (this.data.groupMode || !this.data.record || this.data.revoking) return;
     const id = this.data.record.id;
     wx.showModal({ title: '关闭这张对比卡的链接？', content: '原作者的卡片和已发出的图片不受影响。',
       success: async res => {
@@ -66,6 +90,7 @@ Page({
       } });
   },
   onShareAppMessage() {
+    if (this.data.groupMode) return { title: '群内 Token 排名', path: '/pages/group/group?enter=1', imageUrl: '/assets/share-cover.png' };
     const record = this.data.record;
     return record && !api.accountState() && this._recordEpoch === api.accountEpoch() ? {
       title: comparisonTitle(record), path: '/pages/record/record?id=' + record.id,

@@ -1,7 +1,8 @@
 <template name="leaderboard-row">
   <view class="lb-row {{item.isMe ? 'lb-row-me' : ''}}" id="rank-{{item.rank}}">
     <text class="lb-rank">{{item.rank}}</text>
-    <image wx:if="{{item.avatar_url}}" class="lb-avatar" src="{{item.avatar_url}}" mode="aspectFill" />
+    <button wx:if="{{pkEnabled}}" class="lb-avatar-action" data-rank="{{item.rank}}" bindtap="openPk" hover-class="lb-avatar-pressed" aria-label="{{item.isMe ? '查看我的用量' : '和 ' + item.nickname + ' PK'}}"><image wx:if="{{item.avatar_url}}" class="lb-avatar" src="{{item.avatar_url}}" mode="aspectFill" /><view wx:else class="lb-avatar rank-avatar-ph">{{item.initial}}</view></button>
+    <image wx:elif="{{item.avatar_url}}" class="lb-avatar" src="{{item.avatar_url}}" mode="aspectFill" />
     <view wx:else class="lb-avatar rank-avatar-ph">{{item.initial}}</view>
     <view class="lb-person">
       <view class="lb-name-line"><text class="lb-name">{{item.nickname}}</text><text wx:if="{{item.isMe}}" class="lb-me-tag">我</text></view>

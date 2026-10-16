@@ -44,6 +44,7 @@ Page({
       if (this._continueProfile && flow.hasProfile(this.data.user)) return this.continueProfile(this.data.user);
       return;
     }
+    if (this._refreshAfterPk && !this._needsResolve) { this._refreshAfterPk = false; return this.init({ force: true }); }
     return this._needsResolve ? this.tryEnterGroup() : this.init();
   },
   onReady() { this.buildQuickCover(); if (this._quickRecord) this.buildPoster(); },
@@ -52,6 +53,7 @@ Page({
     this._visible = false;
     this._enterRequest = (this._enterRequest || 0) + 1;
     this._entering = false;
+    this._pkPrompt = false;
     this.setData({ joining: false, loadingMore: false, nicknameFocus: false });
     this._requestId = (this._requestId || 0) + 1;
     this._posterVersion = (this._posterVersion || 0) + 1;
@@ -176,6 +178,24 @@ Page({
   promptConnect() {
     if (!this._visible || this.data.enterState !== 'ready') return;
     updatePrompt.maybePrompt(wx, this.data.user);
+  },
+  openPk(e) {
+    if (!this._visible || this._pkPrompt || this.data.loading || this.data.joined !== true || !this.data.snapshot) return;
+    const entry = this.data.entries.find(item => item.rank === Number(e.currentTarget.dataset.rank));
+    if (!entry) return;
+    if (entry.isMe) { this.goMine(); return; }
+    const { id, period, snapshot } = this.data, request = this._requestId, epoch = api.accountEpoch();
+    const label = this.data.periods.find(item => item.key === period)?.label || '同期';
+    this._pkPrompt = true;
+    wx.showModal({ title: '和 TA PK', content: `${entry.nickname}\n${label} · ${entry.tokens_fmt} tokens\n对比双方同期用量。`,
+      confirmText: '进入PK', cancelText: '取消',
+      success: result => {
+        this._pkPrompt = false;
+        if (!result.confirm || !this._visible || request !== this._requestId || epoch !== api.accountEpoch()) return;
+        this._refreshAfterPk = true;
+        wx.navigateTo({ url: '/pages/compare/compare?g=' + encodeURIComponent(id) + '&period=' + period +
+          '&rank=' + entry.rank + '&snapshot=' + snapshot });
+      }, fail: () => { this._pkPrompt = false; } });
   },
   async init(options = {}) {
     if (!this.data.id) return;
