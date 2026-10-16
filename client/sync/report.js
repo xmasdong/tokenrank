@@ -64,7 +64,7 @@ export async function sync({ dir = SYNC_DIR, full = false, replace = false, dryR
     const unchanged = config.protocol_version === 2 ? config.synced_days || {} : {};
     const present = new Set(days.map(day => day.day));
     for (const day of Object.keys(unchanged)) if (!replace && !present.has(day)) days.push({ day, tokens: 0, input_tokens: 0, output_tokens: 0,
-      cache_read: 0, cache_write: 0, requests: 0, models: [], tools: [] });
+      cache_read: 0, cache_write: 0, requests: 0, models: [], tools: [], tool_models: [] });
     days.sort((a,b) => a.day.localeCompare(b.day));
     const changed = full || replace ? days : days.filter(day => unchanged[day.day] !== fingerprint(day));
     onProgress({stage:'upload',source_day:sourceDay});

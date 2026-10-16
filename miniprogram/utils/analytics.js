@@ -15,10 +15,11 @@ function presentAnalysis(result, { metric = 'tokens', name = '' } = {}) {
   const center = compact(people ? result.summary.users : result.summary.breakdown_tokens);
   const selected = items.find(item => item.selected);
   const daily = result.daily.map(day => ({ ...day, label: day.day.slice(5).replace('-', '/'),
-    value: day.reported ? name ? day.parts.find(item => item.name === name)?.tokens || 0 : day.tokens : null,
-  })).map(day => ({ ...day, amount: day.value === null ? '未同步' : compact(day.value), exact: day.value === null ? '未同步' : integer(day.value) }));
+    value: day.reported && !(name && result.tool && day.details_complete === false) ? name ? day.parts.find(item => item.name === name)?.tokens || 0 : day.tokens : null,
+  })).map(day => ({ ...day, amount: day.value === null ? '未同步' : compact(day.value),
+    exact: day.value === null ? day.reported ? '模型明细待补齐' : '未同步' : integer(day.value) }));
   return { ...result, items, segments, daily, selected: selected || null, amount: compact(result.summary.tokens),
-    exact: integer(result.summary.tokens), requestsText: integer(result.summary.requests),
+    exact: integer(result.summary.tokens), requestsText: result.summary.requests === null ? '' : integer(result.summary.requests),
     categoryCount: items.filter(item => !item.unclassified).length, centerValue: center.value + center.unit,
     centerLabel: people ? '常用用户' : result.has_overlap ? '明细用量' : 'Tokens' };
 }

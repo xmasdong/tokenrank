@@ -37,6 +37,16 @@ export function readDays(path, { now = Date.now(), fromDay = null, costing = nul
       WHERE ts >= ? AND ts <= ? AND ${key} IS NOT NULL AND ${key} != ''
       GROUP BY daynum, name ORDER BY daynum, tokens DESC, name ASC`).all(from, now);
     const models = grouped('model'), tools = grouped('tool');
+    const associations = db.prepare(`SELECT CAST((ts + 28800000) / 86400000 AS INTEGER) AS daynum,
+      report_name(tool) AS tool_name, report_name(model) AS model_name, SUM(total_tokens) AS tokens
+      FROM events WHERE ts >= ? AND ts <= ? AND tool IS NOT NULL AND tool != '' AND model IS NOT NULL AND model != ''
+      GROUP BY daynum,tool_name,model_name ORDER BY daynum,tokens DESC,tool_name,model_name`).all(from, now);
+    const toolModels = new Map();
+    for (const row of associations) {
+      if (!toolModels.has(row.daynum)) toolModels.set(row.daynum, []);
+      const items = toolModels.get(row.daynum);
+      if (items.length < 128 && row.tokens > 0) items.push([row.tool_name, row.model_name, row.tokens]);
+    }
     const detailMap = list => {
       const map = new Map();
       for (const r of list) {
@@ -56,6 +66,7 @@ export function readDays(path, { now = Date.now(), fromDay = null, costing = nul
       }
       return { day, tokens: row.tokens, input_tokens: row.input_tokens, output_tokens: row.output_tokens, requests: row.requests, cache_read: row.cache_read, cache_write: row.cache_write,
         models: modelMap.get(row.daynum) || [], tools: toolMap.get(row.daynum) || [],
+        tool_models: toolModels.get(row.daynum) || [],
         ...(costs?.has(row.daynum) ? { cost: costs.get(row.daynum) } : {}) };
     });
     db.exec('COMMIT');

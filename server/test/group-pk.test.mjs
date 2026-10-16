@@ -26,7 +26,7 @@ function fixture(t, count = 3) {
   for (let id = 1; id <= count; id++) if (id !== 3) db.prepare("INSERT INTO rank_group_members VALUES('g1',?,1,0)").run(id);
   function seed(uid, offset, tokens, device = 'selected') {
     const day = beijingDay(Date.now() + offset * 86400000);
-    db.prepare('INSERT INTO daily_totals VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL)').run(uid, device, day, tokens, 0, 0, tokens, 0, tokens ? 2 : 0,
+    db.prepare('INSERT INTO daily_totals VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,NULL,NULL)').run(uid, device, day, tokens, 0, 0, tokens, 0, tokens ? 2 : 0,
       JSON.stringify([['M', tokens]]), JSON.stringify([['Codex', tokens]]), Date.now(), Date.now());
     db.prepare('INSERT OR IGNORE INTO usage_sync_state VALUES(?,?,?,?)').run(uid, 'selected', Date.now(), Date.now());
     return day;

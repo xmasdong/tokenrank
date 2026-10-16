@@ -3,14 +3,14 @@ const { PERIODS, compact } = require('../../utils/usage');
 const { presentAnalysis } = require('../../utils/analytics');
 const { openInsight } = require('../../utils/insight-access');
 Page({
-  data: { scope: 'mine', period: 'day', periods: PERIODS, dimension: 'tools', view: 'donut', metric: 'tokens',
+  data: { scope: 'mine', period: 'day', periods: PERIODS, dimension: 'tools', tool: '', view: 'donut', metric: 'tokens',
     loading: true, error: '', report: null, focusName: '', selectedDay: null, visibleCount: 8, hasReported: false,
     audienceName: '', audience: [], audienceTotal: null, audienceLoading: false, audienceError: '',
     audienceHasMore: false, audienceSnapshot: '', audienceNext: null, gateBusy: false },
   onLoad(options) {
     const scope = options.scope === 'public' ? 'public' : 'mine';
     this.setData({ scope, period: PERIODS.some(item => item.key === options.period) ? options.period : 'day',
-      dimension: options.dimension === 'models' ? 'models' : 'tools', focusName: String(options.name || '').slice(0, 100) });
+      dimension: options.tool || options.dimension === 'models' ? 'models' : 'tools', tool: String(options.tool || '').slice(0, 60), focusName: String(options.name || '').slice(0, 100) });
     wx.setNavigationBarTitle?.({ title: scope === 'public' ? '广场数据分析' : '我的数据分析' });
     if (scope === 'public') wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); else wx.hideShareMenu();
   },
@@ -26,7 +26,7 @@ Page({
   },
   async load(options = {}) {
     const request = this._requestId = (this._requestId || 0) + 1, epoch = api.accountEpoch();
-    const query = { scope: this.data.scope, period: this.data.period, dimension: this.data.dimension };
+    const query = { scope: this.data.scope, period: this.data.period, dimension: this.data.dimension, ...(this.data.tool ? { tool: this.data.tool } : {}) };
     this.resetAudience(); this.setData({ loading: true, error: '', selectedDay: null, visibleCount: 8, report: null });
     try {
       if (query.scope === 'mine') {
@@ -52,7 +52,7 @@ Page({
   switchDimension(e) {
     const dimension = e.currentTarget.dataset.key;
     if (!['tools','models'].includes(dimension) || dimension === this.data.dimension) return;
-    this.setData({ dimension, focusName: '' }); return this.load();
+    this.setData({ dimension, tool: '', focusName: '' }); return this.load();
   },
   switchView(e) {
     const view = e.currentTarget.dataset.key;
@@ -72,6 +72,12 @@ Page({
   clearFocus() { this.resetAudience(); this.setData({ focusName: '', selectedDay: null }); this.render(); },
   selectDay(e) { this.setData({ selectedDay: this.data.report.daily[e.detail.index] || null }); },
   moreItems() { this.setData({ visibleCount: this.data.visibleCount + 12 }); },
+  openToolModels(e) {
+    const tool = e.currentTarget?.dataset?.name;
+    if (this.data.dimension !== 'tools' || !this._raw?.items.some(item => !item.unclassified && item.name === tool)) return;
+    wx.navigateTo({ url: '/pages/analysis/analysis?scope=' + this.data.scope + '&period=' + this.data.period + '&dimension=models&tool=' + encodeURIComponent(tool) });
+  },
+  backToTools() { wx.redirectTo({ url: '/pages/analysis/analysis?scope=' + this.data.scope + '&period=' + this.data.period + '&dimension=tools' }); },
   async openAudience(e) {
     if (this.data.scope !== 'public' || this.data.gateBusy || this.data.audienceLoading) return;
     const name = e.currentTarget?.dataset?.name || this.data.focusName;
@@ -81,7 +87,7 @@ Page({
     const current = () => this._visible && version === this._audienceVersion && request === this._requestId;
     try {
       const opened = await openInsight({ feature: 'community_audience', policy: this._raw.access,
-        context: { name, period: this.data.period, dimension: this.data.dimension }, current }, async grant => {
+        context: { name, period: this.data.period, dimension: this.data.dimension, tool: this.data.tool }, current }, async grant => {
         this._audienceGrant = grant; await this.fetchAudience(false, current);
       });
       if (!opened && current()) this.resetAudience();
@@ -90,6 +96,7 @@ Page({
   },
   async fetchAudience(more, current, force = false) {
     const query = { period: this.data.period, dimension: this.data.dimension, name: this.data.audienceName,
+      ...(this.data.tool ? { tool: this.data.tool } : {}),
       ...(more ? { offset: this.data.audienceNext, snapshot: this.data.audienceSnapshot } : {}) };
     this.setData({ audienceLoading: true, audienceError: '' });
     try {
@@ -113,8 +120,10 @@ Page({
   audienceAvatarError(e) { this.setData({ [`audience[${e.currentTarget.dataset.index}].avatarFailed`]: true }); },
   goConnect() { wx.navigateTo({ url: api.accountState() ? '/pages/account/account' : '/pages/connect/connect' }); },
   goShareTools() { wx.navigateTo({ url: '/pages/share/share?style=tools&period=' + encodeURIComponent(this.data.period) }); },
-  goMine() { wx.navigateTo({ url: api.accountState() ? '/pages/account/account' : '/pages/analysis/analysis?scope=mine&period=' + this.data.period + '&dimension=' + this.data.dimension }); },
-  onShareAppMessage() { return { title: `${this.data.focusName || (this.data.dimension === 'models' ? '模型' : '工具')} · 广场使用分布`,
+  goMine() { wx.navigateTo({ url: api.accountState() ? '/pages/account/account' : '/pages/analysis/analysis?scope=mine&period=' + this.data.period + '&dimension=' + this.data.dimension +
+    (this.data.tool ? '&tool=' + encodeURIComponent(this.data.tool) : '') }); },
+  onShareAppMessage() { return { title: `${this.data.tool ? this.data.tool + ' · ' : ''}${this.data.focusName || (this.data.dimension === 'models' ? '模型' : '工具')} · 广场使用分布`,
     path: '/pages/analysis/analysis?scope=public&period=' + this.data.period + '&dimension=' + this.data.dimension +
+      (this.data.tool ? '&tool=' + encodeURIComponent(this.data.tool) : '') +
       (this.data.focusName ? '&name=' + encodeURIComponent(this.data.focusName) : ''), imageUrl: '/assets/share-cover.png' }; },
 });

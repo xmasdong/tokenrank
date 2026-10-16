@@ -119,3 +119,34 @@ test('分析及常用用户查询只读，不创建账号、不修改或清理�
   }
   await f.request('/api/insights/users?name=A');tables.forEach((table,i)=>assert.deepEqual(f.db.prepare('SELECT * FROM '+table).all(),before[i]));
 });
+
+test('工具内的模型只使用真实联合明细，同名模型在不同工具间不串用且不公开隐藏用户',async t=>{
+  const f=fixture(t);f.seed(1,0,100,[['A',60],['B',40]],[['X',70],['Y',30]]);f.seed(2,0,100,[['A',100]],[['Y',100]]);
+  f.seed(3,0,10000,[['A',10000]]);f.db.exec('UPDATE users SET rank_hidden=1 WHERE id=3');
+  f.db.prepare('UPDATE daily_totals SET tool_models_json=? WHERE user_id=1').run(JSON.stringify([['A','X',50],['A','Y',10],['B','X',20],['B','Y',20]]));
+  f.db.prepare('UPDATE daily_totals SET tool_models_json=? WHERE user_id=2').run(JSON.stringify([['A','Y',100]]));
+  const before=f.db.prepare('SELECT total_changes() n').get().n;
+  const a=(await f.request('/api/insights?dimension=models&tool=A')).data;
+  assert.equal(a.tool,'A');assert.equal(a.summary.tokens,160);assert.equal(a.summary.requests,null);assert.equal(a.summary.users,2);
+  assert.equal(a.items.find(row=>row.name==='X').tokens,50);assert.equal(a.items.find(row=>row.name==='Y').tokens,110);assert.equal(a.association.percent,100);
+  const b=(await f.request('/api/insights?dimension=models&tool=B')).data;assert.equal(b.summary.tokens,40);assert.equal(b.items.find(row=>row.name==='X').tokens,20);
+  const people=await f.request('/api/insights/users?dimension=models&tool=A&name=X');assert.equal(people.status,200);
+  assert.equal(people.data.total,1);assert.equal(people.data.entries[0].nickname,'用户1');assert.equal(people.data.entries[0].tokens,50);assert.equal(people.data.entries[0].percent,83.3);
+  const mine=await f.request('/api/my/analysis?dimension=models&tool=A&user_id=2',1);assert.equal(mine.data.summary.tokens,60);
+  assert.equal((await f.request('/api/insights?dimension=tools&tool=A')).status,400);
+  assert.equal((await f.request('/api/insights?dimension=models&tool='+encodeURIComponent("A' OR 1=1"))).data.summary.tokens,0);
+  assert.equal(f.db.prepare('SELECT total_changes() n').get().n,before);
+});
+
+test('旧数据与损坏关联不猜测模型，部分上报展示覆盖率，缺明细日期不能视作模型零用量',async t=>{
+  const f=fixture(t);f.seed(1,0,100,[['A',100]],[['X',100]]);const yesterday=f.seed(1,-1,50,[['A',50]],[['Y',50]]);
+  let data=(await f.request('/api/my/analysis?dimension=models&tool=A',1)).data;
+  assert.equal(data.association.percent,0);assert.equal(data.items[0].name,'未关联模型');assert.equal(data.items[0].tokens,100);
+  f.db.prepare('UPDATE daily_totals SET tool_models_json=? WHERE day<>?').run(JSON.stringify([['A','X',60]]),yesterday);
+  data=(await f.request('/api/my/analysis?dimension=models&tool=A&period=week',1)).data;
+  assert.equal(data.summary.tokens,150);assert.equal(data.association.linked_tokens,60);assert.equal(data.association.unlinked_tokens,90);
+  assert.equal(data.items.find(row=>row.name==='X').tokens,60);assert.ok(data.daily.slice(-2).every(row=>row.details_complete===false));
+  assert.equal(data.daily[0].reported,false);assert.equal(data.daily[0].tokens,null);
+  f.db.prepare('UPDATE daily_totals SET tool_models_json=?').run(JSON.stringify([['A','X',10000]]));
+  data=(await f.request('/api/my/analysis?dimension=models&tool=A',1)).data;assert.equal(data.association.percent,0);assert.equal(data.items.length,1);
+});

@@ -51,3 +51,10 @@
 .bottom-entry { margin: 16px; }
 .text-button { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; background: transparent; color: var(--link); font-size: 13px; line-height: 1.5; font-weight: 400; }
 .text-button::after { border: none; }
+.tool-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 16px; border-bottom: 1rpx solid var(--separator); }
+.tool-heading > text { min-width: 0; overflow-wrap: anywhere; font-size: 16px; }
+.tool-heading .text-button { flex: none; width: auto; margin: 0; padding-right: 0; }
+.association-note { margin-top: 12px; color: var(--text-secondary); font-size: 12px; line-height: 1.8; }
+.detail-users { flex-wrap: wrap; }
+.detail-links { display: flex; gap: 16px; margin-left: auto; }
+.detail-links .text-button { width: auto; min-height: 44px; }

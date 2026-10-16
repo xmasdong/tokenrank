@@ -1,6 +1,6 @@
 {
   "name": "tokenrank-client",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "description": "Read-only TokenRank sync adapter for an independently installed token-watcher",
   "keywords": [
     "token",

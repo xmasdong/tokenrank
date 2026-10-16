@@ -1495,6 +1495,19 @@ function analysisData(scope='public',dimension='tools',period='day') {
     items:[{key:'named:A',name:'A',tokens:60,percent:60,users:2,preferred_users:1,preferred_percent:50},{key:'named:B',name:'B',tokens:40,percent:40,users:1,preferred_users:1,preferred_percent:50}],
     daily:[{day:'2026-10-16',tokens:100,reported:true,parts:[{name:'A',tokens:60},{name:'B',tokens:40}]}],trend_days:7,access:{feature:'community_audience',mode:'free'}};
 }
+
+test('工具内查看模型保留真实工具、周期和访问范围，名单与转发也保留工具条件',async()=>{
+  const main=page('analysis',{analysis:async()=>analysisData()});main.p.onLoad({scope:'public',period:'week'});await main.p.onShow();
+  main.p.openToolModels({currentTarget:{dataset:{name:'A'}}});assert.equal(main.navigation.at(-1)[1],'/pages/analysis/analysis?scope=public&period=week&dimension=models&tool=A');
+  const calls=[];const {p,navigation}=page('analysis',{analysis:async query=>{calls.push(query);return {...analysisData('public','models',query.period),tool:'A',association:{percent:100},summary:{...analysisData().summary,requests:null}};},
+    insightUsers:async query=>{calls.push(query);return {entries:[],total:0};}});
+  p.onLoad({scope:'public',period:'week',tool:'A'});await p.onShow();assert.equal(p.data.dimension,'models');assert.equal(calls[0].tool,'A');
+  await p.openAudience({currentTarget:{dataset:{name:'A'}}});assert.equal(calls[1].tool,'A');
+  const share=p.onShareAppMessage();assert.match(share.path,/dimension=models&tool=A/);
+  p.goMine();assert.match(navigation.at(-1)[1],/scope=mine.*tool=A/);
+  await p.switchPeriod({currentTarget:{dataset:{key:'month'}}});assert.equal(calls.at(-1).tool,'A');assert.equal(calls.at(-1).period,'month');
+  p.backToTools();assert.equal(navigation.at(-1)[1],'/pages/analysis/analysis?scope=public&period=month&dimension=tools');
+});
 test('个人分析入口继承周期，广场工具模型浏览不要求登录，也不请求总榜',async()=>{
   const profile=page('profile');profile.p.data.period='month';profile.p.goAnalysis();assert.match(profile.navigation.at(-1)[1],/scope=mine&period=month/);
   const calls=[];const {p}=page('square',{analysis:async query=>{calls.push(query);return analysisData('public',query.dimension);},ensureLogin:async()=>{throw Error('not allowed');},fetchLeaderboard:async()=>{throw Error('not allowed');}});

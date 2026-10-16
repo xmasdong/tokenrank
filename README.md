@@ -54,7 +54,7 @@ tokenrank rank push --full --dry-run
 
 | 目录 | 内容 |
 |---|---|
-| `client/sync` | 电脑端同步器（当前 0.2.15）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
+| `client/sync` | 电脑端同步器（当前 0.2.16）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
 | `client/bin/tokenrank.js` | 同步器命令行入口 |
 | `server` | Cloudflare Worker、D1 表结构与迁移、安装和更新脚本 |
 | `miniprogram` | 原生微信小程序 |
@@ -94,7 +94,7 @@ node --test client/test-sync/*.test.mjs server/test/*.test.mjs miniprogram/test/
 
 ## 部署
 
-1. 新建数据库用 `server/schema.sql`；已有数据库只执行尚未执行过的迁移，当前最新 `0010_sync_agents.sql`。`0009` 是注销并发保护，`0010` 新增心跳表；必须先执行迁移再部署相应 Worker。当前正式库此前通过 SQL 文件逐项迁移，不要依赖 Wrangler 的迁移追踪表重跑全部迁移。
+1. 新建数据库用 `server/schema.sql`；已有数据库只执行尚未执行过的迁移，当前最新 `0011_tool_models.sql`。`0009` 是注销并发保护，`0010` 新增心跳表，`0011` 为工具下的模型分布增加可选 JSON 列；必须先执行迁移再部署相应 Worker。当前正式库此前通过 SQL 文件逐项迁移，不要依赖 Wrangler 的迁移追踪表重跑全部迁移。
 2. `cd client && npm run pack:dist`，然后在 `server` 目录 `npx wrangler deploy`，安装包和脚本作为静态资源一起发布。
 3. 微信后台配置 request、uploadFile 合法域名；在「用户隐私保护指引」里声明“收集你的昵称、头像”和“选中的照片或视频信息”（头像选择的兜底）。
 4. 上传小程序，真机验收后提交审核。

@@ -11,6 +11,13 @@ test('折线不跨越未同步日期连线，空占比不绘制虚构数据段',
  drawTrend(ctx,320,264,[{label:'10/14',value:10},{label:'10/15',value:null},{label:'10/16',value:20}]);assert.equal(calls.filter(x=>x[0]==='lineTo').length,3);
  calls.length=0;drawDonut(ctx,320,264,[],'0','Tokens');assert.equal(calls.filter(x=>x[0]==='arc').length,1);assert.ok(calls.some(x=>x[0]==='fillText'&&x[1]==='暂无数据'));
 });
+
+test('工具内模型缺少关联时留空，不把未知的模型用量显示成零或整站调用次数',()=>{
+ const raw={scope:'mine',tool:'A',summary:{tokens:100,breakdown_tokens:100,requests:null},items:[{name:'X',tokens:60}],
+ daily:[{day:'2026-10-15',reported:true,details_complete:false,tokens:100,parts:[]},{day:'2026-10-16',reported:true,details_complete:true,tokens:100,parts:[{name:'X',tokens:60}]}]};
+ const selected=presentAnalysis(raw,{name:'X'});assert.equal(selected.requestsText,'');assert.equal(selected.daily[0].value,null);assert.equal(selected.daily[0].exact,'模型明细待补齐');assert.equal(selected.daily[1].value,60);
+ assert.equal(presentAnalysis(raw).daily[0].value,100);
+});
 test('激励钩子当前免费直达，取消、未完成、无凭证或迟到结果均不能打开数据',async()=>{
  let opened=0,adCalls=0;const request={feature:'community_audience',policy:{feature:'community_audience',mode:'free'},context:{name:'A'}};
  setInsightAccessProvider(async()=>{adCalls++;return{completed:true,grant:'opaque-proof'};});

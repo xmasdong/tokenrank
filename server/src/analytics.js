@@ -1,12 +1,14 @@
 import { usageWindow } from './usage.js';
 import { beijingDaysAgo, jsonError } from './lib.js';
 import { insightPolicy } from './insight-access.js';
+import { toolModelRows } from './tool-models.js';
 const positive = value => Number.isFinite(Number(value)) ? Math.max(0, Number(value)) : 0;
 const percent = (value, total) => total ? Math.round(value / total * 1000) / 10 : 0;
 const UNKNOWN = '其他 / 未分类';
 const byTokens = (a, b) => b.tokens - a.tokens || a.name.localeCompare(b.name);
 
-export async function analyticsRows(env, { scope, userId = null, period, dimension, trend = true, now = Date.now() }) {
+export async function analyticsRows(env, { scope, userId = null, period, dimension, tool = '', trend = true, now = Date.now() }) {
+  if (tool) return toolModelRows(env, { scope, userId, period, tool, trend, now });
   const range = usageWindow(period, now), view = scope === 'mine' ? 'ranked_usage' : 'public_usage';
   const column = dimension === 'models' ? 'models_json' : 'tools_json';
   const where = `ds.day>=?1 AND ds.day<=?2 AND (?3 IS NULL OR ds.user_id=?3)
@@ -44,6 +46,7 @@ export async function analyticsRows(env, { scope, userId = null, period, dimensi
 
 export function aggregateAnalytics(rows) {
   const { scope, dimension, range, now, trendDays } = rows;
+  const unknownName = rows.unknownName || UNKNOWN;
   const users = new Map(rows.users.map(row => [row.uid, row]));
   const perUser = new Map(), items = new Map(), preferences = new Map();
   const item = (name, unclassified = false) => {
@@ -65,14 +68,14 @@ export function aggregateAnalytics(rows) {
     const named = (perUser.get(row.uid) || []).sort(byTokens), classified = named.reduce((sum, value) => sum + value.tokens, 0);
     const missing = Math.max(0, positive(row.tokens) - classified), denominator = Math.max(positive(row.tokens), classified);
     summary.breakdown_tokens += denominator; summary.unclassified_tokens += missing;
-    if (missing) { const unknown = item(UNKNOWN, true); unknown.tokens += missing; unknown.users.add(row.uid); }
+    if (missing) { const unknown = item(unknownName, true); unknown.tokens += missing; unknown.users.add(row.uid); }
     if (row.tokens > 0 || row.requests > 0) {
       summary.users++;
       // Dominant unclassified data cannot be used to infer a tool preference.
       if (named[0] && named[0].tokens > missing) {
         item(named[0].name).preferred_users++;
         preferences.set(row.uid, { name: named[0].name, tokens: named[0].tokens, percent: percent(named[0].tokens, denominator) });
-      } else item(UNKNOWN, true).preferred_users++;
+      } else item(unknownName, true).preferred_users++;
     }
   }
   const details = [...items.values()].sort(byTokens).map(row => ({ ...row, users: row.users.size,
@@ -89,24 +92,28 @@ export function aggregateAnalytics(rows) {
     day.tokens += positive(row.tokens); day.requests += positive(row.requests); day.reported_users++;
     for (const detail of named) day.parts.set(detail.name, (day.parts.get(detail.name) || 0) + detail.tokens);
     const missing = Math.max(0, positive(row.tokens) - named.reduce((sum, detail) => sum + detail.tokens, 0));
-    if (missing) day.parts.set(UNKNOWN, (day.parts.get(UNKNOWN) || 0) + missing);
+    if (missing) day.parts.set(unknownName, (day.parts.get(unknownName) || 0) + missing);
   }
   const daily = Array.from({ length: trendDays }, (_, i) => {
     const day = beijingDaysAgo(trendDays - 1 - i, now), value = dayMap.get(day);
     return value ? { day, tokens: value.tokens, requests: value.requests, reported: true, reported_users: value.reported_users,
+      ...(rows.tool ? { details_complete: !rows.incompleteDays.has(day) } : {}),
       parts: [...value.parts].map(([name, tokens]) => ({ name, tokens })) }
       : { day, tokens: null, requests: null, reported: false, reported_users: 0, parts: [] };
   });
   const firstDays = rows.users.map(row => row.first_day).filter(Boolean).sort();
+  if (rows.tool) for (const key of ['requests', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write']) summary[key] = null;
   return { preferences, users, data: { scope, dimension, period: range.period, timezone: 'Asia/Shanghai', token_basis: 'upstream_total',
+    ...(rows.tool ? { tool: rows.tool, association: { linked_tokens: summary.breakdown_tokens - summary.unclassified_tokens,
+      unlinked_tokens: summary.unclassified_tokens, percent: percent(summary.breakdown_tokens - summary.unclassified_tokens, summary.breakdown_tokens) } } : {}),
     from: range.period === 'all' ? firstDays[0] || range.to : range.from, to: range.to, summary,
     items: details, daily, trend_days: trendDays, updated_at: rows.users.reduce((latest, row) => Math.max(latest, positive(row.updated_at)), 0) || null,
     preference_basis: 'largest_reported_share_including_unclassified', has_overlap: summary.breakdown_tokens > summary.tokens } };
 }
 
 export async function communityAudience(env, query, origin) {
-  const { period, dimension, name, offset = 0, snapshot = '' } = query;
-  const rows = await analyticsRows(env, { scope: 'public', period, dimension, trend: false });
+  const { period, dimension, name, tool = '', offset = 0, snapshot = '' } = query;
+  const rows = await analyticsRows(env, { scope: 'public', period, dimension, tool, trend: false });
   const aggregate = aggregateAnalytics(rows);
   if (!aggregate.data.items.some(row => !row.unclassified && row.name === name)) return jsonError(404, '本期暂无该工具或模型数据');
   const profiles = await env.DB.prepare(`SELECT id,nickname,avatar_path FROM users WHERE disabled_at IS NULL AND rank_hidden=0
@@ -115,11 +122,11 @@ export async function communityAudience(env, query, origin) {
   const selected = profiles.results.filter(user => aggregate.preferences.get(user.id)?.name === name)
     .map(user => ({ ...user, ...aggregate.preferences.get(user.id), total_tokens: aggregate.users.get(user.id).tokens }))
     .sort((a, b) => b.tokens - a.tokens || a.id - b.id);
-  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([period, dimension, rows.range, name, selected])));
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([period, dimension, tool, rows.range, name, selected])));
   const current = [...new Uint8Array(digest)].map(value => value.toString(16).padStart(2, '0')).join('');
   if (offset && snapshot !== current) return jsonError(409, '数据已有更新，请刷新后继续查看');
   const next = offset + Math.min(50, Math.max(0, selected.length - offset));
-  return Response.json({ period, dimension, name, from: aggregate.data.from, to: aggregate.data.to, total: selected.length,
+  return Response.json({ period, dimension, name, ...(tool ? { tool } : {}), from: aggregate.data.from, to: aggregate.data.to, total: selected.length,
     snapshot: current, has_more: next < selected.length, next_offset: next < selected.length ? next : null,
     updated_at: aggregate.data.updated_at, access: insightPolicy(env, 'community_audience'),
     entries: selected.slice(offset, next).map((row, i) => ({ rank: offset + i + 1,
@@ -130,5 +137,7 @@ export async function communityAudience(env, query, origin) {
 
 export function analyticsQuery(url) {
   const period = url.searchParams.get('period') || 'day', dimension = url.searchParams.get('dimension') || 'tools';
-  return ['day','week','month','all'].includes(period) && ['tools','models'].includes(dimension) ? { period, dimension } : null;
+  const tool = url.searchParams.get('tool') || '';
+  return ['day','week','month','all'].includes(period) && ['tools','models'].includes(dimension) &&
+    (!tool || (dimension === 'models' && tool.trim() && tool.length <= 60)) ? { period, dimension, ...(tool ? { tool } : {}) } : null;
 }

@@ -89,10 +89,11 @@ const groupPath = id => `/api/groups/${encodeURIComponent(id)}`;
 const boardPath = ({ scope = 'global', id = '', period = 'day', offset = 0, snapshot = '' } = {}) =>
   `/api/leaderboard?scope=${scope}${id ? `&id=${encodeURIComponent(id)}` : ''}&period=${period}` +
   (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
-const analysisPath = ({ scope = 'mine', period = 'day', dimension = 'tools' } = {}) =>
-  `${scope === 'public' ? '/api/insights' : '/api/my/analysis'}?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}`;
-const audiencePath = ({ period = 'day', dimension = 'tools', name, offset = 0, snapshot = '' }) =>
+const analysisPath = ({ scope = 'mine', period = 'day', dimension = 'tools', tool = '' } = {}) =>
+  `${scope === 'public' ? '/api/insights' : '/api/my/analysis'}?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}` + (tool ? '&tool=' + encodeURIComponent(tool) : '');
+const audiencePath = ({ period = 'day', dimension = 'tools', tool = '', name, offset = 0, snapshot = '' }) =>
   `/api/insights/users?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&name=${encodeURIComponent(name)}` +
+  (tool ? '&tool=' + encodeURIComponent(tool) : '') +
   (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
 
 function rawRequest(path, { method = 'GET', data = null, auth = true, header = {}, timeout = 15000, deleting = false } = {}) {

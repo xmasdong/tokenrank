@@ -10,6 +10,7 @@ import { sync, batches } from '../sync/report.js';
 import { MIN_REPORT_VERSION } from '../sync/upstream.js';
 import { installAgent, uninstallAgent, migrateLegacyAgent, LABEL } from '../sync/agent.js';
 import { acquireLock } from '../sync/lock.js';
+import { createHash } from 'node:crypto';
 
 function fixture(t, count=1) {
   const root=mkdtempSync(join(tmpdir(),'tokenrank-sync-test-')), dir=join(root,'rank'), source=join(root,'upstream');
@@ -26,6 +27,14 @@ function fixture(t, count=1) {
 }
 const ack = options => Response.json({ok:true,accepted:JSON.parse(options.body).days.length});
 
+test('升级后的日常同步补传联合明细，不重算、不替换或清空线上历史',async t=>{
+  const f=fixture(t);const old=readDays(f.path).map(({tool_models,...day})=>day);
+  writeConfig({...f.config,protocol_version:2,synced_days:Object.fromEntries(old.map(day=>[day.day,createHash('sha256').update(JSON.stringify(day)).digest('hex')]))},f.dir);
+  const sent=[];const fetcher=async(url,options)=>{assert.equal(url,'https://rank.test/report');const report=JSON.parse(options.body);sent.push(report);assert.equal(report.replace,undefined);assert.equal(report.full,false);return ack(options);};
+  const result=await sync({dir:f.dir,fetcher});assert.equal(result.accepted,1);assert.deepEqual(sent[0].days[0].tool_models,[['codex','gpt-test',190]]);
+  assert.equal((await sync({dir:f.dir,fetcher})).accepted,0);assert.equal(sent.length,1);
+});
+
 test('read-only adapter uses upstream total, Beijing boundaries and committed WAL; source unchanged',t=>{
   const f=fixture(t);f.add('2024-01-02',0,0);
   f.db.exec("UPDATE events SET cached_input=0,cache_write=0,total_tokens=0 WHERE input_tokens=0");
@@ -35,6 +44,8 @@ test('read-only adapter uses upstream total, Beijing boundaries and committed WA
   assert.equal(days[0].tokens,190);assert.equal(days[0].cache_read,100);
   assert.equal(days[1].tokens,99);assert.equal(days[1].requests,2);
   assert.deepEqual(days[1].models,[['opus',99]]);
+  assert.deepEqual(days[0].tool_models,[['codex','gpt-test',190]]);
+  assert.deepEqual(days[1].tool_models,[['claude','opus',99]]);
   const ro=openSource(f.path);assert.throws(()=>ro.exec("UPDATE settings SET value='bad'"),/readonly|read-only/i);ro.close();
   assert.deepEqual(readFileSync(f.path),before);assert.deepEqual(readFileSync(f.path+'-wal'),wal);
   assert.equal(f.db.prepare('SELECT value FROM settings').get().value,'"keep"');
@@ -93,7 +104,7 @@ test('dry run does not upload or change configuration; disconnect during retry c
 });
 
 test('large Unicode detail payloads split below server body limit',()=>{
-  const days=Array.from({length:400},(_,i)=>({day:String(i),tokens:100,models:Array.from({length:8},()=>['中'.repeat(60),100]),tools:Array.from({length:8},()=>['中'.repeat(60),100])}));
+  const days=Array.from({length:400},(_,i)=>({day:String(i),tokens:100,models:Array.from({length:8},()=>['中'.repeat(60),100]),tools:Array.from({length:8},()=>['中'.repeat(60),100]),tool_models:Array.from({length:128},(_,j)=>['中'.repeat(60),'文'.repeat(57)+j,1])}));
   const parts=batches(days,'d');assert.ok(parts.length>1);assert.equal(parts.flatMap(p=>p.days).length,400);
   for(const p of parts)assert.ok(Buffer.byteLength(JSON.stringify(p))<=450*1024);
 });
@@ -155,13 +166,13 @@ test('shell installer stages package, keeps original service/data, installs isol
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
   const snapshot=readFileSync(f.path+'-wal');
-  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.15.tar.gz'),TEST_SERVICES:join(f.root,'services.log')};
+  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.16.tar.gz'),TEST_SERVICES:join(f.root,'services.log')};
   await exec('sh',[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token],{env});
   assert.equal(reports,1);assert.equal(readConfig(own).token,f.config.token);
   assert.equal(readFileSync(original,'utf8'),originalText);assert.deepEqual(readFileSync(f.path+'-wal'),snapshot);
   assert.ok(readdirSync(own).some(x=>x.startsWith('app-backup-')));
   assert.match(readFileSync(env.TEST_SERVICES,'utf8'),/com.tokenrank.sync/);assert.doesNotMatch(readFileSync(env.TEST_SERVICES,'utf8'),/(bootout|bootstrap).*com.tokenwatcher/);
-  const result=await exec(join(home,'.local/bin/tokenrank'),['--version'],{env});assert.equal(result.stdout.trim(),'0.2.15');
+  const result=await exec(join(home,'.local/bin/tokenrank'),['--version'],{env});assert.equal(result.stdout.trim(),'0.2.16');
   assert.equal(existsSync(join(own,'app/src')),false);assert.equal(existsSync(join(own,'app/web')),false);
 });
 
@@ -184,7 +195,7 @@ if(cmd==='scan'){const folder=join(homedir(),'.tokenmeter');mkdirSync(folder,{re
     reports++;res.end(JSON.stringify({ok:true,accepted:JSON.parse(body).days.length}));});});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
-  const env={...process.env,HOME:home,PATH:bin+':/usr/bin:/bin',TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.15.tar.gz'),TEST_TEMPLATE:template,TEST_ORIGINAL_ACTIONS:join(f.root,'actions.log')};
+  const env={...process.env,HOME:home,PATH:bin+':/usr/bin:/bin',TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.16.tar.gz'),TEST_TEMPLATE:template,TEST_ORIGINAL_ACTIONS:join(f.root,'actions.log')};
   const args=[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token];
   await exec('sh',args,{env});const db=join(home,'.tokenmeter/tokenmeter.db'),snapshot=readFileSync(db);
   await exec('sh',args,{env});
@@ -216,7 +227,7 @@ test('shell install over a pre-fix original uploads nothing and points to the up
   let reports=0;const server=createServer((req,res)=>{res.setHeader('content-type','application/json');if(req.url==='/registry/token-watcher/latest')return res.end(JSON.stringify({name:'token-watcher',version:'1.8.3'}));reports++;res.end('{}');});
   await new Promise(r=>server.listen(0,'127.0.0.1',r));t.after(()=>{server.closeAllConnections();server.close();});
   const project=new URL('../../',import.meta.url).pathname;
-  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.15.tar.gz')};
+  const env={...process.env,HOME:home,PATH:fakeBin+':'+process.env.PATH,TOKENRANK_REGISTRY:`http://127.0.0.1:${server.address().port}/registry/`,TEST_PACKAGE:join(project,'server/public/dl/tokenrank-client-0.2.16.tar.gz')};
   let out;await assert.rejects(exec('sh',[join(project,'server/public/install.sh'),`http://127.0.0.1:${server.address().port}`,f.config.token],{env}),error=>{out=error;return error.code===1;});
   assert.equal(reports,0);assert.match(out.stdout,/低于修复重复统计的 1\.8\.2/);assert.match(out.stdout,/update\.sh \| sh/);
   assert.match(readConfig(join(home,'.tokenrank')).last_error,/低于 1\.8\.2/);

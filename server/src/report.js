@@ -25,6 +25,19 @@ export function validateTotalReport(body, now = Date.now()) {
       }
       if (total > d.tokens) throw new Error('invalid detail total');
     }
+    if (d.tool_models !== undefined) {
+      if (!Array.isArray(d.tool_models) || d.tool_models.length > 128) throw new Error('invalid tool models');
+      const names = new Set(), byTool = new Map(), byModel = new Map(); let total = 0;
+      for (const pair of d.tool_models) {
+        if (!Array.isArray(pair) || pair.length !== 3 || pair.slice(0, 2).some(name => typeof name !== 'string' || !name || name.length > 60) ||
+          !Number.isSafeInteger(pair[2]) || pair[2] < 0 || names.has(JSON.stringify(pair.slice(0, 2)))) throw new Error('invalid tool models');
+        names.add(JSON.stringify(pair.slice(0, 2))); total += pair[2];
+        byTool.set(pair[0], (byTool.get(pair[0]) || 0) + pair[2]); byModel.set(pair[1], (byModel.get(pair[1]) || 0) + pair[2]);
+      }
+      if (total > d.tokens || !Number.isSafeInteger(total)) throw new Error('invalid tool model total');
+      for (const [field, grouped] of [['tools', byTool], ['models', byModel]])
+        for (const [name, tokens] of d[field]) if ((grouped.get(name) || 0) > tokens) throw new Error('invalid tool model marginal');
+    }
   }
   return body;
 }
@@ -41,16 +54,17 @@ export async function storeTotalReport(env, conn, body, now = Date.now()) {
   if ((!state || state.device_id !== body.device_id) && !body.full) return jsonError(409, '请执行 tokenrank rank push --full 完整同步此电脑');
   if (state && body.source_at < state.source_at) return jsonError(409, '此批数据早于已同步记录，请重新同步');
   const stmts = body.days.map(d => env.DB.prepare(`INSERT INTO daily_totals
-    (user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
-    SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?15
+    (user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json,tool_models_json)
+    SELECT ?1,?2,?3,?4,?5,?6,?7,?8,?9,?10,?11,?12,?13,?15,?16
     WHERE COALESCE((SELECT source_at FROM usage_rebuild_guard WHERE user_id=?1),0)=?14
       AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?1 AND status='collecting' AND expires_at>?13)
     ON CONFLICT(user_id,device_id,day) DO UPDATE SET tokens=excluded.tokens,input_tokens=excluded.input_tokens,
     output_tokens=excluded.output_tokens,cache_read=excluded.cache_read,cache_write=excluded.cache_write,requests=excluded.requests,
-    models_json=excluded.models_json,tools_json=excluded.tools_json,source_at=excluded.source_at,updated_at=excluded.updated_at,cost_json=excluded.cost_json
+    models_json=excluded.models_json,tools_json=excluded.tools_json,source_at=excluded.source_at,updated_at=excluded.updated_at,cost_json=excluded.cost_json,tool_models_json=excluded.tool_models_json
     WHERE excluded.source_at >= daily_totals.source_at`)
     .bind(conn.user_id,body.device_id,d.day,d.tokens,d.input_tokens,d.output_tokens,d.cache_read,d.cache_write,d.requests,
-      JSON.stringify(d.models),JSON.stringify(d.tools),body.source_at,now,guard?.source_at || 0,d.cost ? JSON.stringify(d.cost) : null));
+      JSON.stringify(d.models),JSON.stringify(d.tools),body.source_at,now,guard?.source_at || 0,d.cost ? JSON.stringify(d.cost) : null,
+      d.tool_models === undefined ? null : JSON.stringify(d.tool_models)));
   if (body.complete) stmts.push(env.DB.prepare(`INSERT INTO usage_sync_state (user_id,device_id,source_at,updated_at)
     SELECT ?1,?2,?3,?4 WHERE COALESCE((SELECT source_at FROM usage_rebuild_guard WHERE user_id=?1),0)=?5
       AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?1 AND status='collecting' AND expires_at>?4)
