@@ -1,5 +1,6 @@
 {
   "navigationBarTitleText": "广场排名",
+  "usingComponents": { "usage-chart": "/components/usage-chart/index" },
   "enablePullDownRefresh": true,
   "onReachBottomDistance": 120,
   "backgroundColor": "#FFFFFF",

@@ -9,6 +9,8 @@ import { readShare, createShare, groupShareStanding } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
 import { deleteAccount } from './account.js';
 import { heartbeat, syncHealth } from './sync-health.js';
+import { analyticsRows, aggregateAnalytics, communityAudience, analyticsQuery } from './analytics.js';
+import { insightPolicy, requireInsightAccess } from './insight-access.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -76,6 +78,32 @@ async function route(request, env, url, path) {
   if (method === 'GET' && path === '/healthz') {
     await env.DB.prepare('SELECT 1 FROM users LIMIT 1').first();
     return withCors(Response.json({ ok: true, day: beijingDay() }));
+  }
+
+  if (method === 'GET' && ['/api/my/analysis', '/api/insights'].includes(path)) {
+    const query = analyticsQuery(url);
+    if (!query) return withCors(jsonError(400, '分析参数无效'));
+    const mine = path === '/api/my/analysis';
+    const user = mine ? await sessionUser(request, env) : null;
+    if (mine && !user) return withCors(jsonError(401, '请先登录'));
+    if (mine) {
+      const ready = await env.DB.prepare('SELECT 1 AS ready FROM usage_sync_state WHERE user_id=?1').bind(user.id).first();
+      if (!ready && await env.DB.prepare('SELECT 1 AS found FROM daily_stats WHERE user_id=?1 LIMIT 1').bind(user.id).first())
+        return withCors(jsonError(409, '请先在电脑更新同步程序，以查看含缓存的总用量'));
+    }
+    const rows = await analyticsRows(env, { scope: mine ? 'mine' : 'public', userId: user?.id, ...query });
+    return withCors(Response.json({ ...aggregateAnalytics(rows).data,
+      ...(mine ? {} : { access: insightPolicy(env, 'community_audience') }) }));
+  }
+  if (method === 'GET' && path === '/api/insights/users') {
+    const denied = requireInsightAccess(env, 'community_audience');
+    if (denied) return withCors(denied);
+    const query = analyticsQuery(url), name = url.searchParams.get('name') || '';
+    const offsetText = url.searchParams.get('offset') || '0', snapshot = url.searchParams.get('snapshot') || '';
+    const offset = Number(offsetText);
+    if (!query || !name.trim() || name.length > 100 || !/^\d{1,8}$/.test(offsetText) ||
+      (offset > 0 && !/^[a-f0-9]{64}$/.test(snapshot))) return withCors(jsonError(400, '数据参数无效，请重新选择'));
+    return withCors(await communityAudience(env, { ...query, name, offset, snapshot }, userOrigin(env, request)));
   }
 
   // ---- 小程序身份 ----

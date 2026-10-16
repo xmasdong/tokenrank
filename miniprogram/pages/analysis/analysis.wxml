@@ -1,0 +1,35 @@
+<view class="page">
+  <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+  <view class="tabs"><view class="tab {{dimension === 'tools' ? 'tab-active' : ''}}" data-key="tools" bindtap="switchDimension">工具</view><view class="tab {{dimension === 'models' ? 'tab-active' : ''}}" data-key="models" bindtap="switchDimension">模型</view></view>
+  <view wx:if="{{loading}}" class="state">正在读取分析数据…</view>
+  <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
+  <block wx:elif="{{report}}">
+    <view class="overview"><view class="overview-label">{{scope === 'public' ? '公开用户用量' : '我的用量'}} · 含缓存</view><view class="overview-value">{{report.amount.value}}<text>{{report.amount.unit}}</text></view><view class="overview-exact">{{report.exact}} tokens</view><view class="overview-stats"><text wx:if="{{scope === 'public'}}">{{report.summary.users}} 位公开用户</text><text wx:else>{{report.summary.active_days}} 天活跃</text><text>{{report.categoryCount}} 种{{dimension === 'tools' ? '工具' : '模型'}}</text><text>{{report.requestsText}} 次调用</text></view><view class="range">{{report.from}} — {{report.to}} · 北京时间</view></view>
+    <view class="view-picker"><button class="view-tab {{view === 'donut' ? 'selected' : ''}}" data-key="donut" bindtap="switchView">占比</button><button class="view-tab {{view === 'trend' ? 'selected' : ''}}" data-key="trend" bindtap="switchView">趋势</button><button class="view-tab {{view === 'list' ? 'selected' : ''}}" data-key="list" bindtap="switchView">明细</button></view>
+    <view wx:if="{{scope === 'public' && view === 'donut'}}" class="metric-picker"><button class="metric-tab {{metric === 'tokens' ? 'selected' : ''}}" data-key="tokens" bindtap="switchMetric">Token 占比</button><button class="metric-tab {{metric === 'people' ? 'selected' : ''}}" data-key="people" bindtap="switchMetric">常用人数占比</button></view>
+    <view wx:if="{{focusName}}" class="focus"><text>{{focusName}}</text><button class="text-button" bindtap="clearFocus">查看全部</button></view>
+    <block wx:if="{{view === 'donut'}}"><usage-chart mode="donut" segments="{{report.segments}}" center-value="{{report.centerValue}}" center-label="{{report.centerLabel}}" bindselect="chooseItem" /><view class="legend"><view wx:for="{{report.segments}}" wx:key="key" class="legend-row" data-name="{{item.name}}" bindtap="chooseItem"><view class="legend-name"><view class="dot" style="background:{{item.color}};"></view><text>{{item.name}}</text></view><text>{{item.chartPercent}}%</text></view></view></block>
+    <block wx:elif="{{view === 'trend'}}"><view class="chart-caption">{{focusName || '总用量'}} · 最近 {{report.trend_days}} 天</view><usage-chart mode="trend" daily="{{report.daily}}" bindpoint="selectDay" /><view class="day-detail">{{selectedDay ? selectedDay.day + ' · ' + selectedDay.exact + (selectedDay.reported ? ' tokens' : '') : '点折线查看当天数值'}}</view></block>
+    <view wx:if="{{report.has_overlap}}" class="note">部分上报明细有重叠，占比按明细总量计算。</view>
+    <view class="section-title">{{view === 'list' ? '用量明细' : '各项用量'}}</view>
+    <view wx:if="{{!report.items.length}}" class="empty">本周期暂无{{dimension === 'tools' ? '工具' : '模型'}}明细。</view>
+    <view wx:for="{{report.items}}" wx:key="key" wx:if="{{index < visibleCount}}" class="detail-row {{item.selected ? 'detail-selected' : ''}}">
+      <view class="detail-head" data-name="{{item.unclassified ? '' : item.name}}" bindtap="chooseItem"><view class="detail-name">{{item.name}}</view><view class="detail-number">{{item.amount.value}} {{item.amount.unit}}<text>{{item.percent}}%</text></view></view>
+      <view class="track"><view class="fill" style="width:{{item.percent}}%;background:{{item.color}};"></view></view>
+      <view class="detail-exact">{{item.exact}} tokens</view>
+      <view wx:if="{{scope === 'public' && !item.unclassified}}" class="detail-users"><text>{{item.preferred_users}} 人常用 · {{item.users}} 人用过</text><button class="text-button" data-name="{{item.name}}" bindtap="openAudience" disabled="{{gateBusy || audienceLoading}}">查看常用用户</button></view>
+    </view>
+    <button wx:if="{{report.items.length > visibleCount}}" class="text-button more" bindtap="moreItems">展开更多 · {{visibleCount}} / {{report.items.length}}</button>
+    <view wx:if="{{audienceName}}" id="audience" class="audience-section"><view class="section-title">{{audienceName}} · 常用用户<text wx:if="{{audienceTotal !== null}}"> {{audienceTotal}} 人</text></view>
+      <view wx:if="{{gateBusy || audienceLoading}}" class="note">正在读取…</view><view wx:if="{{audienceError}}" class="error-note">{{audienceError}}<button class="text-button" bindtap="openAudience">重试</button></view>
+      <view wx:if="{{audienceTotal === 0}}" class="empty">本期暂无以此为主要{{dimension === 'tools' ? '工具' : '模型'}}的公开用户。</view>
+      <view wx:for="{{audience}}" wx:key="rank" class="audience-row"><text class="audience-rank">{{item.rank}}</text><image wx:if="{{item.avatar_url && !item.avatarFailed}}" class="avatar" src="{{item.avatar_url}}" mode="aspectFill" data-index="{{index}}" binderror="audienceAvatarError" /><view wx:else class="avatar initial">{{item.initial}}</view><view class="audience-person"><view class="audience-name">{{item.nickname}}</view><view class="note">占本人用量 {{item.percent}}%</view></view><view class="audience-value">{{item.amount.value}}<text>{{item.amount.unit}}</text></view></view>
+      <button wx:if="{{audienceHasMore}}" class="text-button more" bindtap="moreAudience" disabled="{{audienceLoading}}">加载更多 · {{audience.length}} / {{audienceTotal}}</button>
+      <view class="note">只展示公开排名用户；常用取同期占比最高的一项，未分类占比最高时不推断偏好。右侧为所选{{dimension === 'tools' ? '工具' : '模型'}}用量。</view>
+    </view>
+    <view class="footnote">{{scope === 'public' ? '仅统计参与公开排名的用户。' : ''}}按已上报明细计算，未分类单列；未同步日期留空。{{updatedText ? '更新于 ' + updatedText : '等待同步'}}</view>
+    <button wx:if="{{scope === 'mine' && dimension === 'tools' && report.summary.tokens > 0}}" class="btn btn-ghost bottom-entry" bindtap="goShareTools">分享工具偏好</button>
+    <button wx:if="{{scope === 'mine' && !hasReported}}" class="btn btn-primary bottom-entry" bindtap="goConnect">接入电脑</button>
+    <button wx:if="{{scope === 'public'}}" class="btn btn-ghost bottom-entry" bindtap="goMine">查看我的分析</button>
+  </block>
+</view>

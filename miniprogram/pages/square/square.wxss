@@ -13,3 +13,17 @@
 .load-more::after { border: none; }
 .pagination-end, .pagination-error { font-size: 22rpx; color: var(--text-muted); line-height: 1.7; }
 .pagination-error { margin-bottom: 12rpx; color: var(--danger); }
+.insights { padding: 20px 16px; }
+.insight-heading, .insight-row-head, .insight-row-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.insight-heading { font-size: 17px; }
+.insight-heading > text { flex: 1; min-width: 0; }
+.insight-link { flex: none; display: flex; align-items: center; min-height: 40px; margin: 0; padding: 0; background: transparent; font-size: 13px; color: var(--link); font-weight: 400; }
+.insight-link::after { border: none; }
+.insight-caption { font-size: 12px; line-height: 1.8; color: var(--text-secondary); }
+.insight-row { padding: 18px 0; border-bottom: 1rpx solid var(--separator); }
+.insight-name { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.insight-percent { flex: none; font-size: 18px; color: var(--amount); }
+.insight-track { height: 4px; margin-top: 10px; background: var(--surface-muted); }
+.insight-fill { height: 4px; }
+.insight-row-foot { margin-top: 8px; font-size: 11px; color: var(--text-secondary); }
+.insight-full { width: 100%; margin: 20px 0 12px; font-size: 14px; }

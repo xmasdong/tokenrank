@@ -1,8 +1,17 @@
 <import src="../../templates/leaderboard.wxml" />
 <view class="page">
   <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+  <view class="tabs"><view class="tab {{mode === 'ranking' ? 'tab-active' : ''}}" data-key="ranking" bindtap="switchMode">总榜</view><view class="tab {{mode === 'tools' ? 'tab-active' : ''}}" data-key="tools" bindtap="switchMode">工具</view><view class="tab {{mode === 'models' ? 'tab-active' : ''}}" data-key="models" bindtap="switchMode">模型</view></view>
   <view wx:if="{{loading}}" class="hint">加载中…</view>
   <view wx:elif="{{error}}" class="hint"><view class="hint-sub">{{error}}</view><button class="btn btn-ghost retry" bindtap="load">重新加载</button></view>
+  <view wx:elif="{{mode !== 'ranking' && insights}}" class="insights">
+    <view class="insight-heading"><text>{{mode === 'models' ? '模型' : '工具'}}使用分布</text><button class="insight-link" bindtap="goAnalysis">完整分析</button></view>
+    <view class="insight-caption">{{insights.summary.users}} 位公开用户 · {{insights.categoryCount}} 种{{mode === 'models' ? '模型' : '工具'}}</view>
+    <usage-chart id="squareChart" mode="donut" segments="{{insights.segments}}" center-value="{{insights.centerValue}}" center-label="{{insights.centerLabel}}" />
+    <view wx:if="{{!insights.items.length}}" class="hint-sub">本周期暂无明细。</view>
+    <view wx:for="{{insights.items}}" wx:key="key" wx:if="{{index < 8}}" class="insight-row" data-name="{{item.unclassified ? '' : item.name}}" bindtap="goAnalysis"><view class="insight-row-head"><text class="insight-name">{{item.name}}</text><text class="insight-percent">{{item.percent}}%</text></view><view class="insight-track"><view style="width:{{item.percent}}%;background:{{item.color}};" class="insight-fill"></view></view><view class="insight-row-foot"><text>{{item.amount.value}} {{item.amount.unit}} tokens</text><text wx:if="{{!item.unclassified}}">{{item.preferred_users}} 人常用 · {{item.users}} 人用过</text></view></view>
+    <button class="btn btn-ghost insight-full" bindtap="goAnalysis">查看{{mode === 'models' ? '模型' : '工具'}}分析与常用用户</button><view class="insight-caption">常用按同期占比最高的一项统计；隐藏排名的用户不计入。</view>
+  </view>
   <view wx:elif="{{!entries.length}}" class="hint"><view class="hint-title display">本周期暂无用量</view><view class="hint-sub">可以切换到其他周期。</view><view class="hint-link" bindtap="goConnect">接入电脑</view></view>
   <block wx:else>
     <view class="lb-table-head"><text>全站排名<text wx:if="{{total !== null}}"> · {{total}} 人</text></text><text>Token 用量</text></view>
@@ -15,5 +24,5 @@
   </block>
   <view class="board-meta" wx:if="{{!loading && !error}}"><text>{{updated_fmt ? '榜单更新于 ' + updated_fmt : '等待首次上报'}}</text><text>含缓存 · 北京时间</text></view>
 </view>
-<view class="lb-own-dock" wx:if="{{(me || user) && !loading && !error}}"><template is="leaderboard-me" data="{{me, user, rankLabel: '我的全站排名', emptyLabel: user.rank_hidden ? '已关闭排名' : '本周期未上榜'}}" /></view>
+<view class="lb-own-dock" wx:if="{{mode === 'ranking' && (me || user) && !loading && !error}}"><template is="leaderboard-me" data="{{me, user, rankLabel: '我的全站排名', emptyLabel: user.rank_hidden ? '已关闭排名' : '本周期未上榜'}}" /></view>
 <privacy-notice />

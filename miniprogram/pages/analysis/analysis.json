@@ -1,0 +1,1 @@
+{ "navigationBarTitleText": "数据分析", "enablePullDownRefresh": true, "backgroundTextStyle": "dark", "usingComponents": { "usage-chart": "/components/usage-chart/index" } }

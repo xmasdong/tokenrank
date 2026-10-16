@@ -1,0 +1,53 @@
+.page { padding-bottom: calc(32px + env(safe-area-inset-bottom)); }
+.state { padding: 32px 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+.state .btn { width: 100%; margin-top: 16px; }
+.overview { padding: 24px 16px; border-bottom: 1rpx solid var(--separator); }
+.overview-label, .overview-exact, .range { font-size: 12px; color: var(--text-secondary); }
+.overview-value { font-size: 42px; color: var(--amount); margin: 8px 0; line-height: 1.4; }
+.overview-value text { font-size: 24px; margin-left: 6px; }
+.overview-stats { display: flex; flex-wrap: wrap; gap: 8px 16px; margin: 18px 0 8px; font-size: 13px; }
+.view-picker { display: flex; gap: 8px; margin: 20px 16px 8px; }
+.view-tab, .metric-tab { display: flex; align-items: center; justify-content: center; min-height: 40px; margin: 0; padding: 8px 16px; background: transparent; border-radius: 4px; color: var(--text-secondary); font-size: 14px; line-height: 1.5; font-weight: 400; }
+.view-tab::after, .metric-tab::after { border: none; }
+.view-tab.selected { color: var(--text); background: var(--surface-muted); }
+.metric-picker { display: flex; gap: 4px; margin: 0 8px; }
+.metric-tab { font-size: 12px; }
+.metric-tab.selected { color: var(--amount); }
+.focus { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 16px; font-size: 14px; overflow-wrap: anywhere; }
+.focus .text-button { flex: none; }
+.legend { padding: 0 16px 20px; }
+.legend-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 8px 0; font-size: 13px; }
+.legend-name { display: flex; align-items: center; gap: 8px; min-width: 0; overflow-wrap: anywhere; }
+.dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+.section-title { padding: 20px 16px 8px; font-size: 16px; font-weight: 500; }
+.detail-row { margin: 0 16px; padding: 16px 0; border-bottom: 1rpx solid var(--separator); }
+.detail-selected { background: var(--surface-muted); }
+.detail-head, .detail-users { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.detail-name { min-width: 0; overflow-wrap: anywhere; font-size: 15px; }
+.detail-number { flex: none; font-size: 15px; color: var(--amount); text-align: right; }
+.detail-number text { display: block; font-size: 12px; color: var(--text-secondary); }
+.track { height: 4px; margin-top: 12px; background: var(--surface-muted); }
+.fill { height: 4px; }
+.detail-exact, .detail-users { margin-top: 8px; font-size: 11px; color: var(--text-secondary); }
+.detail-users .text-button { flex: none; font-size: 12px; padding: 0; margin: 0; min-height: 36px; }
+.more { margin: 8px 16px; }
+.note, .footnote, .empty, .day-detail { font-size: 12px; color: var(--text-secondary); line-height: 1.8; }
+.footnote { margin: 24px 16px 0; }
+.empty { padding: 16px; }
+.chart-caption { margin: 16px; font-size: 12px; color: var(--text-secondary); }
+.day-detail { margin: 0 16px 24px; text-align: center; }
+.audience-section { margin-top: 24px; border-top: 1rpx solid var(--separator); }
+.audience-section > .note, .error-note { margin: 16px; }
+.error-note { color: var(--danger); font-size: 13px; }
+.audience-row { display: flex; align-items: center; gap: 12px; padding: 16px; border-bottom: 1rpx solid var(--separator); }
+.audience-rank { flex: 0 0 18px; color: var(--text-secondary); font-size: 13px; text-align: center; }
+.avatar { width: 36px; height: 36px; border-radius: 50%; flex: none; }
+.initial { line-height: 36px; text-align: center; background: var(--separator); font-size: 15px; color: var(--text-secondary); }
+.audience-person { flex: 1; min-width: 0; }
+.audience-name { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.audience-person .note { font-size: 11px; margin-top: 4px; }
+.audience-value { flex: none; font-size: 21px; color: var(--amount); }
+.audience-value text { font-size: 14px; margin-left: 4px; }
+.bottom-entry { margin: 16px; }
+.text-button { display: flex; align-items: center; justify-content: center; min-height: 40px; padding: 8px 12px; background: transparent; color: var(--link); font-size: 13px; line-height: 1.5; font-weight: 400; }
+.text-button::after { border: none; }

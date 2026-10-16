@@ -79,6 +79,7 @@ Page({
   },
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
   goTools() { wx.navigateTo({ url: usage.shareUrl(this.data.period) + '&style=tools' }); },
+  goAnalysis() { wx.navigateTo({ url: '/pages/analysis/analysis?scope=mine&period=' + this.data.period }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },

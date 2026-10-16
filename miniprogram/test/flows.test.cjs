@@ -1441,3 +1441,48 @@ test('个人工具明细直接打开工具偏好分享，已有主题不会覆�
   assert.equal(share.data.style, 'tools'); const theme = share.data.theme;
   share.switchTheme({ currentTarget: { dataset: { theme: 'ink' } } }); assert.equal(share.data.theme, theme);
 });
+
+function analysisData(scope='public',dimension='tools',period='day') {
+  return {scope,dimension,period,from:'2026-10-16',to:'2026-10-16',summary:{tokens:100,requests:4,users:2,active_days:1,breakdown_tokens:100},
+    items:[{key:'named:A',name:'A',tokens:60,percent:60,users:2,preferred_users:1,preferred_percent:50},{key:'named:B',name:'B',tokens:40,percent:40,users:1,preferred_users:1,preferred_percent:50}],
+    daily:[{day:'2026-10-16',tokens:100,reported:true,parts:[{name:'A',tokens:60},{name:'B',tokens:40}]}],trend_days:7,access:{feature:'community_audience',mode:'free'}};
+}
+test('个人分析入口继承周期，广场工具模型浏览不要求登录，也不请求总榜',async()=>{
+  const profile=page('profile');profile.p.data.period='month';profile.p.goAnalysis();assert.match(profile.navigation.at(-1)[1],/scope=mine&period=month/);
+  const calls=[];const {p}=page('square',{analysis:async query=>{calls.push(query);return analysisData('public',query.dimension);},ensureLogin:async()=>{throw Error('not allowed');},fetchLeaderboard:async()=>{throw Error('not allowed');}});
+  await p.switchMode({currentTarget:{dataset:{key:'tools'}}});assert.equal(p.data.insights.summary.users,2);assert.equal(calls[0].scope,'public');
+  await p.switchMode({currentTarget:{dataset:{key:'models'}}});assert.equal(calls[1].dimension,'models');assert.match(p.onShareAppMessage().path,/scope=public.*dimension=models/);
+});
+test('公开分析先看真实分布，点击后才查常用用户；切换图表不重复请求接口',async()=>{
+  let loads=0,privateCalls=0,audienceCalls=0;
+  const {p}=page('analysis',{analysis:async()=>{loads++;return analysisData();},ensureLogin:async()=>{privateCalls++;},insightUsers:async()=>{audienceCalls++;return{entries:[{rank:1,nickname:'用户',tokens:60,percent:60}],total:1,has_more:false,snapshot:'s'};}});
+  p.onLoad({scope:'public'});await p.onShow();assert.equal(privateCalls,0);assert.equal(audienceCalls,0);
+  p.switchView({currentTarget:{dataset:{key:'trend'}}});p.switchView({currentTarget:{dataset:{key:'list'}}});p.switchMetric({currentTarget:{dataset:{key:'people'}}});assert.equal(loads,1);
+  await p.openAudience({currentTarget:{dataset:{name:'A'}}});assert.equal(audienceCalls,1);assert.equal(p.data.audienceTotal,1);assert.equal(p.data.audience[0].nickname,'用户');
+});
+test('周期切换或离开后，迟到的分析及常用用户名单不能覆盖新页面',async()=>{
+  let release;const {p}=page('analysis',{analysis:async query=>analysisData('public',query.dimension,query.period),insightUsers:()=>new Promise(resolve=>release=resolve)});
+  p.onLoad({scope:'public'});await p.onShow();const pending=p.openAudience({currentTarget:{dataset:{name:'A'}}});await flush();
+  await p.switchPeriod({currentTarget:{dataset:{key:'week'}}});release({entries:[{nickname:'旧名单',rank:1,tokens:100}],total:1});await pending;
+  assert.equal(p.data.report.period,'week');assert.equal(p.data.audience.length,0);
+  const next=p.openAudience({currentTarget:{dataset:{name:'A'}}});await flush();p.onHide();release({entries:[{nickname:'迟到',rank:1,tokens:100}],total:1});await next;
+  assert.equal(p.data.audience.length,0);
+});
+test('公开分析启动不弹接入说明，注销状态也允许只读公开内容',()=>{
+  for(const state of ['', 'deleted']){
+    let app,armed=0,redirects=0;
+    vm.runInNewContext(fs.readFileSync(path.join(root,'app.js'),'utf8'),{App:value=>app=value,getCurrentPages:()=>[],wx:{reLaunch:()=>redirects++},
+      require:id=>id==='./utils/api'?{accountState:()=>state,clearAvatarFiles:()=>{}}:{arm:()=>armed++}});
+    app.onShow({path:'pages/analysis/analysis',query:{scope:'public'}});assert.equal(armed,0);assert.equal(redirects,0);
+  }
+});
+
+test('常用用户分页遇到快照变化，强制刷新首屏而不复用旧名单缓存',async()=>{
+ const calls=[];let changed=false;
+ const {p}=page('analysis',{analysis:async()=>analysisData(),insightUsers:async(query,options)=>{
+  calls.push({query,options});if(query.offset){changed=true;const error=new Error('数据更新');error.statusCode=409;throw error;}
+  return {entries:[{rank:1,nickname:changed?'新名单':'旧名单',tokens:100,percent:100}],total:2,has_more:true,next_offset:1,snapshot:changed?'new':'old'};
+ }});
+ p.onLoad({scope:'public'});await p.onShow();await p.openAudience({currentTarget:{dataset:{name:'A'}}});await p.moreAudience();
+ assert.equal(calls.at(-1).options.force,true);assert.equal(p.data.audienceSnapshot,'new');assert.equal(p.data.audience[0].nickname,'新名单');
+});

@@ -1,9 +1,10 @@
 const api = require('../../utils/api');
 const flow = require('../../utils/flow');
 const { presentEntries, presentMe } = require('../../utils/leaderboard');
+const { presentAnalysis } = require('../../utils/analytics');
 Page({
   data: { periods: flow.PERIODS, period: 'day', entries: [], me: null, user: null, loading: true, error: '', updated_fmt: '',
-    total: null, hasMore: false, nextOffset: null, snapshot: '', loadingMore: false, moreError: '' },
+    total: null, hasMore: false, nextOffset: null, snapshot: '', loadingMore: false, moreError: '', mode: 'ranking', insights: null },
   onShow() { this._visible = true; return this.load(); },
   onHide() { this._visible = false; this._requestId = (this._requestId || 0) + 1; this.setData({ loadingMore: false }); },
   onReachBottom() { if (!this.data.moreError) return this.loadMore(); },
@@ -19,6 +20,7 @@ Page({
       updated_fmt: api.fmtRelTime(lb.updated_at), loading: false, error: '' });
   },
   async load(options = {}) {
+    if (this.data.mode !== 'ranking') return this.loadInsights(options);
     const requestId = this._requestId = (this._requestId || 0) + 1;
     const period = this.data.period;
     this.setData({ user: api.peekMe() || null });
@@ -41,6 +43,7 @@ Page({
   },
   // First page is 50; continuation must match the first page's snapshot or the list restarts.
   async loadMore() {
+    if (this.data.mode !== 'ranking') return;
     if (!this._visible || this.data.loading || this.data.loadingMore || !this.data.hasMore || !this.data.snapshot) return;
     const requestId = this._requestId;
     const { period, snapshot, nextOffset } = this.data;
@@ -66,7 +69,28 @@ Page({
     this.setData({ period });
     return this.load();
   },
+  switchMode(e) {
+    const mode = e.currentTarget.dataset.key;
+    if (!['ranking','tools','models'].includes(mode) || mode === this.data.mode) return;
+    this.setData({ mode, insights: null }); return this.load();
+  },
+  async loadInsights(options = {}) {
+    const requestId = this._requestId = (this._requestId || 0) + 1;
+    const query = { scope: 'public', period: this.data.period, dimension: this.data.mode };
+    this.setData({ loading: true, error: '', me: null, insights: null });
+    try {
+      const result = api.peekAnalysis?.(query) && options.force !== true ? api.peekAnalysis(query) : await api.analysis(query, options);
+      if (requestId !== this._requestId) return;
+      this.setData({ insights: presentAnalysis(result), loading: false, updated_fmt: api.fmtRelTime(result.updated_at) });
+    } catch (err) { if (requestId === this._requestId) this.setData({ loading: false, error: err.message }); }
+  },
+  goAnalysis(e) {
+    const name = e.currentTarget?.dataset?.name;
+    wx.navigateTo({ url: '/pages/analysis/analysis?scope=public&period=' + this.data.period +
+      '&dimension=' + (this.data.mode === 'models' ? 'models' : 'tools') + (name ? '&name=' + encodeURIComponent(name) : '') });
+  },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
   goMine() { wx.switchTab({ url: '/pages/profile/profile' }); },
-  onShareAppMessage() { return { title: 'AI 编码 Token 广场榜', path: '/pages/square/square', imageUrl: '/assets/share-cover.png' }; },
+  onShareAppMessage() { return this.data.mode === 'ranking' ? { title: 'AI 编码 Token 广场榜', path: '/pages/square/square', imageUrl: '/assets/share-cover.png' }
+    : { title: `${this.data.mode === 'models' ? '模型' : '工具'} · 广场使用分布`, path: '/pages/analysis/analysis?scope=public&period=' + this.data.period + '&dimension=' + this.data.mode, imageUrl: '/assets/share-cover.png' }; },
 });

@@ -26,6 +26,9 @@ database_id = "REPLACE_WITH_D1_DATABASE_ID"
 # 必须配置此项，否则接入命令等会显示 workers.dev 域名：
 # PUBLIC_BASE_URL = "https://tokenrank.xmasdong.cn"
 WX_APPID = "wx0000000000000000"
+# 常用用户入口默认免费。当前仅预留激励入口；启用 rewarded 前必须接入
+# 客户端播放流程和服务端授权核验，否则名单接口会拒绝访问。
+# INSIGHTS_AUDIENCE_ACCESS = "free"
 # 小程序码默认打开正式版。仅体验环境可改为 trial / develop；由服务端固定，客户端不能覆盖。
 # WX_CODE_ENV_VERSION = "release"
 # ⚠️ 联调开关：未配置 WX_APPSECRET 时，允许 code 直接作为 openid 登录（任何人可冒充）。

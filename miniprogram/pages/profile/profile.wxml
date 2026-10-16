@@ -23,7 +23,7 @@
       <view class="axis"><text>{{usage.daily[0].label}}</text><text>{{usage.daily[usage.daily.length - 1].label}}</text></view>
     </view>
     <view class="section">
-      <view class="section-head"><text class="section-title display">工具与模型</text><text class="section-meta">{{usage.periodLabel}}</text></view>
+      <view class="section-head"><text class="section-title display">工具与模型</text><button class="text-button" bindtap="goAnalysis">数据分析</button></view>
       <view class="note" wx:if="{{!usage.summary.tokens}}">这个周期没有明细</view>
       <block wx:else>
         <view class="breakdown-label">使用工具<button class="text-button tools-share" bindtap="goTools">分享工具偏好</button></view>

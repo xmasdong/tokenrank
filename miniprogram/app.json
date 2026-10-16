@@ -9,6 +9,7 @@
     "pages/about/about",
     "pages/record/record",
     "pages/compare/compare",
+    "pages/analysis/analysis",
     "pages/account/account"
   ],
   "window": {

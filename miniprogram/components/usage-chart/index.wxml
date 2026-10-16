@@ -1,0 +1,1 @@
+<view class="chart-wrap"><canvas type="2d" id="chart" class="chart" bindtouchend="touch" aria-label="{{mode === 'trend' ? '每日用量趋势，下方可查看明细' : '用量占比，下方可查看各项数据'}}"></canvas><view wx:if="{{failed}}" class="chart-error">图形暂不可用，下方明细仍可查看</view></view>

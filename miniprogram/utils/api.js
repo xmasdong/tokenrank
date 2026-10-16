@@ -58,7 +58,7 @@ function peek(path) {
   const item = readCache.get(cacheKey(path));
   return item && Date.now() - item.at < READ_TTL ? item.value : null;
 }
-function read(path, options = {}) {
+function read(path, options = {}, requestOptions = {}) {
   const key = cacheKey(path);
   if (options.force !== true) {
     const value = peek(path);
@@ -66,7 +66,7 @@ function read(path, options = {}) {
   } else readCache.delete(key);
   if (pendingReads.has(key)) return pendingReads.get(key);
   const epoch = readEpoch;
-  const task = request(path).then(value => {
+  const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(path);
     if (epoch === readEpoch && key === currentKey) {
       // Bound memory when a user opens many groups in one session.
@@ -88,6 +88,11 @@ const rankingsPath = period => `/api/my/rankings?period=${encodeURIComponent(per
 const groupPath = id => `/api/groups/${encodeURIComponent(id)}`;
 const boardPath = ({ scope = 'global', id = '', period = 'day', offset = 0, snapshot = '' } = {}) =>
   `/api/leaderboard?scope=${scope}${id ? `&id=${encodeURIComponent(id)}` : ''}&period=${period}` +
+  (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
+const analysisPath = ({ scope = 'mine', period = 'day', dimension = 'tools' } = {}) =>
+  `${scope === 'public' ? '/api/insights' : '/api/my/analysis'}?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}`;
+const audiencePath = ({ period = 'day', dimension = 'tools', name, offset = 0, snapshot = '' }) =>
+  `/api/insights/users?period=${encodeURIComponent(period)}&dimension=${encodeURIComponent(dimension)}&name=${encodeURIComponent(name)}` +
   (offset ? `&offset=${encodeURIComponent(offset)}&snapshot=${encodeURIComponent(snapshot)}` : '');
 
 function rawRequest(path, { method = 'GET', data = null, auth = true, header = {}, timeout = 15000, deleting = false } = {}) {
@@ -334,6 +339,10 @@ module.exports = {
   peekRankings: period => peek(rankingsPath(period)),
   peekGroup: id => peek(groupPath(id)),
   peekLeaderboard: query => peek(boardPath(query)),
+  peekAnalysis: query => peek(analysisPath(query)),
+  analysis: (query, options) => read(analysisPath(query), options, { auth: query.scope !== 'public' }),
+  insightUsers: (query, options = {}) => read(audiencePath(query), options, { auth: false,
+    ...(options.grant ? { header: { 'x-insight-grant': options.grant } } : {}) }),
   createShare: (period, style = 'usage', groupId = '') => request('/api/shares', { method: 'POST', data: { period, style, ...(groupId ? { group_id: groupId } : {}) } }),
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
   compareShare: id => request('/api/shares/' + encodeURIComponent(id) + '/compare', { method: 'POST' }),
