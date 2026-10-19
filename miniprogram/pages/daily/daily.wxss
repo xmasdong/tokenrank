@@ -25,3 +25,11 @@
 .entries { border-top: 1rpx solid var(--separator); }
 .text-button { display: flex; align-items: center; justify-content: space-between; min-height: 48px; padding: 10px 0; margin: 0 16px; color: var(--link); background: transparent; font-size: 14px; font-weight: 400; line-height: 28px; }
 .entries .text-button { border-bottom: 1rpx solid var(--separator); }
+.renewal { padding: 20px 16px 0; border-top: 1rpx solid var(--separator); }
+.renewal-title { font-size: 16px; font-weight: 500; }
+.renewal-note, .renewal-notice { margin-top: 10px; color: var(--text-secondary); font-size: 13px; line-height: 1.8; }
+.renewal .btn { width: 100%; margin: 14px 0 0; }
+.renewal-footnote { margin-top: 8px; color: var(--text-muted); font-size: 12px; }
+.renewal-notice { color: var(--text); }
+.renewal .error { color: var(--danger); }
+.manage-reminder { margin: 0; font-size: 13px; }

@@ -4,15 +4,34 @@
   <block wx:elif="{{report}}">
     <view class="day-nav"><button bindtap="switchDay" data-day="{{report.previous_day}}" disabled="{{!report.previous_day}}">前一天</button><text>{{report.dateText}}</text><button bindtap="switchDay" data-day="{{report.next_day}}" disabled="{{!report.next_day}}">后一天</button></view>
     <view wx:if="{{!report.has_history}}" class="state"><view>这一天还没有同步记录。</view><button class="btn btn-ghost" bindtap="goConnect">查看电脑同步</button></view>
-    <block wx:else>
-      <view class="summary"><view class="label">Token 总量 · 含缓存</view><view class="amount num-font">{{report.value}}<text>{{report.unit}}</text></view><view class="exact num-font">{{report.exact}} Tokens</view><view class="calls"><text>调用次数</text><text class="num-font">{{report.requestsText}} 次</text></view></view>
+      <view wx:if="{{report.has_history}}" class="summary"><view class="label">Token 总量 · 含缓存</view><view class="amount num-font">{{report.value}}<text>{{report.unit}}</text></view><view class="exact num-font">{{report.exact}} Tokens</view><view class="calls"><text>调用次数</text><text class="num-font">{{report.requestsText}} 次</text></view></view>
+      <view class="renewal">
+        <view class="renewal-title">{{reminder.item.booked ? '下次日报已预约' : '下一次日报'}}</view>
+        <view wx:if="{{reminder.loading}}" class="renewal-note">正在读取提醒设置…</view>
+        <block wx:elif="{{reminder.savePending}}">
+          <view class="renewal-note">微信已授权，本次预约需要保存。</view>
+          <button class="btn btn-primary" bindtap="retryDailyAppointment" loading="{{reminder.busy}}" disabled="{{reminder.busy}}">保存本次预约</button>
+        </block>
+        <block wx:elif="{{reminder.error}}"><view class="renewal-note error">{{reminder.error}}</view><button class="btn btn-ghost" bindtap="reloadDailyReminder">重试读取</button></block>
+        <block wx:elif="{{reminder.item.available && reminder.hasReported}}">
+          <view class="renewal-note">{{reminder.item.timeText}}（北京时间）<view>{{reminder.item.dayText}} 用量摘要</view></view>
+          <button wx:if="{{reminder.item.canBook}}" class="btn btn-primary" bindtap="subscribeNextDaily" loading="{{reminder.busy}}" disabled="{{reminder.busy}}">接收下一次日报</button>
+          <view wx:elif="{{reminder.item.sending}}" class="renewal-note">正在提交发送，请稍后刷新。</view>
+          <view wx:if="{{!reminder.item.booked && !reminder.item.sending}}" class="renewal-footnote">每次授权接收一条。</view>
+        </block>
+        <view wx:elif="{{!reminder.hasReported}}" class="renewal-note">完成电脑同步后可预约。</view>
+        <view wx:else class="renewal-note">微信日报暂未开放。</view>
+        <view wx:if="{{reminder.notice}}" class="renewal-notice" role="status">{{reminder.notice}}</view>
+        <button class="text-button manage-reminder" bindtap="goReminders">管理提醒<text aria-hidden="true">›</text></button>
+      </view>
+    <block wx:if="{{report.has_history}}">
       <view class="section"><view class="section-title">主力工具与模型</view><view class="primary-row"><text>工具</text><text>{{report.topTool}}</text></view><view class="primary-row"><text>模型</text><text>{{report.topModel}}</text></view></view>
       <view class="section"><view class="section-title">用量明细</view><view class="detail-row"><text>输入（不含缓存）</text><text>{{report.inputText}}</text></view><view class="detail-row"><text>输出</text><text>{{report.outputText}}</text></view><view class="detail-row"><text>缓存读取</text><text>{{report.cacheReadText}}</text></view><view class="detail-row"><text>缓存写入</text><text>{{report.cacheWriteText}}</text></view></view>
       <view class="section"><view class="section-title">工具用量</view><view wx:for="{{report.tools}}" wx:key="name" wx:if="{{expanded || index < 3}}" class="breakdown"><view class="detail-row"><text>{{item.name}}</text><text>{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;"></view></view></view><view wx:if="{{!report.tools.length}}" class="label">这一天没有工具用量</view></view>
       <view class="section"><view class="section-title">模型用量</view><view wx:for="{{report.models}}" wx:key="name" wx:if="{{expanded || index < 3}}" class="breakdown"><view class="detail-row"><text>{{item.name}}</text><text>{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;"></view></view></view><view wx:if="{{!report.models.length}}" class="label">这一天没有模型用量</view><button wx:if="{{report.tools.length > 3 || report.models.length > 3}}" class="text-button" bindtap="toggleDetails">{{expanded ? '收起' : '展开全部'}}</button></view>
     </block>
     <view class="footnote">按北京时间自然日统计，含输入、输出与缓存。历史记录后续同步或重算时，日报会随真实数据更新。</view>
-    <view class="entries"><button class="text-button" bindtap="goReminders">预约微信日报<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goEmail">完整邮箱日报 · 登记中<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button></view>
+    <view class="entries"><button class="text-button" bindtap="goEmail">完整邮箱日报 · 登记中<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button></view>
   </block>
 </view>
 <privacy-notice />

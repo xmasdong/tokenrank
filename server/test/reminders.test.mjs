@@ -66,7 +66,7 @@ test('日报只读取本人选中设备和预约日期，零记录跳过，真�
  const f=fixture(t);await f.reserve();f.seed();f.seed(2,'2026-10-18',9999);f.seed(1,'2026-10-18',9999,'old');f.seed(1,'2026-10-19',9999);
  assert.equal((await f.run(now-1)).processed,0);assert.equal((await f.run()).processed,1);const p=f.sent[0];
  assert.equal(p.touser,'private-1');assert.equal(p.data.thing3.value,'2.58亿 · 1次');assert.equal(p.data.thing2.value,'10.18 Token日报');
- assert.equal(p.page,'pages/daily/daily?day=2026-10-18');assert.equal(f.job().state,'sent');assert.equal((await f.run()).processed,0);
+ assert.equal(p.page,'pages/daily/daily?day=2026-10-18&reminder_id='+f.job().id);assert.equal(f.job().state,'sent');assert.equal((await f.run()).processed,0);
  await f.reserve('daily',2);await f.run();assert.equal(f.sent.length,2);
  await f.reserve('daily',2,now,'request_fixture_0002');await f.run(now+86400000);assert.equal(f.job('daily',2).state,'skipped');assert.equal(f.job('daily',2).error_code,'NO_DAY_USAGE');
  await f.reserve('daily',1,now,'request_fixture_0003');await f.run(now+86400000);assert.equal(f.sent.at(-1).data.thing3.value,'9999 · 1次');

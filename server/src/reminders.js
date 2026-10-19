@@ -176,7 +176,7 @@ export async function runReminders(env,{now=Date.now(),send=sender}={}) {
           if (!report.has_history) result={state:'skipped',code:'NO_DAY_USAGE'};
           values={title:job.week_start.slice(5).replace('-','.')+' Token日报',range:job.week_start,tokens:amount(report.summary.tokens),
             requests:report.summary.requests,summary:dailySummary(report.summary.tokens,report.summary.requests),time:time(now)};
-          page='pages/daily/daily?day='+job.week_start;
+          page='pages/daily/daily?day='+job.week_start+'&reminder_id='+job.id;
         }
       } else if (!result) {
         values={title:'同步异常',time:time(now),reason:reason[job.agent_error]||'同步检查失败',platform:job.platform==='win32'?'Windows':job.platform==='darwin'?'macOS':'电脑',duration:Math.floor((now-Math.max(job.error_since,job.created_at))/60000)};

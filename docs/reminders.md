@@ -57,6 +57,8 @@ Cloudflare Cron `*/5 * * * *` 每五分钟检查已预约任务；关闭总开�
 - 点开 `pages/daily/daily?day=YYYY-MM-DD`，展示通知对应日期的含缓存总量、调用次数、输入／输出／缓存明细和工具／模型占比，只读本人选中设备的正式统计；不会跳回今天。日报 GET 与其他数据一样缓存五分钟，下拉刷新主动取新数据。
 - 无对应日同步记录时标记 `NO_DAY_USAGE` 并跳过，不伪造零用量；真实上报零用量可发送 0。任务到期后延迟不足 24 小时仍可发送原日期日报；延迟达到 24 小时标记 `DAILY_EXPIRED`，不自动换日期补发。
 - 每次用户授权并预约一条日报，发送后停止；不自动续约、补发或承诺永久每天通知。原生授权次数和项目预约状态分别管理。
+- 日报详情在用量总览后显示「下一次日报」，提前读取真实模板与预约状态。用户主动点击「接收下一次日报」才同步调起原生授权，接受后预约下个北京时间 09:00 的日报；拒绝不阻止阅读。已预约时显示日期和时间，不重复索取授权，可进入「管理提醒」取消。保存失败保留同一请求提供重试，不重新调起授权。
+- 新通知链接携带随机 `reminder_id`，当缓存仍将这条已消费预约显示为待发送时，只刷新提醒状态；日报数字及其他数据继续使用已有缓存。普通返回不重复读取，手动刷新会同时读取报表和提醒。旧通知链接仍可打开，不带标识的已到期待发送缓存也会核对。
 - 同步异常：仅本人选中设备明确 `error`、最近 15 分钟仍有心跳、故障连续至少 15 分钟，且预约后已持续 15 分钟才触发。一日最多一次；健康／主动停止清除连续故障，心跳中断超过 15 分钟重新计时。失联、休眠、没有用量变化或主动停用不触发。重置接入码清除旧故障状态。
 - 每项保留一条当前预约，用户接受授权后提交唯一 `request_id`；重试保存同一请求不会增加预约或复活已取消任务。发送中不接受取消或替换。原生授权接受后服务端保存失败，页面提供“重试保存预约”，不重复索取微信授权。
 - 原生结果必须是对应模板的 `accept`；success 回调本身不代表授权。`getSetting` 的记住选择不能证明剩余次数，程序不显示虚构额度。
@@ -72,7 +74,7 @@ Cloudflare Cron `*/5 * * * *` 每五分钟检查已预约任务；关闭总开�
 2. 在 `server/wrangler.toml` 配置每五分钟 Cron，未选用并配置真实模板前总开关保持 0；不需要更新电脑端程序。
 3. `node --test client/test-sync/*.test.mjs server/test/*.test.mjs miniprogram/test/*.test.cjs` 验证账号隔离、首次上报、去重、原生点击时机、保存失败、调度、注销及原有功能。
 4. 在未配置环境验证“暂未开放”；在已配置环境使用正式接口验证实际私有模板 ID、字段对应的可预约状态、返回缓存和手动刷新。开发者工具不代替手机原生授权验收，不应删真实用户数据制造首次接入。
-5. 模板选用并配置后用授权测试账号做手机验收：首次真实同步后询问一次；拒绝后不重弹；页面点击出现微信真实授权；接受／拒绝／总开关关闭分别检查；验证一次指定日期日报与连续故障通知、取消和再次预约。通过后再提交小程序审核与正式发布。
+5. 模板选用并配置后用授权测试账号做手机验收：首次真实同步后询问一次；拒绝后不重弹；页面点击出现微信真实授权；接受／拒绝／总开关关闭分别检查；验证一次指定日期日报与连续故障通知、取消和再次预约；从已收到的通知打开日报，检查一键预约下一次、拒绝授权、已预约状态和保存失败重试。通过后再提交小程序审核与正式发布。
 
 官方依据：[选用模板](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_addwxanewtemplate.html)、[公共模板列表](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_getpubnewtemplatetitles.html)、[订阅消息](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/subscribe-message-overview.html)、[requestSubscribeMessage](https://developers.weixin.qq.com/miniprogram/dev/api/open-api/subscribe-message/wx.requestSubscribeMessage.html)、[发送接口](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage)。按 2026-10-19 官方文档核对，平台实际类目与模板权限仍需在本小程序后台确认。
 
