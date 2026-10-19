@@ -1,4 +1,5 @@
 import { bearerToken, jsonError } from './lib.js';
+import { trackReminderFailure } from './reminders.js';
 import client from '../../client/package.json' with { type: 'json' };
 
 // The release being served from /dl. The mini program reads `update_available` from here, so a new
@@ -69,6 +70,10 @@ export async function heartbeat(request, env, now = Date.now()) {
       (excluded.event_at=sync_agents.event_at AND (sync_agents.state!='stopped' OR excluded.state='stopped'))`)
     .bind(conn.user_id,b.device_id,b.client_version,b.collector_version??null,b.platform,b.state,b.error_code??null,
       b.source_day??null,b.check_started_at??null,b.checked_at??null,b.event_at,now,token).run();
+  if (result.meta?.changes) {
+    try { await trackReminderFailure(env,conn.user_id,b.device_id); }
+    catch { console.error('REMINDER_TRACK_FAILED'); } // A reminder failure must not fail an accepted heartbeat.
+  }
   return Response.json({ ok:true, accepted:!!result.meta?.changes, server_time:now });
 }
 

@@ -43,3 +43,6 @@
 .privacy-line { font-size: 13px; color: var(--text-secondary); line-height: 1.8; }
 .privacy-strong { margin-top: 12px; color: var(--text); font-weight: 500; }
 .privacy-cmd { margin: 8px 0; padding: 10px 12px; border-radius: 6px; background: var(--surface-muted); color: var(--text); font-family: Menlo, Consolas, monospace; font-size: 12px; word-break: break-all; }
+
+.sync-section .text-button { width: auto; min-height: 44px; padding: 10px 0; margin: 8px 0; background: transparent; color: var(--link); font-size: 14px; font-weight: 400; line-height: 24px; }
+.sync-section .text-button::after { border: none; }

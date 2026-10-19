@@ -13,7 +13,8 @@
     "pages/calendar/calendar",
     "pages/weekly/weekly",
     "pages/trends/trends",
-    "pages/account/account"
+    "pages/account/account",
+    "pages/reminders/reminders"
   ],
   "window": {
     "navigationBarTitleText": "Token 群排名",

@@ -25,3 +25,6 @@
 .actions .btn { flex: 1; min-width: 0; width: 0; margin: 0; }
 
 .page .connect { width: calc(100% - 32px); }
+
+.reminder-entry { display: flex; justify-content: space-between; align-items: center; min-height: 48px; margin: 16px; border-top: 1rpx solid var(--separator); border-bottom: 1rpx solid var(--separator); font-size: 14px; }
+.reminder-entry text + text { color: var(--text-secondary); }

@@ -1,4 +1,5 @@
 const api = require('../../utils/api');
+const reminderPrompt = require('../../utils/reminder-prompt');
 const flow = require('../../utils/flow');
 const upstream = require('../../utils/upstream');
 const PRIVACY_ACK = 'privacy_notice_ack_v2';
@@ -58,6 +59,7 @@ Page({
       const command = buildCommand(this.data.os, api.BASE_URL, c.token || '');
       this.setData({ loading: false, checking: false, error: '', command, rawToken: c.token || '',
         aiPrompt: buildAiPrompt(command, this.data.os), ...flow.connection(c) });
+      reminderPrompt.maybePrompt(api, wx, c, () => this._visible);
     } catch (err) {
       if (requestId === this._requestId) this.setData({ loading: false, checking: false,
         error: (this.data.command ? '暂时无法确认同步状态：' : '暂未获取到接入命令：') + err.message });
@@ -111,6 +113,7 @@ Page({
       wx.navigateBack({ delta: 1 });
     } else { wx.redirectTo({ url: flow.groupUrl(id, 'connect') }); }
   },
+  goReminders() { wx.navigateTo({ url: '/pages/reminders/reminders?kind=sync_error' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' + (this.data.sourceGroup ? `?g=${encodeURIComponent(this.data.sourceGroup)}` : '') }); },
   rotate() {
     if (this.data.rotating) return;

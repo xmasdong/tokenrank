@@ -23,6 +23,7 @@ const pendingReads = new Map();
 let readEpoch = 0;
 let readDay = '';
 let readRevision = 0;
+let reminderVersion = 0;
 
 function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
@@ -66,10 +67,10 @@ function read(path, options = {}, requestOptions = {}, cachePath = path) {
     if (value) return Promise.resolve(value);
   } else readCache.delete(key);
   if (pendingReads.has(key)) return pendingReads.get(key);
-  const epoch = readEpoch;
+  const epoch = readEpoch, reminderReadVersion = reminderVersion;
   const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(cachePath);
-    if (epoch === readEpoch && key === currentKey) {
+    if (epoch === readEpoch && key === currentKey && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion)) {
       // Bound memory when a user opens many groups in one session.
       if (readCache.size >= 100) readCache.delete(readCache.keys().next().value);
       readCache.set(key, { value, at: Date.now(), revision: ++readRevision });
@@ -83,6 +84,21 @@ async function mutate(path, options) {
   const result = await request(path, options);
   invalidateReads();
   return result;
+}
+// Reminder appointments do not change usage or derived share revisions.
+async function reminderMutation(path, options) {
+  const epoch = authEpoch, result = await request(path, options);
+  assertActive(epoch);
+  const key = cacheKey('/api/reminders');
+  reminderVersion++; pendingReads.delete(key);
+  readCache.set(key, { value: result, at: Date.now(), revision: ++readRevision });
+  return result;
+}
+function clearPromptEligibility() {
+  for (const path of ['/api/me', '/api/reminders']) {
+    const key = cacheKey(path), item = readCache.get(key);
+    if (item) readCache.set(key, { ...item, value: { ...item.value, reminder_prompt_eligible: false } });
+  }
 }
 const usagePath = period => `/api/my/usage?period=${encodeURIComponent(period || 'day')}`;
 const rankingsPath = period => `/api/my/rankings?period=${encodeURIComponent(period || 'day')}`;
@@ -405,9 +421,17 @@ module.exports = {
     if (user && user.last_report_at !== state.last_report_at) invalidateReads();
     else if (user) {
       const key = cacheKey('/api/me'), cached = readCache.get(key);
-      if (cached) readCache.set(key, { ...cached, value:{...user,sync_health:state.sync_health} });
+      if (cached) readCache.set(key, { ...cached, value:{...user,sync_health:state.sync_health,reminder_kinds:state.reminder_kinds,reminder_prompt_eligible:state.reminder_prompt_eligible} });
     }
     return state;
+  },
+  peekReminders: () => peek('/api/reminders'),
+  reminders: options => read('/api/reminders', options),
+  reserveReminder: (kind, requestId) => reminderMutation('/api/reminders/' + encodeURIComponent(kind), { method: 'POST', data: { request_id: requestId } }),
+  cancelReminder: (kind, id) => reminderMutation('/api/reminders/' + encodeURIComponent(kind), { method: 'DELETE', data: { id } }),
+  ackReminderPrompt: async () => {
+    const result = await request('/api/reminders/prompt-seen', { method: 'POST' });
+    clearPromptEligibility(); return result;
   },
   rotateConnect: () => mutate('/api/connect/token', { method: 'POST' }),
 

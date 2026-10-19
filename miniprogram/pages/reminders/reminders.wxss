@@ -1,0 +1,22 @@
+.page { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.intro { padding: 18px 16px; color: var(--text-secondary); font-size: 14px; background: var(--surface-muted); }
+.state { padding: 24px 16px; color: var(--text-secondary); font-size: 14px; }
+.state .btn { margin-top: 16px; }
+.reminder { padding: 20px 16px; border-bottom: 1rpx solid var(--separator); }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.title { font-size: 17px; font-weight: 500; }
+.status { color: var(--text-secondary); font-size: 13px; }
+.description, .unavailable, .notice, .footnote, .connect { font-size: 13px; line-height: 1.8; color: var(--text-secondary); }
+.description { margin-top: 10px; }
+.unavailable { margin-top: 14px; color: var(--text-muted); }
+.controls { margin-top: 16px; }
+.controls .btn { width: 100%; margin: 0; }
+.text-button { min-height: 44px; margin: 0; padding: 10px 0; background: transparent; color: var(--link); font-size: 14px; line-height: 24px; text-align: left; }
+.text-button::after { border: none; }
+.text-button[disabled] { color: var(--text-muted); }
+.notice { margin: 16px; color: var(--text); }
+.retry { margin: 16px; }
+.footnote { margin: 20px 16px 8px; font-size: 12px; }
+.settings { margin: 0 16px; }
+.connect { padding: 16px; border-bottom: 1rpx solid var(--separator); }
+.connect .btn { margin-top: 12px; }

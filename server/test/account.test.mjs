@@ -6,7 +6,7 @@ import worker from '../src/worker.js';
 import { deleteAccount } from '../src/account.js';
 import { storeTotalReport } from '../src/report.js';
 
-const ownedTables = ['sync_agents','user_avatars','mp_sessions','connect_tokens','rank_group_members','daily_stats','usage_shares',
+const ownedTables = ['reminder_jobs','reminder_failure_runs','reminder_preferences','sync_agents','user_avatars','mp_sessions','connect_tokens','rank_group_members','daily_stats','usage_shares',
   'daily_totals','usage_sync_state','usage_replacements','usage_replacement_chunks','usage_rebuild_guard'];
 function fixture(t) {
   const db = new DatabaseSync(':memory:');
@@ -42,6 +42,11 @@ function fixture(t) {
     db.prepare("INSERT INTO usage_replacements VALUES(?,?,?,1,1,1,'0.2.8','1.8.2','collecting',?)").run(uid,String(uid).repeat(32),'device-'+uid,Date.now()+100000);
     db.prepare("INSERT INTO usage_replacement_chunks VALUES(?,?,0,'digest','[]')").run(uid,String(uid).repeat(32));
     db.prepare("INSERT INTO usage_rebuild_guard VALUES(?,'0.2.8','1.8.2',1)").run(uid);
+  }
+  for (const id of [1,2,3]) {
+    db.prepare('INSERT INTO reminder_preferences VALUES(?,1,1)').run(id);
+    db.prepare("INSERT INTO reminder_jobs(user_id,kind,id,request_id,template_id,state,created_at,updated_at) VALUES(?,'weekly','job','request','template','pending',1,1)").run(id);
+    db.prepare("INSERT INTO reminder_failure_runs VALUES(?,'device-test','error',1,1,1)").run(id);
   }
   for (const [id, owner, members] of [['shared',1,[1,3,2]], ['sole',1,[1]], ['other',2,[1,2]]]) {
     db.prepare('INSERT INTO rank_groups VALUES(?,?,?, ?,1)').run(id,id,owner,'wechat-'+id);

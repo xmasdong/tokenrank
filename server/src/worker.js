@@ -14,6 +14,7 @@ import { insightPolicy, requireInsightAccess } from './insight-access.js';
 import { groupPk, rankSnapshot } from './group-pk.js';
 import { calendarReport, weeklyReport } from './history.js';
 import { trendQuery, trendReport } from './trends.js';
+import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -58,6 +59,7 @@ const CORS = {
 };
 
 export default {
+  async scheduled(event, env, ctx) { ctx.waitUntil(runReminders(env)); },
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
     const url = new URL(request.url);
@@ -81,6 +83,17 @@ async function route(request, env, url, path) {
   if (method === 'GET' && path === '/healthz') {
     await env.DB.prepare('SELECT 1 FROM users LIMIT 1').first();
     return withCors(Response.json({ ok: true, day: beijingDay() }));
+  }
+
+  if (path === '/api/reminders' || path.startsWith('/api/reminders/')) {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    if (method === 'GET' && path === '/api/reminders') return withCors(Response.json(await reminderStatus(env,user.id)));
+    if (method === 'POST' && path === '/api/reminders/prompt-seen') return withCors(await acknowledgeReminderPrompt(env,user.id));
+    const kind=path.slice('/api/reminders/'.length), body=await readJson(request);
+    if (method === 'POST') return withCors(await reserveReminder(env,user.id,kind,body));
+    if (method === 'DELETE') return withCors(await cancelReminder(env,user.id,kind,body));
+    return withCors(jsonError(405,'method not allowed'));
   }
 
   if (method === 'POST' && /^\/api\/groups\/[^/]+\/compare$/.test(path)) {
@@ -292,11 +305,12 @@ async function sessionUser(request, env) {
 
 async function publicUser(env, userId, origin = '') {
   const u = await env.DB.prepare(`SELECT u.id, u.nickname, u.avatar_path, u.rank_hidden,
-    c.user_id AS connected_user_id, c.last_report_at FROM users u
-    LEFT JOIN connect_tokens c ON c.user_id=u.id WHERE u.id=?1`).bind(userId).first();
+    c.user_id AS connected_user_id, c.last_report_at,p.awaiting_first_report,p.prompt_seen_at FROM users u
+    LEFT JOIN connect_tokens c ON c.user_id=u.id LEFT JOIN reminder_preferences p ON p.user_id=u.id WHERE u.id=?1`).bind(userId).first();
   if (!u) throw new Error('ACCOUNT_NOT_FOUND');
   return {
     user_id: u.id,
+    ...reminderMeta(env,u,u.last_report_at),
     nickname: u.nickname,
     avatar_url: u.avatar_path ? `${origin}/avatars/${u.avatar_path}` : null,
     profile_complete: completeProfile(u),
@@ -371,6 +385,8 @@ async function getConnectToken(request, env) {
   const row = await env.DB.prepare('SELECT last_report_at FROM connect_tokens WHERE user_id = ?1').bind(user.id).first();
   return Response.json({
     connected: true,
+    user_id:user.id,
+    ...await connectionReminderMeta(env,user.id,row?.last_report_at),
     token,
     last_report_at: row?.last_report_at ?? null,
     sync_health: await syncHealth(env, user.id),
@@ -385,6 +401,7 @@ async function createConnectToken(request, env) {
   const token = hexToken(16);
   const now = Date.now();
   const batch = [
+    env.DB.prepare('DELETE FROM reminder_failure_runs WHERE user_id=?1').bind(user.id),
     env.DB.prepare('DELETE FROM sync_agents WHERE user_id=?1').bind(user.id),
     env.DB.prepare('DELETE FROM connect_tokens WHERE user_id = ?1').bind(user.id),
     env.DB.prepare('INSERT INTO connect_tokens (token, user_id, created_at) VALUES (?1, ?2, ?3)').bind(token, user.id, now),

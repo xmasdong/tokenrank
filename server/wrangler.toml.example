@@ -21,11 +21,18 @@ database_name = "tokenrank"
 # npx wrangler d1 create tokenrank 后把输出里的 database_id 填进来
 database_id = "REPLACE_WITH_D1_DATABASE_ID"
 
+[triggers]
+crons = ["*/5 * * * *"]
+
 [vars]
 # 若用国内 CDN/服务器反代到 workers.dev（回源 Host 是 workers.dev），
 # 必须配置此项，否则接入命令等会显示 workers.dev 域名：
 # PUBLIC_BASE_URL = "https://tokenrank.xmasdong.cn"
 WX_APPID = "wx0000000000000000"
+# 消息模板未申请时保持关闭，不能用占位 ID。详见 docs/reminders.md。
+WX_REMINDERS_ENABLED = "0"
+# 申请通过后，WX_REMINDER_TEMPLATES 填入真实模板 ID 和关键词映射，建议用 secret put。
+# 程序不预设模板编号，也不会把一次授权当成永久订阅。
 # 常用用户入口默认免费。当前仅预留激励入口；启用 rewarded 前必须接入
 # 客户端播放流程和服务端授权核验，否则名单接口会拒绝访问。
 # INSIGHTS_AUDIENCE_ACCESS = "free"

@@ -5,8 +5,10 @@ const queue = [];
 function pump() {
   if (busy || held || !queue.length) return;
   const [wx, options] = queue.shift();
+  const { shouldShow, onSkip, ...nativeOptions } = options;
+  if (shouldShow && !shouldShow()) { if (onSkip) onSkip(); pump(); return; }
   busy = true;
-  wx.showModal({ ...options, complete: res => {
+  wx.showModal({ ...nativeOptions, complete: res => {
     busy = false;
     if (options.complete) options.complete(res);
     pump();

@@ -1619,3 +1619,10 @@ test('缓存趋势返回保留已展开条目；缓存分析返回保留名单�
 test('广场已缓存的工具分布直接展示，不清空已展示内容或请求接口',async()=>{
   const raw=analysisData('public'),{p}=page('square',{peekAnalysis:()=>raw,analysis:async()=>assert.fail('no request')});p.data.mode='tools';const patches=[],set=p.setData;p.setData=function(patch){patches.push(patch);set.call(this,patch);};await p.onShow();assert.ok(p.data.insights);assert.ok(!patches.some(p=>p.loading===true||p.insights===null));
 });
+
+test('接入页轮询收到真实首次上报后才询问，零用量无需额外接口；隐藏后不弹', async () => {
+ const prompt = require('../utils/reminder-prompt'), queue = require('../utils/modal-queue');queue._reset();prompt._reset();
+ let reported=false;const modals=[];const {p,navigation}=page('connect',{ackReminderPrompt:async()=>({acknowledged:true}),getConnect:async()=>({user_id:101,token:'private-token',last_report_at:reported?1:null,reminder_prompt_eligible:reported,reminder_kinds:['weekly']})},{showModal:o=>modals.push(o)});
+ await p.onShow();assert.equal(modals.length,0);reported=true;await p.load({silent:true});assert.equal(modals.length,1);assert.equal(p.data.hasReported,true);assert.equal(modals[0].title,'电脑已接入');
+ await p.load({silent:true});assert.equal(modals.length,1);modals[0].success({confirm:true});assert.equal(navigation[0][1],'/pages/reminders/reminders?from=first');p.onHide();modals[0].complete({});await p.load({silent:true});assert.equal(modals.length,1);queue._reset();prompt._reset();
+});

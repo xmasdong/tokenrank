@@ -1,4 +1,5 @@
 const api = require('../../utils/api');
+const reminderPrompt = require('../../utils/reminder-prompt');
 const { quickShare } = require('../../utils/quick-share');
 const { drawAchievementPoster, ACHIEVEMENT_HEIGHT } = require('../../utils/achievement-poster');
 const flow = require('../../utils/flow');
@@ -178,6 +179,7 @@ Page({
   promptConnect() {
     if (!this._visible || this.data.enterState !== 'ready') return;
     updatePrompt.maybePrompt(wx, this.data.user);
+    reminderPrompt.maybePrompt(api, wx, this.data.user, () => this._visible);
   },
   openPk(e) {
     if (!this._visible || this._pkPrompt || this.data.loading || this.data.joined !== true || !this.data.snapshot) return;

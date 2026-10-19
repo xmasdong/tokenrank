@@ -54,6 +54,7 @@
     <template is="profile-editor" data="{{user, nickname, avatarUrl, saving, nicknameReady, nicknameFocus, privacyBusy, avatarNative, profileError}}" />
   </view>
   <view class="menu-item" bindtap="goGroups"><text>我的群榜</text><text class="menu-arrow" aria-hidden="true">›</text></view>
+  <view class="menu-item" bindtap="goReminders"><text>消息提醒</text><text class="menu-arrow" aria-hidden="true">›</text></view>
   <view class="menu-item" bindtap="goAbout"><text>使用说明</text><text class="menu-arrow" aria-hidden="true">›</text></view>
   <view class="menu-item account-delete" bindtap="goAccount"><text>注销账号</text><text class="menu-arrow" aria-hidden="true">›</text></view>
 </view>

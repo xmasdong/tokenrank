@@ -30,6 +30,7 @@
     <view class="pending-note" wx:if="{{!error}}">{{connHint}}</view>
     <view class="sync-times" wx:if="{{!error}}"><view class="sync-time" wx:for="{{syncTimes}}" wx:key="label"><text>{{item.label}}</text><text>{{item.value}}</text></view></view>
     <button class="btn btn-primary wide return-button" wx:if="{{hasReported && !error}}" bindtap="goBoard">{{sourceGroup ? '查看本群排名' : '查看我的用量'}}</button>
+    <button wx:if="{{hasReported}}" class="text-button" bindtap="goReminders">同步异常提醒设置</button>
     <button class="btn btn-ghost wide check-button" loading="{{checking}}" disabled="{{checking || rotating}}" bindtap="checkNow">检查同步状态</button>
   </view>
   <block wx:if="{{command}}">

@@ -1,0 +1,23 @@
+<view class="page">
+  <view class="intro">每次预约发送一条，接收后可再预约。</view>
+  <view wx:if="{{loading}}" class="state">正在读取提醒设置…</view>
+  <view wx:if="{{error}}" class="state error">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
+  <block wx:if="{{!loading && items.length}}">
+    <view wx:if="{{!hasReported}}" class="connect"><view>完成电脑接入和首次同步后，可预约提醒。</view><button class="btn btn-primary" bindtap="goConnect">接入电脑</button></view>
+    <view wx:for="{{items}}" wx:key="key" class="reminder {{focus === item.key ? 'focused' : ''}}">
+      <view class="row"><text class="title">{{item.label}}</text><text class="status">{{item.statusText}}</text></view>
+      <view wx:if="{{item.key === 'weekly'}}" class="description">{{item.timeText}}（北京时间）<view>周一收到本周结束后的用量周报。</view></view>
+      <view wx:else class="description">电脑明确报告同步失败，持续至少 15 分钟时提醒一次。<view>电脑休眠、没有新用量、主动停止同步，不发送提醒。</view></view>
+      <view wx:if="{{!item.available}}" class="unavailable">开放后可在这里预约。</view>
+      <view wx:else class="controls">
+        <button wx:if="{{item.appointment.state === 'pending'}}" class="text-button" data-kind="{{item.key}}" bindtap="cancel" disabled="{{busy || savePending}}">取消本次预约</button>
+        <button wx:else class="btn btn-primary" data-kind="{{item.key}}" bindtap="subscribe" loading="{{busy === item.key}}" disabled="{{!item.canBook || busy || savePending}}">{{item.appointment ? '再次预约' : '预约提醒'}}</button>
+      </view>
+    </view>
+    <view wx:if="{{notice}}" class="notice" role="alert">{{notice}}</view>
+    <button wx:if="{{savePending}}" class="btn btn-primary retry" bindtap="saveAppointment" disabled="{{busy}}">重试保存预约</button>
+    <view class="footnote">微信授权只用于本次提醒，不代表永久订阅。接收通知还需允许微信通知；显示“已提交微信”不代表消息已读。</view>
+    <button class="text-button settings" bindtap="openSettings">微信通知设置</button>
+  </block>
+</view>
+<privacy-notice />

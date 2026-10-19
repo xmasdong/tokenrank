@@ -1,4 +1,5 @@
 const api = require('../../utils/api');
+const reminderPrompt = require('../../utils/reminder-prompt');
 const flow = require('../../utils/flow');
 const usage = require('../../utils/usage');
 const { quickShare } = require('../../utils/quick-share');
@@ -8,8 +9,8 @@ Page({
   ...quickShare(api, wx),
   data: { periods: flow.PERIODS, period: 'day', user: null, myGroups: [],
     loading: true, error: '', connState: 'pending', connText: '', hasReported: false, usage: null, usageLoading: true, usageError: '' },
-  onShow() { wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); return this.load(); },
-  onHide() { this.clearQuickShare(); this._requestId = (this._requestId || 0) + 1; },
+  onShow() { this._visible = true; wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); return this.load(); },
+  onHide() { this._visible = false; this.clearQuickShare(); this._requestId = (this._requestId || 0) + 1; },
   onUnload() { this.onHide(); },
   async onPullDownRefresh() { try { await this.load({ force: true }); } finally { wx.stopPullDownRefresh(); } },
   async load(options = {}) {
@@ -78,6 +79,7 @@ Page({
   },
   promptConnect() {
     updatePrompt.maybePrompt(wx, this.data.user);
+    reminderPrompt.maybePrompt(api, wx, this.data.user, () => this._visible);
   },
   openGroup(e) { wx.navigateTo({ url: flow.groupUrl(e.currentTarget.dataset.id) }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },

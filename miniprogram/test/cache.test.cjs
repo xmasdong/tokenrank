@@ -62,3 +62,14 @@ test('注销中的迟到分享不能恢复缓存，任何摘要都不写入持�
   shareRequest.success({statusCode:200,data:{id:'private-share',usage:{tokens:123}}});await late;
   assert.deepEqual([...f.store],[['account_state','deleted']]);await assert.rejects(f.api.createShare('day'),/重新登录/);
 });
+
+test('提醒预约、取消和询问确认不清空用量与周报缓存，提醒页五分钟内复用',async()=>{
+ const f=fixture();await resolve(f,f.api.myUsage('day'),{summary:{tokens:1}});await resolve(f,f.api.weekly(),{snapshot:'real-source'});
+ await resolve(f,f.api.reminders(),{kinds:[],has_reported:true});await f.api.reminders();assert.equal(f.calls.length,3);
+ await resolve(f,f.api.reserveReminder('weekly','request_id_0000001'),{kinds:[{key:'weekly',appointment:{state:'pending'}}]});
+ assert.equal(f.api.peekReminders().kinds[0].appointment.state,'pending');await f.api.myUsage('day');await f.api.weekly();assert.equal(f.calls.length,4);
+ await resolve(f,f.api.cancelReminder('weekly','a'.repeat(24)),{kinds:[]});await resolve(f,f.api.ackReminderPrompt(),{acknowledged:true});await f.api.myUsage('day');await f.api.weekly();assert.equal(f.calls.length,6);
+});
+test('慢到达的提醒GET不能覆盖刚保存的预约状态',async()=>{
+ const f=fixture(),read=f.api.reminders(),old=f.calls[0];await resolve(f,f.api.reserveReminder('weekly','request_id_0000001'),{kinds:[{state:'pending'}]});old.success({statusCode:200,data:{kinds:[]}});await read;assert.equal(f.api.peekReminders().kinds[0].state,'pending');
+});
