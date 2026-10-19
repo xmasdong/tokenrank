@@ -86,5 +86,6 @@ Page({
     finally { if (epoch === api.accountEpoch() && !api.accountState()) this.setData({ busy: '' }); }
   },
   openSettings() { wx.openSetting({ withSubscriptions: true }); },
+  goEmail() { wx.navigateTo({ url: '/pages/email/email' }); },
   goConnect() { wx.navigateTo({ url: '/pages/connect/connect' }); },
 });

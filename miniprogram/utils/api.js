@@ -24,6 +24,7 @@ let readEpoch = 0;
 let readDay = '';
 let readRevision = 0;
 let reminderVersion = 0;
+let emailVersion = 0;
 
 function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
@@ -67,10 +68,11 @@ function read(path, options = {}, requestOptions = {}, cachePath = path) {
     if (value) return Promise.resolve(value);
   } else readCache.delete(key);
   if (pendingReads.has(key)) return pendingReads.get(key);
-  const epoch = readEpoch, reminderReadVersion = reminderVersion;
+  const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion;
   const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(cachePath);
-    if (epoch === readEpoch && key === currentKey && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion)) {
+    if (epoch === readEpoch && key === currentKey && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion) &&
+      (cachePath !== '/api/email-registration' || emailReadVersion === emailVersion)) {
       // Bound memory when a user opens many groups in one session.
       if (readCache.size >= 100) readCache.delete(readCache.keys().next().value);
       readCache.set(key, { value, at: Date.now(), revision: ++readRevision });
@@ -99,6 +101,14 @@ function clearPromptEligibility() {
     const key = cacheKey(path), item = readCache.get(key);
     if (item) readCache.set(key, { ...item, value: { ...item.value, reminder_prompt_eligible: false } });
   }
+}
+async function emailMutation(options) {
+  const epoch = authEpoch, result = await request('/api/email-registration', options);
+  assertActive(epoch);
+  const key = cacheKey('/api/email-registration');
+  emailVersion++; pendingReads.delete(key);
+  readCache.set(key, { value: result, at: Date.now(), revision: ++readRevision });
+  return result;
 }
 const usagePath = period => `/api/my/usage?period=${encodeURIComponent(period || 'day')}`;
 const rankingsPath = period => `/api/my/rankings?period=${encodeURIComponent(period || 'day')}`;
@@ -430,6 +440,10 @@ module.exports = {
   peekDaily: day => peek(dailyPath(day)),
   daily: (day, options) => read(dailyPath(day), options),
   peekReminders: () => peek('/api/reminders'),
+  peekEmailRegistration: () => peek('/api/email-registration'),
+  emailRegistration: options => read('/api/email-registration', options),
+  saveEmailRegistration: data => emailMutation({ method: 'POST', data }),
+  removeEmailRegistration: revision => emailMutation({ method: 'DELETE', data: { expected_revision: revision } }),
   reminders: options => read('/api/reminders', options),
   reserveReminder: (kind, requestId) => reminderMutation('/api/reminders/' + encodeURIComponent(kind), { method: 'POST', data: { request_id: requestId } }),
   cancelReminder: (kind, id) => reminderMutation('/api/reminders/' + encodeURIComponent(kind), { method: 'DELETE', data: { id } }),

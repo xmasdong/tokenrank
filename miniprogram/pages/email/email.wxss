@@ -1,0 +1,22 @@
+.page { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
+.intro { padding: 24px 16px 20px; border-bottom: 1rpx solid var(--separator); }
+.intro-title { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 20px; font-weight: 500; }
+.intro-title text { font-size: 13px; font-weight: 400; color: var(--text-secondary); }
+.description { margin-top: 12px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+.registered, .form { padding: 24px 16px; border-bottom: 1rpx solid var(--separator); }
+.field-label { display: block; font-size: 14px; color: var(--text-secondary); }
+.address { margin-top: 12px; font-size: 20px; word-break: break-all; }
+.email-input { height: 52px; border-bottom: 1rpx solid var(--separator); font-size: 17px; }
+.consent { display: flex; align-items: flex-start; gap: 8px; padding: 22px 0 18px; font-size: 13px; line-height: 24px; }
+.consent checkbox { flex-shrink: 0; }
+.save { width: 100%; margin: 0; }
+.actions { display: flex; gap: 28px; margin-top: 12px; }
+.text-button { min-height: 44px; padding: 10px 0; margin: 0; line-height: 24px; font-size: 14px; color: var(--link); background: transparent; }
+.text-button::after { border: none; }
+.text-button[disabled] { color: var(--text-muted); }
+.remove { color: var(--danger); }
+.cancel { margin: 10px auto 0; }
+.footnote { padding: 18px 16px; color: var(--text-muted); font-size: 12px; line-height: 1.8; }
+.state, .notice { padding: 20px 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+.error { color: var(--danger); }
+.notice .btn { margin-top: 16px; }

@@ -1,0 +1,27 @@
+<view class="page">
+  <view class="intro">
+    <view class="intro-title">完整邮箱日报<text>尚未开放</text></view>
+    <view class="description">用量总览、调用次数、工具／模型占比，以及输入、输出和缓存明细。</view>
+    <view class="description">微信提醒每次授权接收一条摘要。邮箱日报计划开启后每天接收，目前先登记邮箱。</view>
+  </view>
+  <view wx:if="{{loading}}" class="state">正在读取邮箱登记…</view>
+  <block wx:elif="{{status}}">
+    <view wx:if="{{status.registered && !editing}}" class="registered">
+      <view class="field-label">已登记邮箱</view><view class="address">{{status.masked_email}}</view>
+      <view class="description">邮箱尚未验证；开放后先验证，再开启日报。</view>
+      <view class="actions"><button class="text-button" bindtap="editEmail" disabled="{{busy}}">修改邮箱</button><button class="text-button remove" bindtap="remove" disabled="{{busy}}" loading="{{busy}}">撤销登记</button></view>
+    </view>
+    <view wx:else class="form">
+      <label for="daily-email" class="field-label">邮箱地址</label>
+      <input id="daily-email" class="email-input" type="text" value="{{email}}" maxlength="254" placeholder="填写常用邮箱" bindinput="inputEmail" disabled="{{busy}}" confirm-type="done" bindconfirm="save" aria-label="邮箱地址" />
+      <view class="description">仅用于 Token 用量日报，不在排名或分享中展示，可随时撤销。现阶段不发送邮件。</view>
+      <checkbox-group bindchange="changeConsent"><label class="consent"><checkbox value="email" checked="{{consent}}" disabled="{{busy}}" color="#07C160" /><text>同意登记邮箱，用于 Token 用量日报。</text></label></checkbox-group>
+      <button class="btn btn-primary save" bindtap="save" loading="{{busy}}" disabled="{{busy || !email || !consent}}">{{editing ? '保存修改' : '登记邮箱'}}</button>
+      <button wx:if="{{editing}}" class="text-button cancel" bindtap="cancelEdit" disabled="{{busy}}">取消修改</button>
+    </view>
+    <view class="footnote">登记不等于开启推送。后续会在小程序中开放邮箱验证和日报设置；注销账号时一并删除登记邮箱。</view>
+  </block>
+  <view wx:if="{{error}}" class="notice error" role="alert">{{error}}<button wx:if="{{!status}}" class="btn btn-ghost" bindtap="load">重试</button></view>
+  <view wx:if="{{notice}}" class="notice" role="status">{{notice}}</view>
+</view>
+<privacy-notice />

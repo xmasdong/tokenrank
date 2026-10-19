@@ -3,6 +3,7 @@
     <view class="pn-title">关于隐私和开源</view>
     <view class="pn-p">上传每天的用量数字、工具、模型和估算金额，以及同步程序的运行状态与版本。</view>
     <view class="pn-p">代码、对话、项目名和文件路径都不会收集上传。</view>
+    <view class="pn-p">邮箱由你主动填写，仅用于用量日报登记，不公开展示，可随时撤销。</view>
     <view class="pn-p">参与公开排名后，头像昵称、用量及工具／模型偏好会展示在公开榜单和数据分析中。</view>
     <view class="pn-p">本项目已经全部开源，包含采集端、服务端，以及完整的小程序：</view>
     <view class="pn-repo" bindtap="copyRepo">

@@ -15,6 +15,7 @@ import { groupPk, rankSnapshot } from './group-pk.js';
 import { calendarReport, weeklyReport, dailyReport } from './history.js';
 import { trendQuery, trendReport } from './trends.js';
 import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
+import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -83,6 +84,19 @@ async function route(request, env, url, path) {
   if (method === 'GET' && path === '/healthz') {
     await env.DB.prepare('SELECT 1 FROM users LIMIT 1').first();
     return withCors(Response.json({ ok: true, day: beijingDay() }));
+  }
+
+  if (path === '/api/email-registration') {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    if (user.disabled_at) return withCors(jsonError(403, '账号已停用'));
+    if (method === 'GET') return withCors(Response.json(await emailRegistrationStatus(env,user.id)));
+    if (!['POST','DELETE'].includes(method)) return withCors(jsonError(405, 'method not allowed'));
+    const text = await request.text();
+    if (new TextEncoder().encode(text).length > 2048) return withCors(jsonError(413, '登记内容过长'));
+    let body;
+    try { body = JSON.parse(text); } catch { return withCors(jsonError(400, '登记内容格式有误')); }
+    return withCors(await (method === 'POST' ? saveEmailRegistration : removeEmailRegistration)(env,user.id,body));
   }
 
   if (path === '/api/reminders' || path.startsWith('/api/reminders/')) {

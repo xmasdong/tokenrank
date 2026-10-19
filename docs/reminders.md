@@ -75,3 +75,7 @@ Cloudflare Cron `*/5 * * * *` 每五分钟检查已预约任务；关闭总开�
 5. 模板选用并配置后用授权测试账号做手机验收：首次真实同步后询问一次；拒绝后不重弹；页面点击出现微信真实授权；接受／拒绝／总开关关闭分别检查；验证一次指定日期日报与连续故障通知、取消和再次预约。通过后再提交小程序审核与正式发布。
 
 官方依据：[选用模板](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_addwxanewtemplate.html)、[公共模板列表](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_getpubnewtemplatetitles.html)、[订阅消息](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/subscribe-message-overview.html)、[requestSubscribeMessage](https://developers.weixin.qq.com/miniprogram/dev/api/open-api/subscribe-message/wx.requestSubscribeMessage.html)、[发送接口](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage)。按 2026-10-19 官方文档核对，平台实际类目与模板权限仍需在本小程序后台确认。
+
+## 邮箱日报登记
+
+提醒页增加「完整邮箱日报」入口，日报详情也可进入。按当前产品阶段只收集用户主动填写的邮箱，不接入发信服务、不验证或发送邮件，也不改变现有微信预约。界面区分“微信每次授权一条摘要”和“邮箱完整日报计划每日接收”，后者明确尚未开放。迁移、数据边界及验收见 [邮箱日报登记](email-registration.md)。

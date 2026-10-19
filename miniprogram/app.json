@@ -15,6 +15,7 @@
     "pages/trends/trends",
     "pages/account/account",
     "pages/reminders/reminders",
+    "pages/email/email",
     "pages/daily/daily"
   ],
   "window": {

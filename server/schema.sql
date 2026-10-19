@@ -1,5 +1,5 @@
 -- 「Token 群排名」D1 表结构（部署见 wrangler.toml.example 注释）
--- 原则：只存聚合数字与微信侧公开资料（昵称/头像），无原始明细、无 IP、无设备指纹。
+-- 原则：只存聚合数字、微信资料和用户自愿登记的私有邮箱，无原始明细、无 IP、无设备指纹。
 
 -- 用户：openid 为唯一锚点（wx.login → code2session）
 CREATE TABLE IF NOT EXISTS users (
@@ -350,4 +350,20 @@ WHEN NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.user_id) BEGIN SELECT RAISE(ABO
 CREATE TRIGGER IF NOT EXISTS reminder_jobs_account_update BEFORE UPDATE OF user_id ON reminder_jobs
 WHEN NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'ACCOUNT_NOT_FOUND'); END;
 CREATE TRIGGER IF NOT EXISTS reminder_failure_runs_account_update BEFORE UPDATE OF user_id ON reminder_failure_runs
+WHEN NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'ACCOUNT_NOT_FOUND'); END;
+
+-- Optional private email registration only; no subscription or delivery is enabled.
+CREATE TABLE IF NOT EXISTS email_registrations (
+  user_id INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  email TEXT,
+  consent_at INTEGER,
+  consent_version TEXT,
+  revision TEXT NOT NULL,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL
+);
+-- A withdrawn row retains only its revision, preventing stale requests from restoring an address.
+CREATE TRIGGER IF NOT EXISTS email_registrations_account_insert BEFORE INSERT ON email_registrations
+WHEN NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'ACCOUNT_NOT_FOUND'); END;
+CREATE TRIGGER IF NOT EXISTS email_registrations_account_update BEFORE UPDATE OF user_id ON email_registrations
 WHEN NOT EXISTS(SELECT 1 FROM users WHERE id=NEW.user_id) BEGIN SELECT RAISE(ABORT,'ACCOUNT_NOT_FOUND'); END;

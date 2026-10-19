@@ -13,6 +13,7 @@
       <view class="deletion-item"><view class="item-title">全部用量</view><view class="detail">所有日期和设备的用量、同步记录及尚未完成的回传数据</view></view>
       <view class="deletion-item"><view class="item-title">分享与群排名</view><view class="detail">个人分享链接失效，退出全部群榜。多人群榜保留，发起权限转交给最早加入的其他成员；只有你的群榜一并删除。</view></view>
       <view class="deletion-item"><view class="item-title">电脑接入</view><view class="detail">所有接入码立即失效，电脑将无法继续回传。</view></view>
+      <view class="deletion-item"><view class="item-title">消息提醒与邮箱</view><view class="detail">提醒预约、登记邮箱和登记同意记录</view></view>
     </view>
     <view class="scope-note">电脑上的原始日志和统计文件不会删除。已经保存或转发的分享图片无法撤回。</view>
     <button wx:if="{{!loginNeeded}}" class="btn btn-danger delete-button" loading="{{busy}}" disabled="{{busy || confirming}}" bindtap="confirmDeletion">{{state === 'pending' ? '重试确认注销' : '注销账号并删除数据'}}</button>

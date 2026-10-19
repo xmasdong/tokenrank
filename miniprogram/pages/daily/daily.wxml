@@ -12,7 +12,7 @@
       <view class="section"><view class="section-title">模型用量</view><view wx:for="{{report.models}}" wx:key="name" wx:if="{{expanded || index < 3}}" class="breakdown"><view class="detail-row"><text>{{item.name}}</text><text>{{item.formatted}} · {{item.percent}}%</text></view><view class="track"><view style="width:{{item.percent}}%;"></view></view></view><view wx:if="{{!report.models.length}}" class="label">这一天没有模型用量</view><button wx:if="{{report.tools.length > 3 || report.models.length > 3}}" class="text-button" bindtap="toggleDetails">{{expanded ? '收起' : '展开全部'}}</button></view>
     </block>
     <view class="footnote">按北京时间自然日统计，含输入、输出与缓存。历史记录后续同步或重算时，日报会随真实数据更新。</view>
-    <view class="entries"><button class="text-button" bindtap="goReminders">预约下次日报<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button></view>
+    <view class="entries"><button class="text-button" bindtap="goReminders">预约微信日报<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goEmail">完整邮箱日报 · 登记中<text aria-hidden="true">›</text></button><button class="text-button" bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button></view>
   </block>
 </view>
 <privacy-notice />

@@ -30,6 +30,10 @@
     <view class="p">Token 明细每天保留用量前 8 的工具和模型，其余计入未分类。重新同步会覆盖同一天的旧值。一个账号只显示最近接入的一台电脑，多台不相加。</view>
   </view>
   <view class="sec"><view class="sec-title display">金额估算</view><view class="p">金额沿用电脑上 token-watcher 的价格表和汇率，按输入、输出及缓存读写折算为 USD，属于 API 等值估算，不是实际扣费。没有价格的模型不计入金额，并单独标注。</view><view class="p">旧用户运行一次更新命令后，历史金额会自动同步。账单分享固定生成时的金额和模型明细，之后价格变化不会改动已发出的账单。</view></view>
+  <view class="sec"><view class="sec-title display">消息提醒与邮箱</view>
+    <view class="p">微信日报每次授权接收一条摘要。完整邮箱日报计划提供工具／模型和缓存明细，目前仅收集自愿登记的邮箱，不验证、不发送邮件。</view>
+    <view class="p">登记入口在「我的 → 消息提醒 → 完整邮箱日报」，可修改或撤销。邮箱不在榜单和分享中展示；注销账号时一并删除。开放后需要先验证邮箱，再主动开启接收。</view>
+  </view>
   <view class="sec"><view class="sec-title display">开源</view>
     <view class="p">小程序、服务端和电脑端同步器的代码全部开源（MIT），可以自己核对上传了什么。</view>
     <view class="cmd" data-cmd="https://github.com/xmasdong/tokenrank" bindtap="copyCmd">github.com/xmasdong/tokenrank</view>

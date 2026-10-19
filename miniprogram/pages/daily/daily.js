@@ -35,6 +35,7 @@ Page({
   switchDay(e) { const day = e.currentTarget.dataset.day; if (day && day !== this.data.day) { this.setData({ day, expanded: false }); return this.load(); } },
   toggleDetails() { this.setData({ expanded: !this.data.expanded }); },
   goReminders() { wx.navigateTo({ url: '/pages/reminders/reminders?kind=daily' }); },
+  goEmail() { wx.navigateTo({ url: '/pages/email/email' }); },
   goCalendar() { wx.navigateTo({ url: '/pages/calendar/calendar?month=' + this.data.day.slice(0,7) }); },
   goConnect() { wx.navigateTo({ url: '/pages/connect/connect' }); },
 });

@@ -18,5 +18,9 @@
 .retry { margin: 16px; }
 .footnote { margin: 20px 16px 8px; font-size: 12px; }
 .settings { margin: 0 16px; }
+.email-entry { padding: 20px 16px 0; border-bottom: 1rpx solid var(--separator); }
+.email-link { display: flex; align-items: center; justify-content: space-between; min-height: 52px; padding: 10px 0; margin: 0; background: transparent; color: var(--link); font-size: 14px; }
+.email-link::after { border: none; }
+.email-link text { color: var(--text-muted); font-size: 20px; }
 .connect { padding: 16px; border-bottom: 1rpx solid var(--separator); }
 .connect .btn { margin-top: 12px; }

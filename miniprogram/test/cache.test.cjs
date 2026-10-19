@@ -74,6 +74,24 @@ test('慢到达的提醒GET不能覆盖刚保存的预约状态',async()=>{
  const f=fixture(),read=f.api.reminders(),old=f.calls[0];await resolve(f,f.api.reserveReminder('daily','request_id_0000001'),{kinds:[{state:'pending'}]});old.success({statusCode:200,data:{kinds:[]}});await read;assert.equal(f.api.peekReminders().kinds[0].state,'pending');
 });
 
+test('邮箱登记复用五分钟缓存，保存和撤销不清空用量或提醒，邮箱不持久化到设备',async()=>{
+ const f=fixture();await resolve(f,f.api.myUsage('day'),{summary:{tokens:1}});await resolve(f,f.api.reminders(),{kinds:[]});
+ await resolve(f,f.api.emailRegistration(),{registered:false,revision:null});await f.api.emailRegistration();assert.equal(f.calls.length,3);
+ await resolve(f,f.api.saveEmailRegistration({email:'u@example.com'}),{registered:true,email:'u@example.com',revision:'a'});
+ assert.equal(f.api.peekEmailRegistration().email,'u@example.com');await f.api.myUsage('day');await f.api.reminders();await f.api.emailRegistration();assert.equal(f.calls.length,4);
+ await resolve(f,f.api.removeEmailRegistration('a'),{registered:false,email:null,revision:'b'});assert.equal(f.api.peekEmailRegistration().registered,false);
+ assert.doesNotMatch(JSON.stringify([...f.store]),/example\.com/);
+ await resolve(f,f.api.emailRegistration({force:true}),{registered:false,revision:'b'});assert.equal(f.calls.length,6);
+});
+test('慢到达的邮箱读取不能覆盖撤销结果，注销后迟到的登记不能恢复缓存',async()=>{
+ const f=fixture(),read=f.api.emailRegistration(),old=f.calls[0];await resolve(f,f.api.removeEmailRegistration('a'),{registered:false,email:null});
+ old.success({statusCode:200,data:{registered:true,email:'old@example.com'}});await read;assert.equal(f.api.peekEmailRegistration().email,null);
+ const late=f.api.saveEmailRegistration({email:'late@example.com'}),lateRequest=f.calls.at(-1),rejected=assert.rejects(late,/重新登录/);
+ const deletion=f.api.deleteAccount();await flush();reply(f,{deleted:true});await deletion;
+ lateRequest.success({statusCode:200,data:{registered:true,email:'late@example.com'}});await rejected;
+ assert.equal(f.api.peekEmailRegistration(),null);assert.doesNotMatch(JSON.stringify([...f.store]),/example\.com/);
+});
+
 test('默认昨日与显式日期复用日报缓存，强制刷新读新数据，北京时间跨日换日期',async()=>{
  const f=fixture();await resolve(f,f.api.daily(),{day:'2026-10-15',has_history:true});await f.api.daily('2026-10-15');assert.equal(f.calls.length,1);assert.equal(f.api.peekDaily().day,'2026-10-15');
  await resolve(f,f.api.daily('2026-10-15',{force:true}),{day:'2026-10-15',summary:{tokens:2}});assert.equal(f.calls.length,2);
