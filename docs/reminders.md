@@ -1,8 +1,8 @@
 # 小程序消息提醒
 
-## 当前状态
+## 开放条件
 
-消息模板尚未申请，正式环境总开关 `WX_REMINDERS_ENABLED=0`。页面入口可使用，但两项均显示“暂未开放”，不会发送消息，也不将模拟授权写成真实预约。
+真实模板 ID、关键词映射和 `WX_REMINDERS_ENABLED=1` 同时配置才开放对应预约；否则页面显示“暂未开放”。模板从当前小程序可用的公共库选用，不使用模拟授权或虚构模板 ID。是否已经选用、是否已经开启与是否实际收到消息是三种不同状态。
 
 - 我的 → 消息提醒；周报 → 下期周报提醒；接入页 → 同步异常提醒设置。
 - 首次获取接入命令时记录“等待首次上报”。收到真实 `last_report_at` 后才有询问资格，零 Token 也算同步成功。已有历史数据的用户、重新同步、重装或重置接入码不产生新的资格。
@@ -12,13 +12,30 @@
 
 ## 申请与配置
 
-在当前小程序的微信公众平台申请可用类目内的**一次性订阅消息**，分别用于周报、同步异常。能否申请及字段由平台实际返回决定，程序没有预设通用模板编号。申请前不要开启开关。普通一次订阅不能承诺每天／每周无限推送。
+优先通过微信官方 API 查询并选用当前小程序类目内的**一次性订阅消息**；已有公共模板不需要重新申请。只有公共库没有适用内容时，再到微信公众平台申请新的模板或关键词。
 
-申请通过后把两项真实配置保存为 `WX_REMINDER_TEMPLATES`（JSON 对象；可用 `wrangler secret put WX_REMINDER_TEMPLATES` 输入，勿将生产凭证提交到仓库）。顶层键为 `weekly`、`sync_error`，各包含：
+1. `getCategory`（`GET /wxaapi/newtmpl/getcategory`）读取本账号的类目，不猜类目 ID。
+2. `getPubTemplateTitleList`（`GET /wxaapi/newtmpl/getpubtemplatetitles`）传真实类目 `ids`，`start` 从 0 开始分页、`limit` 最大 30；只选择 `type=2`，不能把其他类型当作普通一次授权。
+3. `getPubTemplateKeyWordsById`（`GET /wxaapi/newtmpl/getpubtemplatekeywords`）按 `tid` 查询字段的 `kid`、名称、类型和示例，按实际语义选择 2–5 个关键词。
+4. `addTemplate`（`POST /wxaapi/newtmpl/addtemplate`）提交 `tid`、`kidList` 和不超过 15 字的 `sceneDesc`，选入本小程序私有库，取得 `priTmplId`。公共库的 `tid` 不能用作小程序授权的模板 ID。
+5. `getTemplateList`（`GET /wxaapi/newtmpl/gettemplate`）复核私有模板的实际 `content` 和类型，严格按 `{{thingN.DATA}}` 等编号配置映射。不修改或删除其他已有模板；请求结果不确定时先查询现有库，不盲目重复添加。
+
+这些接口在服务端使用当前小程序的稳定访问凭据调用；不导出 AppSecret，不在日志中输出访问凭据，不在客户端暴露模板管理能力。仅选用模板不会获得用户授权，也不会自动发送消息。普通一次订阅不能承诺每天／每周无限推送。
+
+已核对的公共模板组合（仍需以本账号实际返回为准，私有 ID 不提交到仓库）：
+
+| 业务 | 公共模板 | 选择的关键词 | 程序映射 |
+|---|---|---|---|
+| 周报 | 报告生成通知，`tid=2663` | 报告名称、报告摘要、生成时间（2、3、5） | `thing2: title`、`thing3: tokens`、`time5: time` |
+| 同步异常 | 日志记录提醒，`tid=5161` | 日志类型、提示信息（1、3） | `thing1: title`、`thing3: reason` |
+
+同步异常属于电脑同步日志告警，日志类型填“同步异常”，提示信息填安全错误描述。提醒标题由微信模板决定。
+
+选用成功并复核后，把两项真实配置保存为 `WX_REMINDER_TEMPLATES`（JSON 对象；可用 `wrangler secret put WX_REMINDER_TEMPLATES` 输入，勿将生产凭证提交到仓库）。顶层键为 `weekly`、`sync_error`，各包含：
 
 | 字段 | 内容 |
 |---|---|
-| `template_id` | 该小程序平台实际申请通过的模板 ID |
+| `template_id` | 该小程序实际选用成功返回的私有模板 ID |
 | `fields` | 实际关键词编号到程序数据字段的映射，不能按编号猜模板内容 |
 
 可映射字段（未列出的值不允许）：
@@ -30,7 +47,7 @@
 
 关键词名支持 `thingN`、`numberN`、`timeN`、`dateN`、`phraseN`、`character_stringN`。必须匹配已批准模板的实际语义与类型：例如 `tokens` 带中文单位应映射文本字段，天数／分钟数映射 number，时间映射 time，不能把区间映射 date。发送前限制 thing 20 字、phrase 5 字和 number 类型；不合规会记录失败而不发送。不同提醒必须用不同模板 ID。只配置一项时仅开放该项。
 
-设置 `WX_REMINDERS_ENABLED="1"` 并部署后，再进行真实授权与发送验收。`WX_APPID`、`WX_APPSECRET` 复用现有真实微信配置。服务端通过 stable_token 获取微信访问凭证，不返回给小程序。
+确认私有模板类型和字段后，设置 `WX_REMINDERS_ENABLED="1"` 并部署，再进行真实授权与发送验收。`WX_APPID`、`WX_APPSECRET` 复用现有真实微信配置。服务端通过 stable_token 获取微信访问凭证，不返回给小程序。
 
 ## 调度与状态
 
@@ -49,9 +66,9 @@ Cloudflare Cron `*/5 * * * *` 每五分钟检查已预约任务；关闭总开�
 ## 升级与验收
 
 1. 已有库只执行 `server/migrations/0012_reminders.sql`，是新增表／索引／触发器，不会清空用量和群信息。必须先迁移、后部署。
-2. 在 `server/wrangler.toml` 配置每五分钟 Cron，未获模板前总开关保持 0；不需要更新电脑端程序。
+2. 在 `server/wrangler.toml` 配置每五分钟 Cron，未选用并配置真实模板前总开关保持 0；不需要更新电脑端程序。
 3. `node --test client/test-sync/*.test.mjs server/test/*.test.mjs miniprogram/test/*.test.cjs` 验证账号隔离、首次上报、去重、原生点击时机、保存失败、调度、注销及原有功能。
-4. 当前生产接口和开发者工具只能验证“暂未开放”和正常业务不受影响；不应删真实用户数据制造首次接入。
-5. 模板申请后用授权测试账号做手机验收：首次真实同步后询问一次；拒绝后不重弹；页面点击出现微信真实授权；接受／拒绝／总开关关闭分别检查；验证一次周报与连续故障通知、取消和再次预约。通过后再提交小程序审核与正式发布。
+4. 在未配置环境验证“暂未开放”；在已配置环境使用正式接口验证实际私有模板 ID、字段对应的可预约状态、返回缓存和手动刷新。开发者工具不代替手机原生授权验收，不应删真实用户数据制造首次接入。
+5. 模板选用并配置后用授权测试账号做手机验收：首次真实同步后询问一次；拒绝后不重弹；页面点击出现微信真实授权；接受／拒绝／总开关关闭分别检查；验证一次周报与连续故障通知、取消和再次预约。通过后再提交小程序审核与正式发布。
 
-官方依据：[订阅消息](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/subscribe-message-overview.html)、[requestSubscribeMessage](https://developers.weixin.qq.com/miniprogram/dev/api/open-api/subscribe-message/wx.requestSubscribeMessage.html)、[发送接口](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage)。按 2026-10-19 官方文档核对，平台实际类目与模板权限仍需在本小程序后台确认。
+官方依据：[选用模板](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_addwxanewtemplate.html)、[公共模板列表](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_getpubnewtemplatetitles.html)、[订阅消息](https://developers.weixin.qq.com/miniprogram/dev/framework/open-ability/subscribe-message-overview.html)、[requestSubscribeMessage](https://developers.weixin.qq.com/miniprogram/dev/api/open-api/subscribe-message/wx.requestSubscribeMessage.html)、[发送接口](https://developers.weixin.qq.com/miniprogram/dev/server/API/mp-message-management/subscribe-message/api_sendmessage)。按 2026-10-19 官方文档核对，平台实际类目与模板权限仍需在本小程序后台确认。
