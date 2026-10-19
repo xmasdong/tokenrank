@@ -16,7 +16,7 @@
       <view wx:if="{{!usage.has_history && !hasReported}}" class="first-report"><view>还没有接入电脑。</view><button class="btn btn-primary" bindtap="goConnect">接入电脑</button></view>
       <view wx:if="{{usage.has_history && !usage.summary.tokens}}" class="note">这个周期没有用量。</view>
     </view>
-    <view class="history-entries"><button bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button><button bindtap="goWeekly">个人周报<text aria-hidden="true">›</text></button></view>
+    <view class="history-entries"><button bindtap="goDaily">昨日用量日报<text aria-hidden="true">›</text></button><button bindtap="goCalendar">使用日历<text aria-hidden="true">›</text></button><button bindtap="goWeekly">个人周报<text aria-hidden="true">›</text></button></view>
     <view class="section trend-section">
       <view class="section-head"><text class="section-title display">用量走势</text><text class="section-meta">最近 {{usage.trend_days}} 天</text></view>
       <view class="chart-caption">{{selectedDay ? selectedDay.day + ' · ' + selectedDay.exact + ' tokens' : '点柱条查看当天数值'}}<text wx:if="{{!selectedDay}}">峰值 {{usage.peakText}}</text></view>

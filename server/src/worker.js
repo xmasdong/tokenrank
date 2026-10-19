@@ -12,7 +12,7 @@ import { heartbeat, syncHealth } from './sync-health.js';
 import { analyticsRows, aggregateAnalytics, communityAudience, analyticsQuery } from './analytics.js';
 import { insightPolicy, requireInsightAccess } from './insight-access.js';
 import { groupPk, rankSnapshot } from './group-pk.js';
-import { calendarReport, weeklyReport } from './history.js';
+import { calendarReport, weeklyReport, dailyReport } from './history.js';
 import { trendQuery, trendReport } from './trends.js';
 import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
 
@@ -103,9 +103,10 @@ async function route(request, env, url, path) {
     return withCors(await groupPk(env, user, path.split('/')[3], await readJson(request), userOrigin(env, request)));
   }
 
-  if (method === 'GET' && ['/api/my/calendar', '/api/my/weekly'].includes(path)) {
+  if (method === 'GET' && ['/api/my/calendar', '/api/my/weekly', '/api/my/daily'].includes(path)) {
     const user = await sessionUser(request, env);
     if (!user) return withCors(jsonError(401, '请先登录'));
+    if (path === '/api/my/daily') return withCors(await dailyReport(env,user.id,url.searchParams.get('day')));
     return withCors(await (path === '/api/my/calendar' ? calendarReport(env, user.id, url.searchParams.get('month'))
       : weeklyReport(env, user.id, url.searchParams.get('week'))));
   }

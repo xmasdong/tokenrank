@@ -4,7 +4,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import worker from '../src/worker.js';
 import { beijingDay } from '../src/lib.js';
-import { addDays, calendarMonth, calendarReport, weeklyRange, weeklyReport, buildWeekly, mondayOf } from '../src/history.js';
+import { addDays, calendarMonth, calendarReport, weeklyRange, weeklyReport, buildWeekly, mondayOf, dailyReport, buildDaily } from '../src/history.js';
 import { trendQuery, trendReport } from '../src/trends.js';
 function fixture(t, count = 6) {
   const db = new DatabaseSync(':memory:'); db.exec(readFileSync(new URL('../schema.sql', import.meta.url), 'utf8')); t.after(() => db.close());
@@ -139,4 +139,24 @@ test('趋势多页使用同一快照，隐私或上报变化拒绝旧页；损�
   for(const text of ['broken','["bad",1,null,[false,4],["negative",-5]]','{"not":"array"}']) {
     f.db.prepare('UPDATE daily_totals SET tools_json=?').run(text); const r=await f.request('/api/insights/trends'); assert.equal(r.status,200); assert.equal(r.data.entries.length,0); assert.equal(r.data.summary.tokens,700);
   }
+});
+
+test('日报固定已经结束的北京时间日期，真实工具模型和含缓存总量只取本人选中设备',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-15',258000000);f.seed(1,'2026-10-15',9999,{device:'old'});f.seed(2,'2026-10-15',9999);f.seed(1,'2026-10-16',9999);
+ const before=f.db.prepare('SELECT total_changes() n').get().n;
+ const report=await (await dailyReport(f.env,1,'',fixed)).json();assert.equal(report.day,'2026-10-15');assert.equal(report.summary.tokens,258000000);assert.equal(report.summary.requests,2);
+ assert.equal(report.top_tool.name,'A');assert.equal(report.top_model.name,'M');assert.equal(report.models[0].tokens,258000000);assert.equal(report.previous_day,null);assert.equal(report.next_day,null);assert.equal(report.daily.length,1);
+ f.db.exec('UPDATE users SET rank_hidden=1 WHERE id=1');assert.equal((await (await dailyReport(f.env,1,'2026-10-15',fixed)).json()).summary.tokens,258000000);
+ assert.equal(f.db.prepare('SELECT total_changes() n').get().n,before+1);
+});
+test('日报缺记录用null，真实零用量用0；不将今天或无效日期当成昨日',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-14',0);
+ const zero=await (await dailyReport(f.env,1,'2026-10-14',fixed)).json();assert.equal(zero.has_history,true);assert.equal(zero.summary.tokens,0);assert.equal(zero.summary.requests,0);assert.equal(zero.next_day,'2026-10-15');
+ const missing=await (await dailyReport(f.env,1,'2026-10-15',fixed)).json();assert.equal(missing.has_history,false);assert.equal(missing.summary.tokens,null);assert.equal(missing.summary.requests,null);assert.equal(missing.top_tool,null);
+ for(const day of ['2026-10-16','2026-10-17','2026-02-30','invalid'])assert.equal((await dailyReport(f.env,1,day,fixed)).status,400);
+});
+test('日报接口要求本人会话，保留旧统计口径更新提示',async t=>{
+ const f=fixture(t);assert.equal((await f.request('/api/my/daily?day=2026-10-15')).status,401);
+ f.seed(1,'2026-10-15',100);assert.equal((await f.request('/api/my/daily?day=2026-10-15',1)).data.summary.tokens,100);
+ f.db.prepare("INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(3,'2026-10-15',99,1)").run();assert.equal((await dailyReport(f.env,3,'2026-10-15',fixed)).status,409);
 });

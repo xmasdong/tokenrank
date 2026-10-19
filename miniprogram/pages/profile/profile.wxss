@@ -58,7 +58,7 @@
 .share-options .text-button { margin: 0; padding: 4px 0; }
 .tools-share { float: right; margin: 0; padding: 0 0 0 12px; min-height: 32px; font-size: 13px; }
 
-.history-entries { display: flex; gap: 16px; border-top: 1rpx solid var(--separator); }
-.history-entries button { width: 0; flex: 1; display: flex; justify-content: space-between; align-items: center; padding: 0; margin: 0; min-height: 56px; background: transparent; font-size: 15px; font-weight: 400; }
+.history-entries { display: flex; flex-wrap: wrap; gap: 0 16px; border-top: 1rpx solid var(--separator); }
+.history-entries button { width: calc(50% - 8px); flex: none; display: flex; justify-content: space-between; align-items: center; padding: 0; margin: 0; min-height: 56px; background: transparent; font-size: 15px; font-weight: 400; }
 .history-entries button::after { border: none; }
 .history-entries text { color: var(--text-muted); font-size: 22px; }

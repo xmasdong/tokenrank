@@ -118,6 +118,8 @@ const defaultWeek = () => {
   day.setUTCDate(day.getUTCDate() - (day.getUTCDay() + 6) % 7 - 7);
   return day.toISOString().slice(0, 10);
 };
+const yesterday = () => new Date(Date.parse(beijingDate() + 'T00:00:00Z') - 86400000).toISOString().slice(0,10);
+const dailyPath = day => '/api/my/daily?day=' + encodeURIComponent(day || yesterday());
 const calendarPath = month => '/api/my/calendar?month=' + encodeURIComponent(month || beijingDate().slice(0, 7));
 const weeklyPath = week => '/api/my/weekly?week=' + encodeURIComponent(week || defaultWeek());
 const trendsPath = ({ period = 'week', dimension = 'tools', metric = 'users', end = '', offset = 0, snapshot = '' } = {}) =>
@@ -425,6 +427,8 @@ module.exports = {
     }
     return state;
   },
+  peekDaily: day => peek(dailyPath(day)),
+  daily: (day, options) => read(dailyPath(day), options),
   peekReminders: () => peek('/api/reminders'),
   reminders: options => read('/api/reminders', options),
   reserveReminder: (kind, requestId) => reminderMutation('/api/reminders/' + encodeURIComponent(kind), { method: 'POST', data: { request_id: requestId } }),

@@ -10,7 +10,7 @@ function maybePrompt(api, wx, user, isCurrent = () => true) {
   if (!current()) return false;
   pending.add(id);
   const kinds = user.reminder_kinds;
-  const label = kinds.includes('weekly') && kinds.includes('sync_error') ? '周报和同步异常' : kinds.includes('weekly') ? '周报' : '同步异常';
+  const label = kinds.includes('daily') && kinds.includes('sync_error') ? '日报和同步异常' : kinds.includes('daily') ? '日报' : '同步异常';
   queue.show(wx, {
     title: '电脑已接入', content: `要接收${label}提醒吗？每项提醒一次，可在「我的」管理。`,
     confirmText: '设置提醒', cancelText: '暂不开启', shouldShow: current,

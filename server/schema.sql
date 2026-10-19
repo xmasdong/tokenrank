@@ -314,7 +314,7 @@ CREATE TABLE IF NOT EXISTS reminder_preferences (
 );
 CREATE TABLE IF NOT EXISTS reminder_jobs (
   user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  kind TEXT NOT NULL CHECK(kind IN ('weekly','sync_error')),
+  kind TEXT NOT NULL CHECK(kind IN ('weekly','daily','sync_error')),
   id TEXT NOT NULL,
   request_id TEXT NOT NULL,
   template_id TEXT NOT NULL,

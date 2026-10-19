@@ -1,9 +1,9 @@
 import { jsonError, beijingDay } from './lib.js';
-import { addDays, mondayOf, weeklyRange, buildWeekly } from './history.js';
-const KEYS = ['weekly','sync_error'], STALE = 15 * 60000;
-const VALUES = new Set(['title','range','tokens','active_days','reported_days','requests','time','reason','platform','duration']);
-const SOURCES = { weekly:new Set(['title','range','tokens','active_days','reported_days','requests','time']), sync_error:new Set(['title','reason','platform','duration','time']) };
-const LABELS = { weekly:'下期周报', sync_error:'同步异常' };
+import { addDays, buildDaily, validDay } from './history.js';
+const KEYS = ['daily','sync_error'], STALE = 15 * 60000;
+const VALUES = new Set(['title','range','tokens','active_days','reported_days','requests','time','reason','platform','duration','summary']);
+const SOURCES = { daily:new Set(['title','range','tokens','requests','time','summary']), sync_error:new Set(['title','reason','platform','duration','time']) };
+const LABELS = { daily:'用量日报', sync_error:'同步异常' };
 export function reminderConfig(env) {
   let raw; try { raw = JSON.parse(env.WX_REMINDER_TEMPLATES || '{}'); } catch { raw = {}; }
   const result = {};
@@ -36,9 +36,10 @@ export async function connectionReminderMeta(env, userId, lastReport) {
   }
   return reminderMeta(env,preference,lastReport);
 }
-export function nextWeekly(now = Date.now()) {
-  const week = mondayOf(beijingDay(now));
-  return { week_start:week, scheduled_at:Date.parse(addDays(week,7)+'T09:00:00+08:00') };
+export function nextDaily(now = Date.now()) {
+  const today = beijingDay(now), nine = Date.parse(today + 'T09:00:00+08:00');
+  const sendDay = now < nine ? today : addDays(today, 1);
+  return { report_day:addDays(sendDay, -1), scheduled_at:Date.parse(sendDay + 'T09:00:00+08:00') };
 }
 export async function reminderStatus(env, userId, now = Date.now()) {
   const user = await env.DB.prepare(`SELECT c.last_report_at,p.awaiting_first_report,p.prompt_seen_at
@@ -47,8 +48,8 @@ export async function reminderStatus(env, userId, now = Date.now()) {
   const {results} = await env.DB.prepare('SELECT * FROM reminder_jobs WHERE user_id=?1').bind(userId).all(), config = reminderConfig(env);
   return { ...reminderMeta(env,user,user.last_report_at), has_reported:!!user.last_report_at,
     kinds:KEYS.map(key => { const job=results.find(row=>row.kind===key);return {key,label:LABELS[key],available:!!config[key],
-      template_id:config[key]?.template_id || null, ...(key==='weekly' ? nextWeekly(now) : {}),
-      appointment:job ? {id:job.id,state:job.state,scheduled_at:job.scheduled_at,week_start:job.week_start,
+      template_id:config[key]?.template_id || null, ...(key==='daily' ? nextDaily(now) : {}),
+      appointment:job ? {id:job.id,state:job.state,scheduled_at:job.scheduled_at,...(key==='daily' ? {report_day:job.week_start} : {}),
         updated_at:job.updated_at,error_code:job.error_code} : null}; }) };
 }
 export async function acknowledgeReminderPrompt(env, userId, now = Date.now()) {
@@ -59,6 +60,7 @@ export async function acknowledgeReminderPrompt(env, userId, now = Date.now()) {
   return Response.json({acknowledged:true});
 }
 export async function reserveReminder(env, userId, kind, body, now = Date.now()) {
+  if (kind === 'weekly') return jsonError(410,'周报提醒已调整为日报，请重新预约');
   if (!KEYS.includes(kind) || !/^[A-Za-z0-9_-]{16,80}$/.test(body?.request_id || '')) return jsonError(400,'预约参数无效');
   const config = reminderConfig(env)[kind];
   if (!config) return jsonError(503,'该提醒暂未开放');
@@ -66,14 +68,14 @@ export async function reserveReminder(env, userId, kind, body, now = Date.now())
   if (!connected) return jsonError(409,'请先完成电脑接入和首次用量同步');
   const current = await env.DB.prepare('SELECT * FROM reminder_jobs WHERE user_id=?1 AND kind=?2').bind(userId,kind).first();
   if (current?.state==='sending' && current.request_id!==body.request_id) return jsonError(409,'本次提醒正在发送，请稍后再试');
-  const date = kind==='weekly' ? nextWeekly(now) : {scheduled_at:null,week_start:null};
+  const date = kind==='daily' ? nextDaily(now) : {scheduled_at:null,report_day:null};
   await env.DB.prepare(`INSERT INTO reminder_jobs(user_id,kind,id,request_id,template_id,state,scheduled_at,week_start,created_at,updated_at)
     SELECT ?1,?2,?3,?4,?5,'pending',?6,?7,?8,?8 WHERE EXISTS(SELECT 1 FROM users WHERE id=?1 AND disabled_at IS NULL)
     ON CONFLICT(user_id,kind) DO UPDATE SET id=excluded.id,request_id=excluded.request_id,template_id=excluded.template_id,
       state='pending',scheduled_at=excluded.scheduled_at,week_start=excluded.week_start,created_at=excluded.created_at,
       updated_at=excluded.updated_at,attempted_at=NULL,error_code=NULL
     WHERE reminder_jobs.request_id<>excluded.request_id AND reminder_jobs.state<>'sending'`)
-    .bind(userId,kind,crypto.randomUUID().replaceAll('-','').slice(0,24),body.request_id,config.template_id,date.scheduled_at,date.week_start,now).run();
+    .bind(userId,kind,crypto.randomUUID().replaceAll('-','').slice(0,24),body.request_id,config.template_id,date.scheduled_at,date.report_day,now).run();
   return Response.json(await reminderStatus(env,userId,now));
 }
 export async function cancelReminder(env, userId, kind, body, now=Date.now()) {
@@ -136,6 +138,12 @@ export function createReminderSender({fetcher=(...args)=>fetch(...args),now=()=>
 }
 const sender=createReminderSender();
 const amount = tokens => tokens>=1e8 ? (tokens/1e8).toFixed(2)+' 亿' : tokens>=1e4 ? (tokens/1e4).toFixed(2)+' 万' : String(tokens);
+export function dailySummary(tokens, requests) {
+  const compact = value => amount(Math.max(0,Number(value)||0)).replaceAll(' ','');
+  const content = compact(tokens) + ' · ' + compact(requests) + '次';
+  if ([...content].length <= 20) return content;
+  return Number(tokens).toExponential(2) + ' · ' + Number(requests).toExponential(1) + '次';
+}
 const reason = {SOURCE_READ_FAILED:'读取统计失败',COLLECTOR_OUTDATED:'统计内核需更新',UPLOAD_FAILED:'用量上传失败',AUTH_INVALID:'接入凭证失效',SYNC_CONFLICT:'同步任务冲突',UPGRADE_REQUIRED:'同步程序需更新',RATE_LIMITED:'上传请求受限',CHECK_TIMEOUT:'同步检查超时',PROCESS_EXIT:'同步检查退出'};
 export async function runReminders(env,{now=Date.now(),send=sender}={}) {
   const config=reminderConfig(env);if (!Object.keys(config).length) return {processed:0};
@@ -145,7 +153,7 @@ export async function runReminders(env,{now=Date.now(),send=sender}={}) {
     JOIN users u ON u.id=j.user_id AND u.disabled_at IS NULL JOIN connect_tokens c ON c.user_id=j.user_id AND c.last_report_at IS NOT NULL
     LEFT JOIN usage_sync_state s ON s.user_id=j.user_id LEFT JOIN sync_agents a ON a.user_id=j.user_id AND a.device_id=s.device_id
     LEFT JOIN reminder_failure_runs r ON r.user_id=a.user_id AND r.device_id=a.device_id
-    WHERE j.state='pending' AND ((j.kind='weekly' AND j.scheduled_at<=?1) OR
+    WHERE j.state='pending' AND ((j.kind='daily' AND j.scheduled_at<=?1) OR
       (j.kind='sync_error' AND a.state='error' AND a.last_seen_at>=?2 AND r.event_at=a.event_at
        AND r.error_since IS NOT NULL AND MAX(r.error_since,j.created_at)<=?2 AND (j.last_sent_at IS NULL OR j.last_sent_at<=?3)))
     ORDER BY j.created_at,j.user_id LIMIT 50`).bind(now,now-STALE,now-86400000).all();
@@ -159,15 +167,17 @@ export async function runReminders(env,{now=Date.now(),send=sender}={}) {
     try {
       if (job.template_id!==item.template_id) result={state:'needs_permission',code:'TEMPLATE_CHANGED'};
       let values,page;
-      if (!result && job.kind==='weekly') {
-        const range=weeklyRange(job.week_start,now);
-        const {results:rows}=await env.DB.prepare('SELECT * FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3 ORDER BY day')
-          .bind(job.user_id,range.from,range.through).all();
-        const report=buildWeekly(rows,range);
-        if (!report.has_history) result={state:'skipped',code:'NO_WEEK_USAGE'};
-        values={title:'个人周报',range:report.from.slice(5).replace('-','.')+'–'+report.to.slice(5).replace('-','.'),tokens:amount(report.summary.tokens),active_days:report.summary.active_days,
-          reported_days:report.weekly.reported_days,requests:report.summary.requests,time:time(now)};
-        page='pages/weekly/weekly?week='+job.week_start;
+      if (!result && job.kind==='daily') {
+        if (!validDay(job.week_start) || job.week_start >= beijingDay(now) || now - job.scheduled_at >= 86400000) result={state:'skipped',code:'DAILY_EXPIRED'};
+        if (!result) {
+          // The legacy column name is retained so existing weekly rows and old Workers remain compatible during migration.
+          const {results:rows}=await env.DB.prepare('SELECT * FROM ranked_usage WHERE user_id=?1 AND day=?2').bind(job.user_id,job.week_start).all();
+          const report=buildDaily(rows,job.week_start);
+          if (!report.has_history) result={state:'skipped',code:'NO_DAY_USAGE'};
+          values={title:job.week_start.slice(5).replace('-','.')+' Token日报',range:job.week_start,tokens:amount(report.summary.tokens),
+            requests:report.summary.requests,summary:dailySummary(report.summary.tokens,report.summary.requests),time:time(now)};
+          page='pages/daily/daily?day='+job.week_start;
+        }
       } else if (!result) {
         values={title:'同步异常',time:time(now),reason:reason[job.agent_error]||'同步检查失败',platform:job.platform==='win32'?'Windows':job.platform==='darwin'?'macOS':'电脑',duration:Math.floor((now-Math.max(job.error_since,job.created_at))/60000)};
         page='pages/connect/connect';

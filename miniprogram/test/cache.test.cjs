@@ -66,10 +66,16 @@ test('注销中的迟到分享不能恢复缓存，任何摘要都不写入持�
 test('提醒预约、取消和询问确认不清空用量与周报缓存，提醒页五分钟内复用',async()=>{
  const f=fixture();await resolve(f,f.api.myUsage('day'),{summary:{tokens:1}});await resolve(f,f.api.weekly(),{snapshot:'real-source'});
  await resolve(f,f.api.reminders(),{kinds:[],has_reported:true});await f.api.reminders();assert.equal(f.calls.length,3);
- await resolve(f,f.api.reserveReminder('weekly','request_id_0000001'),{kinds:[{key:'weekly',appointment:{state:'pending'}}]});
+ await resolve(f,f.api.reserveReminder('daily','request_id_0000001'),{kinds:[{key:'daily',appointment:{state:'pending'}}]});
  assert.equal(f.api.peekReminders().kinds[0].appointment.state,'pending');await f.api.myUsage('day');await f.api.weekly();assert.equal(f.calls.length,4);
- await resolve(f,f.api.cancelReminder('weekly','a'.repeat(24)),{kinds:[]});await resolve(f,f.api.ackReminderPrompt(),{acknowledged:true});await f.api.myUsage('day');await f.api.weekly();assert.equal(f.calls.length,6);
+ await resolve(f,f.api.cancelReminder('daily','a'.repeat(24)),{kinds:[]});await resolve(f,f.api.ackReminderPrompt(),{acknowledged:true});await f.api.myUsage('day');await f.api.weekly();assert.equal(f.calls.length,6);
 });
 test('慢到达的提醒GET不能覆盖刚保存的预约状态',async()=>{
- const f=fixture(),read=f.api.reminders(),old=f.calls[0];await resolve(f,f.api.reserveReminder('weekly','request_id_0000001'),{kinds:[{state:'pending'}]});old.success({statusCode:200,data:{kinds:[]}});await read;assert.equal(f.api.peekReminders().kinds[0].state,'pending');
+ const f=fixture(),read=f.api.reminders(),old=f.calls[0];await resolve(f,f.api.reserveReminder('daily','request_id_0000001'),{kinds:[{state:'pending'}]});old.success({statusCode:200,data:{kinds:[]}});await read;assert.equal(f.api.peekReminders().kinds[0].state,'pending');
+});
+
+test('默认昨日与显式日期复用日报缓存，强制刷新读新数据，北京时间跨日换日期',async()=>{
+ const f=fixture();await resolve(f,f.api.daily(),{day:'2026-10-15',has_history:true});await f.api.daily('2026-10-15');assert.equal(f.calls.length,1);assert.equal(f.api.peekDaily().day,'2026-10-15');
+ await resolve(f,f.api.daily('2026-10-15',{force:true}),{day:'2026-10-15',summary:{tokens:2}});assert.equal(f.calls.length,2);
+ f.advance(86400000);const next=f.api.daily();assert.match(f.calls.at(-1).url,/day=2026-10-16/);await resolve(f,next,{day:'2026-10-16'});assert.equal(f.calls.length,3);
 });

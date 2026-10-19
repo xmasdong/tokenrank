@@ -36,6 +36,7 @@ Page({
     const selected = this.data.report?.days.find(day => day.day === e.currentTarget.dataset.day && !day.future);
     if (selected) this.setData({ selected });
   },
+  goDaily() { const day = this.data.selected?.day; if (day && day < this.data.report.today) wx.navigateTo({ url: '/pages/daily/daily?day=' + day }); },
   goWeekly() {
     const day = this.data.selected?.day;
     if (!day) return;

@@ -77,7 +77,7 @@ Page({
   },
   retryShare() { return this.prepareShare(false, { force: true }); },
   avatarError() { this.setData({ avatarFailed: true }); },
-  goReminders() { wx.navigateTo({ url: '/pages/reminders/reminders?kind=weekly' }); },
+  goReminders() { wx.navigateTo({ url: '/pages/reminders/reminders?kind=daily' }); },
   goConnect() { wx.navigateTo({ url: '/pages/connect/connect' }); },
   preview() { if (this.data.socialPosterPath) wx.previewImage({ urls: [this.data.socialPosterPath] }); },
   savePoster() {

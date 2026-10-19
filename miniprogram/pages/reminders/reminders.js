@@ -1,17 +1,18 @@
 const api = require('../../utils/api');
-const STATES = { pending: '已预约本次', sending: '正在提交发送', sent: '本次已提交微信', cancelled: '已取消', needs_permission: '需要重新授权', failed: '本次发送失败', unknown: '发送结果待确认', skipped: '本周没有同步记录' };
+const STATES = { pending: '已预约本次', sending: '正在提交发送', sent: '本次已提交微信', cancelled: '已取消', needs_permission: '需要重新授权', failed: '本次发送失败', unknown: '发送结果待确认', skipped: '本次未发送' };
 const formatTime = value => value ? new Date(value + 8 * 3600000).toISOString().slice(0, 16).replace('T', ' ') : '';
 function rows(status) {
   return status.kinds.map(item => {
     const state = item.appointment?.state;
-    return { ...item, statusText: !item.available ? '暂未开放' : STATES[state] || '未预约',
+    return { ...item, statusText: !item.available ? '暂未开放' : item.appointment?.error_code === 'NO_DAY_USAGE' ? '该日没有同步记录' : item.appointment?.error_code === 'DAILY_EXPIRED' ? '本次预约已过期' : STATES[state] || '未预约',
+      dayText: (state === 'pending' ? item.appointment.report_day : item.report_day) || '',
       timeText: formatTime(state === 'pending' ? item.appointment.scheduled_at : item.scheduled_at),
       canBook: item.available && status.has_reported && !['pending', 'sending'].includes(state) };
   });
 }
 Page({
   data: { loading: true, error: '', items: [], hasReported: false, busy: '', savePending: '', notice: '', focus: '' },
-  onLoad(options) { this.setData({ focus: ['weekly', 'sync_error'].includes(options.kind) ? options.kind : '' }); },
+  onLoad(options) { this.setData({ focus: options.kind === 'weekly' ? 'daily' : ['daily', 'sync_error'].includes(options.kind) ? options.kind : '' }); },
   onShow() { this._visible = true;
     const epoch = api.accountEpoch();
     if (this._accountEpoch !== undefined && this._accountEpoch !== epoch) {

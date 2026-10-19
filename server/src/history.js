@@ -50,6 +50,26 @@ export async function calendarReport(env, userId, month, now = Date.now()) {
       elapsed_days: daily.filter(row => !row.future).length }, updated_at: Math.max(0, ...source.rows.map(row => row.updated_at)) || null });
 }
 
+/** A completed Beijing day. Missing reports are distinct from a reported zero. */
+export function buildDaily(rows, day) {
+  const selected = rows.filter(row => row.day === day), reported = selected.length > 0;
+  const usage = buildUsage(selected, 'day', Date.parse(day + 'T23:59:59.999+08:00'));
+  return { ...usage, day, has_history: reported,
+    summary: reported ? usage.summary : Object.fromEntries(Object.keys(usage.summary).map(key => [key, null])),
+    daily: [{ day, reported, tokens: reported ? usage.summary.tokens : null, requests: reported ? usage.summary.requests : null }],
+    top_tool: usage.tools.find(item => !item.unclassified) || null,
+    top_model: usage.models.find(item => !item.unclassified) || null };
+}
+export async function dailyReport(env, userId, value, now = Date.now()) {
+  const day = value || addDays(beijingDay(now), -1);
+  if (!validDay(day) || day >= beijingDay(now)) return jsonError(400, '请选择已经结束的日期');
+  const source = await ownRows(env, userId, day, day);
+  if (source instanceof Response) return source;
+  return Response.json({ ...buildDaily(source.rows, day), first_day: source.history.first_day,
+    previous_day: source.history.first_day && day > source.history.first_day ? addDays(day, -1) : null,
+    next_day: addDays(day, 1) < beijingDay(now) ? addDays(day, 1) : null });
+}
+
 export function weeklyRange(value, now = Date.now()) {
   const today = beijingDay(now), current = mondayOf(today), start = value || addDays(current, -7);
   if (!validDay(start) || mondayOf(start) !== start || start > current) return null;

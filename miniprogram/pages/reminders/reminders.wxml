@@ -1,12 +1,12 @@
 <view class="page">
-  <view class="intro">每次预约发送一条，接收后可再预约。</view>
+  <view class="intro">日报在每天 09:00 发送前一日用量，每次授权预约一条。</view>
   <view wx:if="{{loading}}" class="state">正在读取提醒设置…</view>
   <view wx:if="{{error}}" class="state error">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
   <block wx:if="{{!loading && items.length}}">
     <view wx:if="{{!hasReported}}" class="connect"><view>完成电脑接入和首次同步后，可预约提醒。</view><button class="btn btn-primary" bindtap="goConnect">接入电脑</button></view>
     <view wx:for="{{items}}" wx:key="key" class="reminder {{focus === item.key ? 'focused' : ''}}">
       <view class="row"><text class="title">{{item.label}}</text><text class="status">{{item.statusText}}</text></view>
-      <view wx:if="{{item.key === 'weekly'}}" class="description">{{item.timeText}}（北京时间）<view>周一收到本周结束后的用量周报。</view></view>
+      <view wx:if="{{item.key === 'daily'}}" class="description">{{item.timeText}}（北京时间）<view>{{item.dayText}} · 含缓存 Token 总量与调用次数。</view></view>
       <view wx:else class="description">电脑明确报告同步失败，持续至少 15 分钟时提醒一次。<view>电脑休眠、没有新用量、主动停止同步，不发送提醒。</view></view>
       <view wx:if="{{!item.available}}" class="unavailable">开放后可在这里预约。</view>
       <view wx:else class="controls">
