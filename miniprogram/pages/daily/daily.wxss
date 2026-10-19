@@ -33,3 +33,9 @@
 .renewal-notice { color: var(--text); }
 .renewal .error { color: var(--danger); }
 .manage-reminder { margin: 0; font-size: 13px; }
+.daily-sharing { padding: 0 16px 24px; }
+.share-actions { display:flex; gap:12px; }
+.share-actions .btn { margin:0; min-width:0; width:0; flex:1; }
+.share-actions .btn-primary { flex:1.4; }
+.share-error { margin-top:12px; font-size:13px; color:var(--danger); line-height:1.8; }
+.share-error .text-button { margin:0; }

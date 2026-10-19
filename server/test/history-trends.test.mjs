@@ -160,3 +160,33 @@ test('日报接口要求本人会话，保留旧统计口径更新提示',async 
  f.seed(1,'2026-10-15',100);assert.equal((await f.request('/api/my/daily?day=2026-10-15',1)).data.summary.tokens,100);
  f.db.prepare("INSERT INTO daily_stats(user_id,day,tokens,updated_at) VALUES(3,'2026-10-15',99,1)").run();assert.equal((await dailyReport(f.env,3,'2026-10-15',fixed)).status,409);
 });
+test('日报分享固定所见日期和本人设备数字，公开摘要免登录，历史重算不改旧卡片',async t=>{
+ const f=fixture(t),day=addDays(beijingDay(),-1);f.seed(1,day,258000000);f.seed(1,day,999999999,{device:'old'});f.seed(2,day,500);f.seed(1,beijingDay(),123);
+ const report=await f.request('/api/my/daily?day='+day,1);assert.match(report.data.snapshot,/^[a-f0-9]{64}$/);
+ const body={style:'daily',day,day_snapshot:report.data.snapshot,tokens:999999,user_id:2};
+ const shared=await f.request('/api/shares',1,body);assert.equal(shared.status,200);assert.equal(shared.data.style,'daily');
+ assert.equal(shared.data.user.nickname,'用户1');assert.equal(shared.data.usage.from,day);assert.equal(shared.data.usage.to,day);assert.equal(shared.data.usage.report_day,day);
+ assert.equal(shared.data.usage.summary.tokens,258000000);assert.equal(shared.data.usage.summary.requests,2);assert.equal(shared.data.usage.summary.cache_read,258000000);assert.equal(shared.data.usage.models[0].name,'M');
+ assert.doesNotMatch(JSON.stringify(shared.data),/openid|user_id|device_id|session|day_snapshot|snapshot|first_day|previous_day|email|cost_json/);assert.equal(shared.data.usage.daily,undefined);assert.equal(shared.data.usage.activity,undefined);
+ assert.equal((await f.request('/api/shares',1,body)).data.id,shared.data.id);assert.deepEqual((await f.request('/api/shares/'+shared.data.id)).data,shared.data);
+ const compared=await f.request('/api/shares/'+shared.data.id+'/compare',2,{});assert.equal(compared.status,200);assert.equal(compared.data.usage.from,day);assert.equal(compared.data.usage.to,day);
+ const before=f.db.prepare('SELECT COUNT(*) n FROM usage_shares').get().n;
+ f.db.prepare('UPDATE daily_totals SET tokens=100,updated_at=2 WHERE user_id=1 AND day=?').run(day);
+ const stale=await f.request('/api/shares',1,body);assert.equal(stale.status,409);assert.equal(stale.data.code,'DAY_CHANGED');assert.equal(f.db.prepare('SELECT COUNT(*) n FROM usage_shares').get().n,before);
+ assert.equal((await f.request('/api/shares/'+shared.data.id)).data.usage.summary.tokens,258000000);
+});
+test('日报分享拒绝缺日期、未来、未同步和旧版本，不把缺记录变成零；真实零仍能分享',async t=>{
+ const f=fixture(t),day=addDays(beijingDay(),-1);f.seed(1,day,0);
+ assert.equal((await f.request('/api/shares',null,{style:'daily',day})).status,401);
+ for(const value of [undefined,'',beijingDay(),'2026-02-30'])assert.equal((await f.request('/api/shares',1,{style:'daily',day:value})).status,400);
+ const zero=(await f.request('/api/my/daily?day='+day,1)).data;
+ assert.equal((await f.request('/api/shares',1,{style:'daily',day})).data.code,'DAY_CHANGED');
+ const shared=await f.request('/api/shares',1,{style:'daily',day,day_snapshot:zero.snapshot});assert.equal(shared.status,200);assert.equal(shared.data.usage.summary.tokens,0);assert.equal(shared.data.usage.summary.requests,0);
+ const missing=(await f.request('/api/my/daily?day='+day,2)).data;assert.equal((await f.request('/api/shares',2,{style:'daily',day,day_snapshot:missing.snapshot})).status,400);
+});
+test('日报分享版本仅依赖数字和工具模型，不因后台检查时间变化失效',async t=>{
+ const f=fixture(t),day=addDays(beijingDay(),-1);f.seed(1,day,123);
+ const read=async()=>(await f.request('/api/my/daily?day='+day,1)).data.snapshot;
+ const first=await read();f.db.exec('UPDATE daily_totals SET updated_at=999');assert.equal(await read(),first);
+ f.db.exec("UPDATE daily_totals SET models_json='[[\"new model\",123]]'");assert.notEqual(await read(),first);
+});

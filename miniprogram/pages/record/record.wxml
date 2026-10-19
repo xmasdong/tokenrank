@@ -4,7 +4,16 @@
   <view wx:if="{{loading}}" class="state">正在加载用量…</view>
   <view wx:elif="{{error}}" class="state"><view>{{error}}</view><button class="btn btn-ghost" bindtap="load">重试</button></view>
   <block wx:else>
-    <block wx:if="{{weeklyReport}}"><template is="weekly-summary" data="{{weeklyReport, weeklyUser: record.user, initial, avatarFailed}}" /><view class="note">{{weeklyReport.from}} — {{weeklyReport.to}} · 北京时间 · 含缓存总量。数据为分享时的记录。群排名按分享时的当前成员计算。</view></block>
+    <block wx:if="{{dailyReport}}">
+      <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">{{dailyReport.dateText}} · 用量日报</view></view></view>
+      <view class="total"><view>Token 总量 · 含缓存</view><view class="number">{{dailyReport.value}}<text class="number-unit">{{dailyReport.unit}}</text></view><view class="exact">{{dailyReport.exact}} Tokens</view></view>
+      <view class="receipt-row"><text>调用次数</text><text>{{dailyReport.requestsText}} 次</text></view>
+      <view class="receipt-row"><text>主力工具</text><text>{{dailyReport.topTool}}</text></view><view class="receipt-row"><text>主力模型</text><text>{{dailyReport.topModel}}</text></view>
+      <view class="receipt-row"><text>输入（不含缓存）</text><text>{{dailyReport.inputText}}</text></view><view class="receipt-row"><text>输出</text><text>{{dailyReport.outputText}}</text></view>
+      <view class="receipt-row"><text>缓存读取</text><text>{{dailyReport.cacheReadText}}</text></view><view class="receipt-row"><text>缓存写入</text><text>{{dailyReport.cacheWriteText}}</text></view>
+      <view class="note">{{dailyReport.day}} · 北京时间 · 分享时的记录</view>
+    </block>
+    <block wx:elif="{{weeklyReport}}"><template is="weekly-summary" data="{{weeklyReport, weeklyUser: record.user, initial, avatarFailed}}" /><view class="note">{{weeklyReport.from}} — {{weeklyReport.to}} · 北京时间 · 含缓存总量。数据为分享时的记录。群排名按分享时的当前成员计算。</view></block>
     <template wx:elif="{{comparison}}" is="comparison" data="{{comparison}}" />
     <block wx:else>
     <view class="person"><image wx:if="{{record.user.avatar_url && !avatarFailed}}" class="avatar" src="{{record.user.avatar_url}}" mode="aspectFill" binderror="avatarError" /><view wx:else class="avatar initial">{{initial}}</view><view class="person-details"><view class="name">{{record.user.nickname}}</view><view class="muted">截至 {{record.usage.to}}</view></view></view>

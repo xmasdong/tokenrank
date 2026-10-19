@@ -12,7 +12,7 @@ import { heartbeat, syncHealth } from './sync-health.js';
 import { analyticsRows, aggregateAnalytics, communityAudience, analyticsQuery } from './analytics.js';
 import { insightPolicy, requireInsightAccess } from './insight-access.js';
 import { groupPk, rankSnapshot } from './group-pk.js';
-import { calendarReport, weeklyReport, dailyReport } from './history.js';
+import { calendarReport, weeklyReport, dailyReport, validDay } from './history.js';
 import { trendQuery, trendReport } from './trends.js';
 import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
 import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
@@ -167,11 +167,15 @@ async function route(request, env, url, path) {
     if (!user) return withCors(jsonError(401, '请先登录'));
     const body = await readJson(request);
     const usageUrl = new URL(request.url); usageUrl.searchParams.set('period', body?.period || 'day');
-    const result = body?.style === 'weekly' ? await weeklyReport(env, user.id, body.week) : await myUsage(request, env, usageUrl);
+    if (body?.style === 'daily' && !validDay(body.day)) return withCors(jsonError(400,'日报分享日期无效'));
+    const result = body?.style === 'daily' ? await dailyReport(env,user.id,body.day)
+      : body?.style === 'weekly' ? await weeklyReport(env, user.id, body.week) : await myUsage(request, env, usageUrl);
     if (!result.ok) return withCors(result);
     const usage = await result.json();
     if (body?.style === 'weekly' && body.week_snapshot !== usage.snapshot)
       return withCors(Response.json({ error: '周报数据已有更新，请刷新后重新分享', code: 'WEEK_CHANGED' }, { status: 409 }));
+    if (body?.style === 'daily' && body.day_snapshot !== usage.snapshot)
+      return withCors(Response.json({ error: '日报数据已有更新，请刷新后重新分享', code: 'DAY_CHANGED' }, { status: 409 }));
     if (!usage.has_history) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
     if (body?.group_id !== undefined) {
       if (typeof body.group_id !== 'string' || !body.group_id || body.group_id.length > 128)
@@ -181,7 +185,7 @@ async function route(request, env, url, path) {
       usage.group_standing = group;
     }
     return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage,
-      ['receipt', 'tools', 'weekly'].includes(body?.style) ? body.style : 'usage'));
+      ['receipt', 'tools', 'weekly', 'daily'].includes(body?.style) ? body.style : 'usage'));
   }
   if (method === 'POST' && /^\/api\/shares\/[0-9a-f]{24}\/compare$/.test(path)) {
     const user = await sessionUser(request, env);

@@ -2,6 +2,7 @@ const { compact, usageBasis, PERIODS } = require('./usage');
 const { drawCodeBadge } = require('./share-code');
 const { weeklyView } = require('./history');
 const { comparisonView, toolRows } = require('./social-share');
+const { dailyShareView } = require('./daily-share');
 const SOCIAL_HEIGHT = 1280;
 function painter(ctx, height) {
   const ink = '#191919', soft = '#777777', orange = '#D88A2D';
@@ -126,4 +127,28 @@ function drawWeeklyPoster(ctx, { user, usage, cover = false, codeImage, avatarIm
   }
   p.text(`${usageBasis(usage).shortNote} · 分享时的记录`, 60, H - 20, 20, p.soft);
 }
-module.exports = { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster };
+function drawDailyPoster(ctx, {user,usage,cover=false,codeImage,avatarImage}) {
+  if (!codeImage) throw new Error('小程序码尚未就绪，请重试');
+  const H=cover?800:SOCIAL_HEIGHT,p=painter(ctx,H),v=dailyShareView(usage);
+  p.text('Token 群排名',60,52,24,p.soft);p.text('用量日报',940,52,24,p.soft,300,'right');
+  p.avatar(user,avatarImage,108,130,96);
+  p.text(user.nickname || 'AI 玩家',180,124,38,p.ink,760);p.text(v.dateText,180,166,26,p.soft);p.rule(208);
+  p.text('Token 总量 · 含缓存',60,270,26,p.soft);
+  const width=p.text(v.value,60,384,104,p.orange,690);
+  if(v.unit)p.text(v.unit,60+width+16,384,48,p.orange,130);
+  p.text(v.exact+' Tokens',60,430,24,p.soft);
+  p.text('调用次数',60,508,28,p.soft);p.text(v.requestsText+' 次',940,508,38,p.ink,600,'right');p.rule(544);
+  if(cover){
+    p.text('主力工具',60,600,24,p.soft,610);p.text(v.topTool,60,642,34,p.ink,610);
+    p.text(v.topModel,60,718,26,p.soft,610);drawCodeBadge(ctx,codeImage,748,580,192);
+  }else{
+    [['输入（不含缓存）',v.inputText],['输出',v.outputText],['缓存读取',v.cacheReadText],['缓存写入',v.cacheWriteText]].forEach(([label,value],i)=>{
+      const y=610+i*70;p.text(label,60,y,28,p.soft,560);p.text(value,940,y,34,p.ink,360,'right');
+    });
+    p.rule(864);p.text('主力工具',60,920,24,p.soft);p.text(v.topTool,60,966,36,p.ink,590);
+    p.text('主力模型',60,1054,24,p.soft);p.text(v.topModel,60,1100,32,p.ink,590);
+    drawCodeBadge(ctx,codeImage,688,950,252);p.text('长按识别小程序码',814,1230,24,p.soft,310,'center');
+  }
+  p.text(v.day+' · 北京时间 · 含缓存 · 分享时的记录',60,H-20,20,p.soft);
+}
+module.exports = { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster, drawDailyPoster };

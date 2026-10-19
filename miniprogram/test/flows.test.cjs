@@ -55,6 +55,15 @@ function page(name, overrides = {}, wxOverrides = {}) {
   return { p: instance, timers, navigation, pages, api, wx };
 }
 
+test('日报公开卡片免登录展示原作者指定日期，转发保留作者，不公开私有日报与续订入口',async()=>{
+  let logins=0;
+  const record={id:'d'.repeat(24),style:'daily',user:{nickname:'原作者'},usage:{...usageData('day',258000000),from:'2026-10-18',to:'2026-10-18',report_day:'2026-10-18'}};
+  const {p}=page('record',{sharedRecord:async()=>record,ensureLogin:async()=>{logins++;throw Error('not needed');}});
+  p.onLoad({id:record.id});await p.onShow();assert.equal(logins,0);assert.equal(p.data.dailyReport.day,'2026-10-18');assert.equal(p.data.dailyReport.value,'2.58');assert.equal(p.data.record.user.nickname,'原作者');
+  assert.equal(p.onShareAppMessage().path,'/pages/record/record?id='+record.id);assert.match(p.onShareAppMessage().title,/原作者.*10.18.*2.58亿/);
+  const template=fs.readFileSync(path.join(root,'pages/record/record.wxml'),'utf8');assert.doesNotMatch(template,/subscribeNextDaily|reminder_id/);assert.match(template,/去看我的用量/);
+});
+
 test('导航拆为群榜、广场、我的，所有页面均已注册', () => {
   const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json')));
   assert.deepEqual(app.tabBar.list.map(x => x.text), ['群榜', '广场', '我的']);

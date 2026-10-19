@@ -59,6 +59,12 @@ export async function createShare(env, user, usage, style = 'usage', source = nu
       tools: style === 'tools' ? shareTools(usage) : usage.tools.filter(t => !t.unclassified).slice(0, 1), activity: usage.activity, standing: usage.standing },
   };
   if (style === 'tools') snapshot.style = 'tools';
+  if (style === 'daily') {
+    snapshot.style = 'daily';
+    snapshot.usage.report_day = usage.day;
+    snapshot.usage.models = usage.models.filter(item => !item.unclassified).slice(0,1);
+    for (const key of ['input_tokens','output_tokens','cache_read','cache_write']) snapshot.usage.summary[key] = usage.summary[key];
+  }
   if (style === 'weekly') {
     snapshot.style = 'weekly';
     const week = usage.weekly;

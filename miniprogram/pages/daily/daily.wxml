@@ -5,6 +5,11 @@
     <view class="day-nav"><button bindtap="switchDay" data-day="{{report.previous_day}}" disabled="{{!report.previous_day}}">前一天</button><text>{{report.dateText}}</text><button bindtap="switchDay" data-day="{{report.next_day}}" disabled="{{!report.next_day}}">后一天</button></view>
     <view wx:if="{{!report.has_history}}" class="state"><view>这一天还没有同步记录。</view><button class="btn btn-ghost" bindtap="goConnect">查看电脑同步</button></view>
       <view wx:if="{{report.has_history}}" class="summary"><view class="label">Token 总量 · 含缓存</view><view class="amount num-font">{{report.value}}<text>{{report.unit}}</text></view><view class="exact num-font">{{report.exact}} Tokens</view><view class="calls"><text>调用次数</text><text class="num-font">{{report.requestsText}} 次</text></view></view>
+      <view wx:if="{{report.has_history}}" class="daily-sharing">
+        <view class="share-actions"><button class="btn btn-primary" open-type="share" disabled="{{!record || sharePreparing}}" loading="{{sharePreparing}}">转发日报</button><button class="btn btn-ghost" bindtap="shareDailyImage" disabled="{{!socialPosterPath}}">分享图片</button></view>
+        <view wx:if="{{shareError}}" class="share-error">{{shareError}}<button class="text-button" bindtap="retryShare">重试分享</button></view>
+        <view wx:if="{{socialImageError}}" class="share-error">{{socialImageError}}<button class="text-button" bindtap="buildSocialImages">重试图片</button></view>
+      </view>
       <view class="renewal">
         <view class="renewal-title">{{reminder.item.booked ? '下次日报已预约' : '下一次日报'}}</view>
         <view wx:if="{{reminder.loading}}" class="renewal-note">正在读取提醒设置…</view>
@@ -35,3 +40,4 @@
   </block>
 </view>
 <privacy-notice />
+<canvas type="2d" id="socialCanvas" class="export-canvas"></canvas>

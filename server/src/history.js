@@ -65,7 +65,9 @@ export async function dailyReport(env, userId, value, now = Date.now()) {
   if (!validDay(day) || day >= beijingDay(now)) return jsonError(400, '请选择已经结束的日期');
   const source = await ownRows(env, userId, day, day);
   if (source instanceof Response) return source;
-  return Response.json({ ...buildDaily(source.rows, day), first_day: source.history.first_day,
+  const usage = buildDaily(source.rows, day);
+  const snapshot = await digest([day,usage.summary,usage.tools,usage.models]);
+  return Response.json({ ...usage, snapshot, first_day: source.history.first_day,
     previous_day: source.history.first_day && day > source.history.first_day ? addDays(day, -1) : null,
     next_day: addDays(day, 1) < beijingDay(now) ? addDays(day, 1) : null });
 }

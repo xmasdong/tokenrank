@@ -1,5 +1,5 @@
 const { loadCodeImage } = require('./share-code');
-const { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster } = require('./social-poster');
+const { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster, drawDailyPoster } = require('./social-poster');
 function socialImages(wx, api) {
   return {
     resetSocialImages() {
@@ -27,7 +27,7 @@ function socialImages(wx, api) {
           if (!cover && this._socialCoverOnly) break;
           canvas.width = 1000; canvas.height = cover ? 800 : SOCIAL_HEIGHT;
           const options = { ...record, cover, codeImage, avatarImages, avatarImage: avatarImages[record.user.avatar_url] };
-          (record.style === 'comparison' ? drawComparisonPoster : record.style === 'weekly' ? drawWeeklyPoster : drawToolsPoster)(canvas.getContext('2d'), options);
+          (record.style === 'daily' ? drawDailyPoster : record.style === 'comparison' ? drawComparisonPoster : record.style === 'weekly' ? drawWeeklyPoster : drawToolsPoster)(canvas.getContext('2d'), options);
           const file = await new Promise((resolve, reject) => wx.canvasToTempFilePath({ canvas, destWidth: 1000, destHeight: canvas.height,
             fileType: 'png', success: res => resolve(res.tempFilePath), fail: reject }));
           if (!current()) return;

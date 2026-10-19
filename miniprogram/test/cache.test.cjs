@@ -97,3 +97,9 @@ test('默认昨日与显式日期复用日报缓存，强制刷新读新数据�
  await resolve(f,f.api.daily('2026-10-15',{force:true}),{day:'2026-10-15',summary:{tokens:2}});assert.equal(f.calls.length,2);
  f.advance(86400000);const next=f.api.daily();assert.match(f.calls.at(-1).url,/day=2026-10-16/);await resolve(f,next,{day:'2026-10-16'});assert.equal(f.calls.length,3);
 });
+test('日报分享按日期和数据版本复用，刷新后更新，提醒预约不造成重复分享请求',async()=>{
+ const f=fixture(),data={day:'2026-10-15',day_snapshot:'a'.repeat(64)};
+ await resolve(f,f.api.daily(data.day),{day:data.day,snapshot:data.day_snapshot});await resolve(f,f.api.createDailyShare(data),{id:'a'.repeat(24)});await f.api.createDailyShare(data);assert.equal(f.calls.length,2);
+ await resolve(f,f.api.reserveReminder('daily','request_fixture_0001'),{kinds:[]});await f.api.createDailyShare(data);assert.equal(f.calls.length,3);
+ await resolve(f,f.api.daily(data.day,{force:true}),{day:data.day,snapshot:'b'.repeat(64)});await resolve(f,f.api.createDailyShare({...data,day_snapshot:'b'.repeat(64)}),{id:'b'.repeat(24)});assert.equal(f.calls.length,5);
+});

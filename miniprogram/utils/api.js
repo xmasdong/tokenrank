@@ -406,6 +406,7 @@ module.exports = {
   calendar: (month, options) => read(calendarPath(month), options),
   weekly: (week, options) => read(weeklyPath(week), options),
   createWeeklyShare: (data, options) => derived('/api/shares', { ...data, style: 'weekly' }, options, ['/api/me']),
+  createDailyShare: (data, options) => derived('/api/shares', { ...data, style: 'daily' }, options, ['/api/me',dailyPath(data.day)]),
   trends: (query, options) => read(trendsPath(query), options, { auth: false }),
   revokeShare: id => mutate('/api/shares/' + encodeURIComponent(id) + '/revoke', { method: 'POST' }),
 
