@@ -20,7 +20,7 @@
         <block wx:elif="{{reminder.error}}"><view class="renewal-note error">{{reminder.error}}</view><button class="btn btn-ghost" bindtap="reloadDailyReminder">重试读取</button></block>
         <block wx:elif="{{reminder.item.available && reminder.hasReported}}">
           <view class="renewal-note">{{reminder.item.timeText}}（北京时间）<view>{{reminder.item.dayText}} 用量摘要</view></view>
-          <button wx:if="{{reminder.item.canBook}}" class="btn btn-primary" bindtap="subscribeNextDaily" loading="{{reminder.busy}}" disabled="{{reminder.busy}}">接收下一次日报</button>
+          <button wx:if="{{reminder.item.canBook}}" class="btn btn-ghost" bindtap="subscribeNextDaily" loading="{{reminder.busy}}" disabled="{{reminder.busy}}">接收下一次日报</button>
           <view wx:elif="{{reminder.item.sending}}" class="renewal-note">正在提交发送，请稍后刷新。</view>
           <view wx:if="{{!reminder.item.booked && !reminder.item.sending}}" class="renewal-footnote">每次授权接收一条。</view>
         </block>
