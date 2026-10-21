@@ -375,7 +375,7 @@ CREATE TABLE IF NOT EXISTS user_subscriptions (
   name TEXT NOT NULL,
   plan TEXT,
   price_minor INTEGER NOT NULL CHECK (price_minor > 0),
-  currency TEXT NOT NULL CHECK (currency IN ('CNY','USD')),
+  currency TEXT NOT NULL CHECK (currency IN ('CNY','USD','EUR','GBP','HKD','JPY')),
   cycle TEXT NOT NULL CHECK (cycle IN ('week','month','quarter','year','custom')),
   custom_days INTEGER,
   start_day TEXT NOT NULL,

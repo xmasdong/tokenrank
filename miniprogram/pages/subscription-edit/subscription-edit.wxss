@@ -16,8 +16,8 @@ page { background: var(--surface-muted); }
 .icon.ph { background: var(--surface-muted); color: var(--text-secondary); font-size: 18px; display: flex; align-items: center; justify-content: center; }
 .name { flex: 1; font-size: 18px; font-weight: 500; }
 .price-row { display: flex; align-items: center; gap: 8px; padding: 14px 0; border-bottom: 1rpx solid var(--separator); }
-.currency { width: auto !important; margin: 0 !important; padding: 0 14px; height: 40px; line-height: 40px; font-size: 20px; font-weight: 500; color: var(--text); background: var(--surface-muted); border-radius: 8px; }
-.currency::after { border: none; }
+.currency { display: flex; align-items: center; gap: 4px; padding: 0 12px; height: 40px; line-height: 40px; font-size: 20px; font-weight: 500; color: var(--text); background: var(--surface-muted); border-radius: 8px; }
+.caret { font-size: 11px; color: var(--text-muted); }
 .price { flex: 1; height: 40px; font-size: 26px; font-weight: 600; }
 .row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; border-bottom: 1rpx solid var(--separator); }
 .label { font-size: 14px; color: var(--text-secondary); }
@@ -36,6 +36,8 @@ page { background: var(--surface-muted); }
 .footnote { padding: 8px 4px 0; color: var(--text-muted); font-size: 12px; line-height: 1.8; text-align: center; }
 .bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1rpx solid var(--separator); z-index: 5; }
 .save { width: 100% !important; margin: 0 !important; }
+.bar.two { display: flex; gap: 10px; }
+.bar.two .save, .bar.two .next { flex: 1; width: auto !important; margin: 0 !important; }
 .mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 10; }
 .sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; background: var(--surface); border-radius: 20px 20px 0 0; padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
 .sheet-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1rpx solid var(--separator); font-size: 18px; font-weight: 500; }
@@ -43,3 +45,4 @@ page { background: var(--surface-muted); }
 .plan { display: flex; justify-content: space-between; align-items: center; min-height: 54px; font-size: 15px; border-bottom: 1rpx solid var(--separator); }
 .plan:last-child { border-bottom: none; }
 .plan-price { font-weight: 600; }
+.sheet-scroll { max-height: 60vh; }

@@ -6,35 +6,52 @@ const S = require('../utils/subscriptions');
 const item = (extra = {}) => ({ id: 'a'.repeat(32), name: 'Claude', plan: 'Max 20x', price_minor: 20000, currency: 'USD', cycle: 'month', custom_days: null,
   start_day: '2026-09-21', status: 'active', ended_day: null, notes: null, cycle_days: 30, daily_minor: 666.67, monthly_minor: 20293,
   yearly_minor: 243333, paid_periods: 2, spent_minor: 40000, next_renewal_day: '2026-11-20', ...extra });
-const listData = (items, extra = {}) => ({ today: '2026-10-21', items, summary: { currencies: [{ currency: 'USD', active_count: 1, daily_minor: 666.67,
-  monthly_minor: 20293, yearly_minor: 243333, spent_minor: 40000 }], active_count: 1, inactive_count: 0, limit: 30 },
+const FX = { base: 'USD', date: '2026-10-20', source: 'ECB', rates: { USD: 1, CNY: 6.678, EUR: 0.89166, GBP: 0.74925, HKD: 7.8487, JPY: 158.13 } };
+const listData = (items, extra = {}) => ({ today: '2026-10-21', fx: FX, items, suggestions: [], summary: { currencies: [{ currency: 'USD', active_count: 1, daily_minor: 666.67,
+  monthly_minor: 20293, yearly_minor: 243333, spent_minor: 40000 }], usd: { daily_minor: 666.67, monthly_minor: 20293, yearly_minor: 243333, spent_minor: 40000 },
+  active_count: 1, inactive_count: 0, limit: 30 },
   value: { ratio: 6.4, api_usd_micros: 1_294_610_000, usd_monthly_minor: 20293, cost_status: 'complete' }, ...extra });
 
-test('金额按币种格式化：整数去掉小数、千分位、每天成本保留两位', () => {
+test('金额按币种格式化，日元不带小数；换算按每美元单位数', () => {
   assert.equal(S.money(20000, 'USD'), '$200'); assert.equal(S.money(666.67, 'USD'), '$6.67'); assert.equal(S.money(5900, 'CNY'), '¥59');
-  assert.equal(S.money(243333, 'USD', 0), '$2,433'); assert.equal(S.money(1999, 'USD'), '$19.99');
-  const view = S.presentList(listData([item(), item({ id: 'b'.repeat(32), name: 'Cursor', plan: null, status: 'cancelled', ended_day: '2026-10-01', next_renewal_day: null, spent_minor: 2000 })]));
-  assert.equal(view.active.length, 1); assert.equal(view.inactive.length, 1);
-  assert.equal(view.active[0].title, 'Claude Max 20x'); assert.equal(view.active[0].meta, '$200/月 · 下次扣费 11-20'); assert.equal(view.active[0].daily, '$6.67');
-  assert.equal(view.inactive[0].title, 'Cursor'); assert.match(view.inactive[0].meta, /已取消/); assert.equal(view.inactive[0].initial, 'C');
-  assert.deepEqual(view.totals[0], { currency: 'USD', daily: '$6.67', monthly: '$203', yearly: '$2,433', spent: '$400', count: 1 });
-  assert.deepEqual(view.value, { api: '$1,295', plan: '$203', ratio: 6.4 });
-  assert.equal(S.presentList(listData([item()], { value: { ratio: null } })).value, null);
+  assert.equal(S.money(243333, 'USD', 0), '$2,433'); assert.equal(S.money(1999, 'USD'), '$19.99'); assert.equal(S.money(158130, 'JPY'), 'JP¥1,581');
+  assert.equal(S.money(1000, 'HKD'), 'HK$10'); assert.equal(Math.round(S.convert(2000, 'USD', 'CNY', FX)), 13356);
+  assert.equal(Math.round(S.convert(13356, 'CNY', 'EUR', FX)), 1783); assert.equal(S.convert(100, 'USD', 'XYZ', FX), null);
 });
 
-test('今天 Token 值、近 7 天回本格子、行内图标与按厂商归属的今日价值', () => {
+test('列表统一按显示单位换算；每行保留原币价格，切换单位只改显示', () => {
+  const data = listData([item(), item({ id: 'b'.repeat(32), name: 'Cursor', plan: null, status: 'cancelled', ended_day: '2026-10-01', next_renewal_day: null, spent_minor: 2000 })]);
+  const usd = S.presentList(data, 'USD');
+  assert.equal(usd.active[0].title, 'Claude Max 20x'); assert.equal(usd.active[0].meta, '$200/月 · 下次扣费 11-20'); assert.equal(usd.active[0].daily, '$6.67');
+  assert.match(usd.inactive[0].meta, /已取消/); assert.deepEqual(usd.total, { daily: '$6.67', monthly: '$203', yearly: '$2,433', spent: '$400', count: 1 });
+  assert.deepEqual(usd.value, { api: '$1,295', plan: '$203', ratio: 6.4 }); assert.equal(usd.fx, '');
+  const cny = S.presentList(data, 'CNY');
+  assert.equal(cny.active[0].meta, '$200/月 · 下次扣费 11-20'); assert.equal(cny.active[0].daily, '¥44.52'); assert.equal(cny.total.monthly, '¥1,355');
+  assert.equal(cny.displayLabel, '人民币'); assert.equal(cny.fx, '1 美元 = 6.678 人民币，欧洲央行 2026-10-20 参考汇率');
+  assert.match(S.presentList({ ...data, fx: { ...FX, source: 'fallback' } }, 'CNY').fx, /备用参考汇率/);
+  assert.equal(S.presentList(listData([item()], { value: { ratio: null } }), 'USD').value, null);
+});
+
+test('今天 Token 值、近 7 天回本格子、同厂商多个订阅合计、行内图标', () => {
   const days = Array.from({ length: 7 }, (_, i) => ({ day: `2026-10-${15 + i}`, api_usd_micros: i < 2 ? null : i * 10_000_000, paid_back: i < 2 ? null : i >= 4 }));
-  const view = S.presentList(listData([item({ today_usd_micros: 30_000_000, paid_back_today: true }), item({ id: 'c'.repeat(32), name: 'Cursor', plan: 'Pro', today_usd_micros: null, paid_back_today: null }),
-    item({ id: 'd'.repeat(32), name: '自建网关', plan: null })], { days, today_value: { api_usd_micros: 60_000_000, usd_daily_minor: 733.33, ratio: 8.2, paid_back: true } }));
+  const view = S.presentList(listData([item({ today_usd_micros: 30_000_000, paid_back_today: true, vendor_count: 2 }), item({ id: 'c'.repeat(32), name: 'Cursor', plan: 'Plus', today_usd_micros: null, paid_back_today: null }),
+    item({ id: 'd'.repeat(32), name: '自建网关', plan: null })], { days, today_value: { api_usd_micros: 60_000_000, usd_daily_minor: 733.33, ratio: 8.2, paid_back: true } }), 'USD');
   assert.deepEqual(view.today, { value: '$60', hasValue: true, daily: '$7.33', paid: true, ratio: 8.2, gap: '' });
   assert.deepEqual(view.week.cells.map(c => [c.label, c.value, c.state]), [['四', '—', 'none'], ['五', '—', 'none'], ['六', '$20', 'unpaid'], ['日', '$30', 'unpaid'], ['一', '$40', 'paid'], ['二', '$50', 'paid'], ['今天', '$60', 'paid']]);
   assert.equal(view.week.paidDays, 3);
-  assert.equal(view.active[0].icon, '/assets/subscriptions/claude.png'); assert.deepEqual(view.active[0].today, { value: '$30', paid: true });
+  assert.equal(view.active[0].icon, '/assets/subscriptions/claude.png'); assert.deepEqual(view.active[0].today, { value: '$30', paid: true, shared: '2 个订阅合计' });
   assert.equal(view.active[1].icon, '/assets/subscriptions/cursor.png'); assert.equal(view.active[1].today, null);
   assert.equal(view.active[2].icon, ''); assert.equal(view.active[2].initial, '自');
-  const short = S.presentList(listData([item()], { today_value: { api_usd_micros: 2_000_000, usd_daily_minor: 666.67, ratio: 0.3, paid_back: false } }));
+  const short = S.presentList(listData([item()], { today_value: { api_usd_micros: 2_000_000, usd_daily_minor: 666.67, ratio: 0.3, paid_back: false } }), 'USD');
   assert.equal(short.today.gap, '$4.67'); assert.equal(short.today.paid, false);
   for (const p of S.PRESETS) assert.ok(fs.existsSync(path.join(__dirname, '..', p.icon)), p.icon);
+});
+
+test('用量推测的订阅显示图标、用量和依据；综合给出估算提示', () => {
+  const view = S.presentList(listData([], { suggestions: [{ key: 'chatgpt', tokens: 1_234_000_000, evidence: ['codex', 'gpt-6.1-sol'] }, { key: 'other', tokens: 52_000, evidence: ['dsh', 'hy4-preview'] }, { key: 'unknown', tokens: 1 }] }), 'CNY');
+  assert.equal(view.empty, true);
+  assert.deepEqual(view.suggestions.map(s => [s.key, s.name, s.tokens, s.evidence]), [['chatgpt', 'ChatGPT', '12.34 亿', 'codex · gpt-6.1-sol'], ['other', '综合', '5.2 万', 'dsh · hy4-preview']]);
+  assert.equal(view.suggestions[1].icon, '/assets/subscriptions/other.png'); assert.match(view.suggestions[1].hint, /按月估算/);
 });
 
 test('表单校验名称、价格、自定义天数和开始日期；停用时带停用日期', () => {
@@ -96,11 +113,11 @@ test('添加页选预设填入套餐和价格，校验失败不提交，保存�
   await f.p.onLoad({});
   await f.p.save(); assert.equal(f.p.data.error, '请填写服务名称'); assert.equal(saved.length, 0);
   f.p.choosePreset({ currentTarget: { dataset: { index: 0 } } });
-  assert.equal(f.p.data.sheet.name, 'Claude'); assert.equal(f.p.data.sheet.icon, '/assets/subscriptions/claude.png'); assert.equal(f.p.data.sheet.plans[2].label, '$200/月');
-  f.p.choosePlan({ currentTarget: { dataset: { index: 2 } } }); assert.equal(f.p.data.sheet, null);
+  assert.equal(f.p.data.sheet.name, 'Claude'); assert.equal(f.p.data.sheet.icon, '/assets/subscriptions/claude.png'); assert.equal(f.p.data.sheet.plans[3].label, '$200/月'); assert.equal(f.p.data.sheet.plans[1].label, '$200/年');
+  f.p.choosePlan({ currentTarget: { dataset: { index: 3 } } }); assert.equal(f.p.data.sheet, null); assert.equal(f.p.data.form.cycle, 'month');
   assert.equal(f.p.data.icon, '/assets/subscriptions/claude.png'); assert.equal(f.p.data.selected, 'claude');
   assert.equal(f.p.data.form.name, 'Claude'); assert.equal(f.p.data.form.plan, 'Max 20x'); assert.equal(f.p.data.form.price, '200'); assert.equal(f.guards.length, 1);
-  f.p.toggleCurrency(); assert.equal(f.p.data.symbol, '¥'); f.p.toggleCurrency(); assert.equal(f.p.data.form.currency, 'USD');
+  f.p.pickCurrency({ detail: { value: '0' } }); assert.equal(f.p.data.symbol, '¥'); f.p.pickCurrency({ detail: { value: '1' } }); assert.equal(f.p.data.form.currency, 'USD');
   await f.p.save(); assert.equal(saved[0].price, 200); assert.equal(saved[0].currency, 'USD'); assert.deepEqual(f.navigation, ['back']); assert.equal(f.guards.at(-1), 'off');
 });
 
@@ -113,4 +130,19 @@ test('编辑页读取已有订阅，可删除；删除失败显示错误不返�
   assert.deepEqual(deleted, ['a'.repeat(32)]); assert.match(f.p.data.error, /不存在/); assert.deepEqual(f.navigation, []); assert.equal(f.p.data.busy, false);
   const missing = pageFixture('subscription-edit/subscription-edit.js', baseApi({ peekSubscriptions: () => listData([]) }));
   await missing.p.onLoad({ id: 'b'.repeat(32) }); assert.match(missing.p.data.error, /不存在/);
+});
+
+test('从用量建议进入直接弹出套餐；综合只填名称；保存并继续添加清空表单留在本页', async () => {
+  const saved = [];
+  const api = baseApi({ createSubscription: async body => { saved.push(body); return listData([item()]); } });
+  const f = pageFixture('subscription-edit/subscription-edit.js', api);
+  await f.p.onLoad({ preset: 'chatgpt' });
+  assert.equal(f.p.data.sheet.name, 'ChatGPT'); assert.deepEqual(f.p.data.sheet.plans.map(p => p.label), ['$8/月', '$20/月', '$100/月', '$200/月', '$500/月']);
+  f.p.closeSheet(); f.p.choosePreset({ currentTarget: { dataset: { index: S.PRESETS.findIndex(p => p.key === 'other') } } });
+  assert.equal(f.p.data.form.name, '综合'); assert.equal(f.p.data.form.plan, '按月估算'); assert.equal(f.p.data.form.price, ''); assert.equal(f.p.data.icon, '/assets/subscriptions/other.png');
+  f.p.input({ currentTarget: { dataset: { field: 'price' } }, detail: { value: '300' } });
+  f.p.pickCurrency({ detail: { value: '0' } }); assert.equal(f.p.data.form.currency, 'CNY'); assert.equal(f.p.data.symbol, '¥');
+  await f.p.saveAndNext();
+  assert.equal(saved[0].name, '综合'); assert.equal(saved[0].currency, 'CNY'); assert.deepEqual(f.navigation, []);
+  assert.equal(f.p.data.form.name, ''); assert.equal(f.p.data.added, 1); assert.equal(f.guards.at(-1), 'off');
 });

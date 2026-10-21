@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import worker from '../src/worker.js';
-import { subscriptionFigures, normalizeSubscription, SUBSCRIPTION_LIMIT } from '../src/subscriptions.js';
+import { subscriptionFigures, normalizeSubscription, suggestSubscriptions, getRates, FALLBACK_RATES, SUBSCRIPTION_LIMIT } from '../src/subscriptions.js';
 import { beijingDay, beijingDaysAgo } from '../src/lib.js';
 
 function fixture(t) {
@@ -19,6 +19,8 @@ function fixture(t) {
       async run() { return { meta: { changes: db.prepare(sql).run(params()).changes } }; } };
   }
   const env = { DB: { prepare } };
+  // No network in tests: the rate lookup falls back to the dated reference set.
+  const realFetch = globalThis.fetch; globalThis.fetch = async () => new Response('', { status: 503 }); t.after(() => { globalThis.fetch = realFetch; });
   for (const id of [1, 2]) {
     db.prepare('INSERT INTO users(id,openid,created_at,updated_at) VALUES(?,?,1,1)').run(id, 'private-' + id);
     db.prepare('INSERT INTO mp_sessions VALUES(?,?,?)').run('session-' + id, id, Date.now() + 86400000);
@@ -46,7 +48,7 @@ test('拒绝空名称、非数字或越界价格、未知币种与周期、未�
   const today = '2026-10-21', ok = { name: ' Cursor ', price: 19.99, currency: 'USD', cycle: 'month', start_day: '2026-10-01' };
   const { value } = normalizeSubscription(ok, today);
   assert.equal(value.name, 'Cursor'); assert.equal(value.price_minor, 1999); assert.equal(value.status, 'active'); assert.equal(value.ended_day, null);
-  for (const bad of [{ name: '' }, { name: 'x'.repeat(41) }, { price: 0 }, { price: '20' }, { price: 2e6 }, { currency: 'EUR' }, { cycle: 'daily' },
+  for (const bad of [{ name: '' }, { name: 'x'.repeat(41) }, { price: 0 }, { price: '20' }, { price: 2e9 }, { currency: 'XYZ' }, { cycle: 'daily' },
     { cycle: 'custom' }, { cycle: 'custom', custom_days: 0 }, { start_day: '2026-10-22' }, { start_day: '2026-02-30' },
     { status: 'cancelled', ended_day: '2026-09-01' }, { status: 'gone' }, { notes: 'x'.repeat(101) }]) {
     assert.ok(normalizeSubscription({ ...ok, ...bad }, today).error, JSON.stringify(bad));
@@ -102,8 +104,10 @@ test('近 30 天 API 等值估算只和美元订阅月费比较，没有费用�
     VALUES(1,'device-1',?,1000,10,10,980,0,5,'[]','[]',1,1,?)`).run(beijingDaysAgo(40), JSON.stringify(cost));
   data = await (await f.request('GET')).json();
   assert.equal(data.value.api_usd_micros, 1_294_610_000); assert.equal(data.value.ratio, 6.4); assert.equal(data.value.from, beijingDaysAgo(29));
+  // A CNY plan joins the comparison at the reference rate: $202.93 + ¥199 / 6.678 a month.
   await f.request('POST', { name: 'Kimi', price: 199, currency: 'CNY', cycle: 'month', start_day: beijingDay() });
-  assert.equal((await (await f.request('GET')).json()).value.ratio, 6.4);
+  data = await (await f.request('GET')).json();
+  assert.equal(data.value.ratio, 5.6); assert.equal(data.fx.source, 'fallback'); assert.equal(data.summary.usd.monthly_minor, 23317);
 });
 
 test('近 7 天每天的 API 等值和是否回本；按厂商归属今天的价值，Cursor 这类多模型工具不归属', async t => {
@@ -126,6 +130,73 @@ test('近 7 天每天的 API 等值和是否回本；按厂商归属今天的价
   assert.equal(data.today_value.ratio, 4.8); assert.equal(data.today_value.paid_back, true);
   assert.equal(data.days[5].paid_back, false); assert.equal(data.days[0].api_usd_micros, null); assert.equal(data.days[0].paid_back, null);
   const byName = Object.fromEntries(data.items.map(i => [i.name, i]));
-  assert.equal(byName.Claude.provider, 'anthropic'); assert.equal(byName.Claude.today_usd_micros, 30_000_000); assert.equal(byName.Claude.paid_back_today, true);
-  assert.equal(byName.Cursor.provider, null); assert.equal(byName.Cursor.today_usd_micros, null); assert.equal(byName.Cursor.paid_back_today, null);
+  assert.equal(byName.Claude.provider, 'claude'); assert.equal(byName.Claude.today_usd_micros, 30_000_000); assert.equal(byName.Claude.paid_back_today, true);
+  assert.equal(byName.Cursor.provider, 'cursor'); assert.equal(byName.Cursor.today_usd_micros, null); assert.equal(byName.Cursor.paid_back_today, null);
+});
+
+test('同一厂商多个订阅合并判断回本，今日价值不重复计算', async t => {
+  const f = fixture(t);
+  await f.request('POST', claude({ plan: 'Max 20x', price: 200 }));
+  await f.request('POST', claude({ plan: 'Pro', price: 20 }));
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 70_000_000, models: [['claude-opus-5-5', 70_000_000]], unpriced_models: [], unpriced_tokens: 0 };
+  f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
+    VALUES(1,'device-1',?,1000,10,10,980,0,5,'[]','[]',1,1,?)`).run(beijingDay(), JSON.stringify(cost));
+  let data = await (await f.request('GET')).json();
+  // $70 today against $6.67 + $0.67 a day for the two Claude plans together
+  for (const item of data.items) { assert.equal(item.vendor_count, 2); assert.equal(item.today_usd_micros, 70_000_000); assert.equal(item.paid_back_today, true); }
+  assert.equal(data.today_value.ratio, 9.5);
+  await f.request('POST', { name: 'Claude', plan: 'Team', price: 30000, currency: 'USD', cycle: 'month', start_day: beijingDaysAgo(1) });
+  data = await (await f.request('GET')).json();
+  assert.ok(data.items.every(i => i.vendor_count === 3 && i.paid_back_today === false));
+});
+
+test('按近 7 天的工具和模型推测订阅：同一份用量不重复计，无法归属的进入综合，已订阅的不再推荐', () => {
+  const row = (tools, models) => ({ day: '2026-10-20', tools_json: JSON.stringify(tools), models_json: JSON.stringify(models) });
+  const rows = [row([['codex', 900], ['claude-code', 300], ['cursor', 50], ['workbuddy', 40]],
+    [['gpt-6.1-sol', 900], ['claude-opus-5-5', 300], ['wecoding/claude-sonnet-5-5', 50], ['workbuddy/hy4-preview', 40]]),
+    row([['zcode', 70]], [['zhipu-anthropic/glm-5.3', 70]])];
+  const list = suggestSubscriptions(rows, new Set());
+  assert.deepEqual(list.map(s => [s.key, s.tokens]), [['chatgpt', 900], ['claude', 350], ['glm', 70], ['cursor', 50], ['other', 40]]);
+  assert.deepEqual(list.find(s => s.key === 'claude').evidence, ['claude-code', 'claude-opus-5-5', 'claude-sonnet-5-5']);
+  assert.deepEqual(list.at(-1).evidence, ['hy4-preview']);
+  assert.deepEqual(suggestSubscriptions(rows, new Set(['chatgpt', 'other'])).map(s => s.key), ['claude', 'glm', 'cursor']);
+});
+
+test('汇率取 ECB 参考价并缓存，失败或缺币种时用标注过日期的备用汇率', async t => {
+  const realFetch = globalThis.fetch; t.after(() => { globalThis.fetch = realFetch; });
+  globalThis.fetch = async () => Response.json({ date: '2026-10-21', rates: { CNY: 6.7, EUR: 0.9, GBP: 0.75, HKD: 7.85, JPY: 158 } });
+  const fx = await getRates();
+  assert.equal(fx.source, 'ECB'); assert.equal(fx.rates.CNY, 6.7); assert.equal(fx.rates.USD, 1);
+  globalThis.fetch = async () => Response.json({ date: '2026-10-21', rates: { CNY: 6.7 } });
+  assert.equal(await getRates(), FALLBACK_RATES);
+  globalThis.fetch = async () => { throw new Error('offline'); };
+  assert.equal(await getRates(), FALLBACK_RATES);
+});
+
+test('0016 迁移重建表后保留已有订阅，并允许欧元、港币等币种', () => {
+  const db = new DatabaseSync(':memory:');
+  const schema = readFileSync(new URL('../schema.sql', import.meta.url), 'utf8');
+  db.exec(schema.slice(0, schema.indexOf('-- Private ledger of a user')));
+  db.exec(readFileSync(new URL('../migrations/0015_user_subscriptions.sql', import.meta.url), 'utf8'));
+  db.prepare('INSERT INTO users(id,openid,created_at,updated_at) VALUES(1,?,1,1)').run('o');
+  db.prepare("INSERT INTO user_subscriptions(id,user_id,name,price_minor,currency,cycle,start_day,status,created_at,updated_at) VALUES('a',1,'Claude',2000,'USD','month','2026-10-01','active',1,1)").run();
+  assert.throws(() => db.prepare("INSERT INTO user_subscriptions(id,user_id,name,price_minor,currency,cycle,start_day,status,created_at,updated_at) VALUES('b',1,'X',100,'EUR','month','2026-10-01','active',1,1)").run());
+  db.exec(readFileSync(new URL('../migrations/0016_subscription_currencies.sql', import.meta.url), 'utf8'));
+  db.prepare("INSERT INTO user_subscriptions(id,user_id,name,price_minor,currency,cycle,start_day,status,created_at,updated_at) VALUES('b',1,'X',100,'EUR','month','2026-10-01','active',1,1)").run();
+  assert.equal(db.prepare('SELECT COUNT(*) n FROM user_subscriptions').get().n, 2);
+  assert.throws(() => db.prepare("INSERT INTO user_subscriptions(id,user_id,name,price_minor,currency,cycle,start_day,status,created_at,updated_at) VALUES('c',2,'X',100,'EUR','month','2026-10-01','active',1,1)").run(), /ACCOUNT_NOT_FOUND/);
+  db.close();
+});
+
+test('没有对应厂商的模型用量归入「综合」，用来判断综合这一项是否回本', async t => {
+  const f = fixture(t);
+  await f.request('POST', { name: '综合', plan: '按月估算', price: 300, currency: 'CNY', cycle: 'month', start_day: beijingDaysAgo(3) });
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 3_000_000, models: [['deepseek-v4.1-flash', 1_000_000], ['claude-opus-5-5', 2_000_000]], unpriced_models: [], unpriced_tokens: 0 };
+  f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
+    VALUES(1,'device-1',?,1000,10,10,980,0,5,'[]','[]',1,1,?)`).run(beijingDay(), JSON.stringify(cost));
+  const item = (await (await f.request('GET')).json()).items[0];
+  // ¥300 / 30 days / 6.678 = $1.50 a day against $1.00 of DeepSeek today
+  assert.equal(item.provider, 'other'); assert.equal(item.today_usd_micros, 1_000_000); assert.equal(item.paid_back_today, false);
 });

@@ -8,7 +8,7 @@
           <image class="tpl-icon" src="{{item.icon}}" mode="aspectFit" /><text class="tpl-name">{{item.name}}</text>
         </view>
       </view>
-      <view class="hint">美元套餐为参考价，Kimi 和智谱请按实际账单填写。</view>
+      <view class="hint">套餐价格于 2026-10-21 按官网核对，可能有优惠或调价，请按实际扣款修改；没有对应订阅的用量选「综合」，按月估算填写。<text wx:if="{{added}}">本次已添加 {{added}} 个。</text></view>
     </block>
     <view class="card">
       <view class="name-row">
@@ -16,7 +16,7 @@
         <input class="name" value="{{form.name}}" data-field="name" bindinput="input" maxlength="40" placeholder="服务名称" disabled="{{busy}}" />
       </view>
       <view class="price-row">
-        <button class="currency" bindtap="toggleCurrency" disabled="{{busy}}" aria-label="切换币种">{{symbol}}</button>
+        <picker range="{{currencyLabels}}" value="{{currencyIndex}}" bindchange="pickCurrency" disabled="{{busy}}"><view class="currency" aria-label="选择币种">{{symbol}}<text class="caret">▾</text></view></picker>
         <input class="price num" type="digit" value="{{form.price}}" data-field="price" bindinput="input" placeholder="0.00" disabled="{{busy}}" />
       </view>
       <view class="row"><text class="label">套餐</text><input class="row-input" value="{{form.plan}}" data-field="plan" bindinput="input" maxlength="30" placeholder="选填，如 Max" disabled="{{busy}}" /></view>
@@ -33,13 +33,13 @@
     <view class="card"><textarea class="notes" value="{{form.notes}}" data-field="notes" bindinput="input" maxlength="100" placeholder="备注（选填）" disabled="{{busy}}" auto-height /></view>
     <button wx:if="{{id}}" class="text-button remove" bindtap="remove" disabled="{{busy}}">删除这条订阅</button>
     <view class="footnote">只记录你填写的金额，不连接任何支付账户，也不会替你取消订阅。</view>
-    <view class="bar"><button class="btn btn-primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">保存</button></view>
+    <view class="bar {{id ? '' : 'two'}}"><button wx:if="{{!id}}" class="btn btn-ghost next" bindtap="saveAndNext" disabled="{{busy}}">保存并继续添加</button><button class="btn btn-primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">{{id ? '保存' : '保存并返回'}}</button></view>
   </block>
   <view wx:if="{{error}}" class="notice error" role="alert">{{error}}</view>
 </view>
 <view wx:if="{{sheet}}" class="mask" bindtap="closeSheet"></view>
-<view wx:if="{{sheet}}" class="sheet">
+<view wx:if="{{sheet}}" class="sheet"><scroll-view scroll-y class="sheet-scroll">
   <view class="sheet-head"><image class="sheet-icon" src="{{sheet.icon}}" mode="aspectFit" /><text>{{sheet.name}}</text></view>
   <view wx:for="{{sheet.plans}}" wx:key="plan" class="plan" data-index="{{index}}" bindtap="choosePlan"><text>{{item.plan}}</text><text class="plan-price num">{{item.label}}</text></view>
-</view>
+</scroll-view></view>
 <privacy-notice />

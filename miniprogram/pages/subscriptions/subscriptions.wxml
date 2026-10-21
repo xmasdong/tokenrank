@@ -6,15 +6,24 @@
       <view class="description">记下 Claude、ChatGPT、Cursor 等订阅，算出每天花多少；再和电脑端统计的 Token 用量对照，看每天有没有用回本。</view>
       <button class="btn btn-primary wide" bindtap="add">添加订阅</button>
     </view>
-    <block wx:else>
-      <view wx:if="{{view.today}}" class="card today" data-om-id="today">
+    <view wx:if="{{view.suggestions.length}}" class="card suggest">
+      <view class="card-label">根据近 7 天的用量，你可能在用</view>
+      <view wx:for="{{view.suggestions}}" wx:key="key" class="sg" data-key="{{item.key}}" bindtap="addSuggested">
+        <image class="icon" src="{{item.icon}}" mode="aspectFit" />
+        <view class="body"><view class="title">{{item.name}}</view><view class="meta">{{item.hint || '近 7 天 ' + item.tokens + ' · ' + item.evidence}}</view><view wx:if="{{item.hint}}" class="meta">近 7 天 {{item.tokens}} · {{item.evidence}}</view></view>
+        <view class="sg-add">记一笔</view>
+      </view>
+    </view>
+    <block wx:if="{{!view.empty}}">
+      <view class="unit-bar"><text>金额单位</text><picker range="{{currencyLabels}}" value="{{currencyIndex}}" bindchange="pickDisplay"><view class="unit-pick">{{view.displayLabel}}<text class="caret">▾</text></view></picker></view>
+      <view wx:if="{{view.today}}" class="card today">
         <view class="card-label">今天 Token 值多少钱</view>
         <view class="today-row">
           <view><text class="big num">{{view.today.value}}</text></view>
           <view wx:if="{{view.today.paid === true}}" class="badge paid">已回本 {{view.today.ratio}} 倍</view>
           <view wx:elif="{{view.today.paid === false}}" class="badge unpaid">还差 {{view.today.gap}}</view>
         </view>
-        <view class="today-note">{{view.today.daily ? '美元订阅每天 ' + view.today.daily + ' · ' : ''}}按上报的模型价格估算</view>
+        <view class="today-note">{{view.today.daily ? '订阅每天 ' + view.today.daily + ' · ' : ''}}按上报的模型价格估算</view>
         <view wx:if="{{view.week.judged}}" class="week">
           <view wx:for="{{view.week.cells}}" wx:key="day" class="cell {{item.state}}"><text class="cell-label">{{item.label}}</text><text class="cell-value num">{{item.value}}</text></view>
         </view>
@@ -22,17 +31,17 @@
       </view>
       <view class="card">
         <view class="card-label">订阅每日成本</view>
-        <view wx:for="{{view.totals}}" wx:key="currency" class="total">
-          <view class="daily"><text class="mid num">{{item.daily}}</text><text class="per">/天</text><text class="count">{{item.count}} 个订阅中</text></view>
-          <view class="mini"><view><text class="mini-label">月均</text><text class="num">{{item.monthly}}</text></view><view><text class="mini-label">年均</text><text class="num">{{item.yearly}}</text></view><view><text class="mini-label">累计已花</text><text class="num">{{item.spent}}</text></view></view>
+        <view wx:if="{{view.total}}" class="total">
+          <view class="daily"><text class="mid num">{{view.total.daily}}</text><text class="per">/天</text><text class="count">{{view.total.count}} 个订阅中</text></view>
+          <view class="mini"><view><text class="mini-label">月均</text><text class="num">{{view.total.monthly}}</text></view><view><text class="mini-label">年均</text><text class="num">{{view.total.yearly}}</text></view><view><text class="mini-label">累计已花</text><text class="num">{{view.total.spent}}</text></view></view>
         </view>
-        <view wx:if="{{view.value}}" class="value">近 30 天 API 等值 <text class="num">{{view.value.api}}</text>，是美元订阅月费 <text class="num">{{view.value.plan}}</text> 的 <text class="ratio num">{{view.value.ratio}} 倍</text></view>
+        <view wx:if="{{view.value}}" class="value">近 30 天 API 等值 <text class="num">{{view.value.api}}</text>，是订阅月费 <text class="num">{{view.value.plan}}</text> 的 <text class="ratio num">{{view.value.ratio}} 倍</text></view>
       </view>
       <view wx:if="{{view.active.length}}" class="section">订阅中 <text>{{view.active.length}}</text></view>
       <view wx:for="{{view.active}}" wx:key="id" class="tile" bindtap="edit" data-id="{{item.id}}">
         <image wx:if="{{item.icon}}" class="icon" src="{{item.icon}}" mode="aspectFit" /><view wx:else class="icon ph">{{item.initial}}</view>
         <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view>
-          <view wx:if="{{item.today}}" class="today-tag {{item.today.paid === true ? 'paid' : item.today.paid === false ? 'unpaid' : ''}}">今天 {{item.today.value}}{{item.today.paid === true ? ' · 已回本' : item.today.paid === false ? ' · 未回本' : ''}}</view>
+          <view wx:if="{{item.today}}" class="today-tag {{item.today.paid === true ? 'paid' : item.today.paid === false ? 'unpaid' : ''}}">今天 {{item.today.value}}{{item.today.shared ? ' · ' + item.today.shared : ''}}{{item.today.paid === true ? ' · 已回本' : item.today.paid === false ? ' · 未回本' : ''}}</view>
         </view>
         <view class="cost"><view class="num">{{item.daily}}</view><view class="unit">每天</view></view>
       </view>
@@ -42,7 +51,8 @@
         <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view></view>
         <view class="cost"><view class="num">{{item.spent}}</view><view class="unit">累计</view></view>
       </view>
-      <view class="footnote">每天成本 = 每期价格 ÷ 周期天数，月均按 30.44 天、年均按 365 天换算，累计按开始日起已扣的期数计算。回本比较的是当天 API 等值估算和美元订阅的每日成本，只有 Claude、ChatGPT、Gemini 等单一厂商的订阅会单独归属当天用量。估算不代表实际账单。订阅只有你自己能看到，不进入排名和分享。</view>
+      <view wx:if="{{view.fx}}" class="footnote">按 {{view.fx}} 换算。</view>
+      <view class="footnote">每天成本 = 每期价格 ÷ 周期天数，月均按 30.44 天、年均按 365 天换算，累计按开始日起已扣的期数计算。回本比较的是当天 API 等值估算和全部订阅的每日成本；Claude、ChatGPT、Gemini、Kimi、智谱的订阅另按该厂商模型单独判断，同一厂商的多个订阅合并计算。估算不代表实际账单。订阅只有你自己能看到，不进入排名和分享。</view>
     </block>
   </block>
   <view wx:if="{{error}}" class="notice error" role="alert">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>

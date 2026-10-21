@@ -16,7 +16,7 @@ import { calendarReport, weeklyReport, dailyReport, validDay } from './history.j
 import { trendQuery, trendReport } from './trends.js';
 import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
 import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
-import { listSubscriptions, createSubscription, updateSubscription, deleteSubscription } from './subscriptions.js';
+import { listSubscriptions, createSubscription, updateSubscription, deleteSubscription, getRates } from './subscriptions.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -93,7 +93,7 @@ async function route(request, env, url, path) {
     if (!user) return withCors(jsonError(401, '请先登录'));
     if (user.disabled_at) return withCors(jsonError(403, '账号已停用'));
     const id = subscriptionPath[1];
-    if (!id && method === 'GET') return withCors(Response.json(await listSubscriptions(env, user.id)));
+    if (!id && method === 'GET') return withCors(Response.json(await listSubscriptions(env, user.id, Date.now(), await getRates())));
     if (id && method === 'DELETE') return withCors(await deleteSubscription(env, user.id, id));
     if (method !== 'POST') return withCors(jsonError(405, 'method not allowed'));
     const text = await request.text();
