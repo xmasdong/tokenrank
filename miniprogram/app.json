@@ -16,6 +16,8 @@
     "pages/account/account",
     "pages/reminders/reminders",
     "pages/email/email",
+    "pages/subscriptions/subscriptions",
+    "pages/subscription-edit/subscription-edit",
     "pages/daily/daily"
   ],
   "window": {

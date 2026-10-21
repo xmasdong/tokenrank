@@ -25,6 +25,7 @@ let readDay = '';
 let readRevision = 0;
 let reminderVersion = 0;
 let emailVersion = 0;
+let subscriptionVersion = 0;
 
 function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
@@ -68,11 +69,12 @@ function read(path, options = {}, requestOptions = {}, cachePath = path) {
     if (value) return Promise.resolve(value);
   } else readCache.delete(key);
   if (pendingReads.has(key)) return pendingReads.get(key);
-  const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion;
+  const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion, subscriptionReadVersion = subscriptionVersion;
   const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(cachePath);
     if (epoch === readEpoch && key === currentKey && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion) &&
-      (cachePath !== '/api/email-registration' || emailReadVersion === emailVersion)) {
+      (cachePath !== '/api/email-registration' || emailReadVersion === emailVersion) &&
+      (cachePath !== '/api/subscriptions' || subscriptionReadVersion === subscriptionVersion)) {
       // Bound memory when a user opens many groups in one session.
       if (readCache.size >= 100) readCache.delete(readCache.keys().next().value);
       readCache.set(key, { value, at: Date.now(), revision: ++readRevision });
@@ -107,6 +109,15 @@ async function emailMutation(options) {
   assertActive(epoch);
   const key = cacheKey('/api/email-registration');
   emailVersion++; pendingReads.delete(key);
+  readCache.set(key, { value: result, at: Date.now(), revision: ++readRevision });
+  return result;
+}
+// The subscription ledger is private and does not change usage, boards or shares.
+async function subscriptionMutation(path, options) {
+  const epoch = authEpoch, result = await request(path, options);
+  assertActive(epoch);
+  const key = cacheKey('/api/subscriptions');
+  subscriptionVersion++; pendingReads.delete(key);
   readCache.set(key, { value: result, at: Date.now(), revision: ++readRevision });
   return result;
 }
@@ -441,6 +452,11 @@ module.exports = {
   peekDaily: day => peek(dailyPath(day)),
   daily: (day, options) => read(dailyPath(day), options),
   peekReminders: () => peek('/api/reminders'),
+  peekSubscriptions: () => peek('/api/subscriptions'),
+  subscriptions: options => read('/api/subscriptions', options),
+  createSubscription: data => subscriptionMutation('/api/subscriptions', { method: 'POST', data }),
+  updateSubscription: (id, data) => subscriptionMutation('/api/subscriptions/' + encodeURIComponent(id), { method: 'POST', data }),
+  deleteSubscription: id => subscriptionMutation('/api/subscriptions/' + encodeURIComponent(id), { method: 'DELETE' }),
   peekEmailRegistration: () => peek('/api/email-registration'),
   emailRegistration: options => read('/api/email-registration', options),
   saveEmailRegistration: data => emailMutation({ method: 'POST', data }),

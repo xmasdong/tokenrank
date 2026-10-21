@@ -191,6 +191,16 @@ node --test miniprogram/test/*.test.cjs
 
 接口：`GET /api/my/calendar?month=YYYY-MM` 与 `GET /api/my/weekly?week=YYYY-MM-DD` 仅允许本人会话；`week` 必须是周一，省略时取上个完整周。`GET /api/insights/trends?period=week|month&dimension=tools|models&metric=users|tokens&end=YYYY-MM-DD` 允许匿名读取；续页携带 `offset` 和 `snapshot`。`POST /api/shares` 的 `style=weekly` 必须携带 `week` 与读取周报得到的 `week_snapshot`，可选 `group_id`；数据变化返回 `409/WEEK_CHANGED`。GET 只读已有日桶，不触发重算或清理；生成分享仅写入本人的摘要快照。继续复用现有 0011 表结构和 0.2.16 同步数据，无需数据库迁移或客户端升级。
 
+## 我的订阅
+
+「我的 → 我的订阅」记录用户为 AI 工具付的订阅费，交互参考本地「超值」App：首页是订阅中的每日成本大数字，下面是月均、年均和累计已花；列表分订阅中和已停用，每行显示每期价格、下次扣费日和每天成本，点行编辑。添加页可点常用 AI 服务（Claude、ChatGPT、Cursor、GitHub Copilot、Google AI、Windsurf）选套餐，自动填入参考价、美元和每月周期，参考价以实际账单为准，可修改。
+
+- 换算：每天成本 = 每期价格 ÷ 周期天数（周 7、月 30、季 91、年 365、自定义 1–3650 天）；月均按 30.44 天、年均按 365 天。累计按开始日起已扣期数计算，续费当天计入新一期；暂停或取消后按停用日期截止。
+- 人民币和美元分开汇总，不做汇率换算。
+- 有美元订阅且近 30 天有费用数据时，显示「API 等值估算是美元订阅月费的几倍」，估算来自电脑端统计，不代表实际账单。
+- 订阅只在本人会话中读写，不进入排名、分享或公开分析；每人最多 30 条；注销账号时一并删除。金额以分／美分整数保存在 `user_subscriptions`（`0015_user_subscriptions.sql`）。
+- 接口：`GET/POST /api/subscriptions`，`POST/DELETE /api/subscriptions/:id`，均返回完整列表与汇总；小程序缓存直接写回，不清空用量缓存。
+
 ## 用量日报与消息提醒
 
 「我的 → 昨日用量日报」查看昨天的含缓存总量、调用次数、工具／模型与缓存明细。日历内可查看已结束日期的日报；微信消息携带固定日期，点开后展示该日期的数据。普通返回复用五分钟缓存，下拉刷新获取最新数据。

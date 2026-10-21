@@ -1,0 +1,36 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在读取订阅…</view>
+  <block wx:elif="{{view}}">
+    <view wx:if="{{!view.active.length && !view.inactive.length}}" class="empty">
+      <view class="empty-title">记下你为 AI 付的钱</view>
+      <view class="description">把 Claude、ChatGPT、Cursor 等订阅记下来，自动算出每天、每月和每年的花费，以及从开始到现在一共花了多少。</view>
+      <button class="btn btn-primary add" bindtap="add">添加订阅</button>
+    </view>
+    <block wx:else>
+      <view class="overview">
+        <view class="overview-label">订阅中的每日成本</view>
+        <view wx:for="{{view.totals}}" wx:key="currency" class="total">
+          <view class="daily"><text class="num">{{item.daily}}</text><text class="per">/天</text><text wx:if="{{item.count}}" class="count">{{item.count}} 个订阅</text></view>
+          <view class="mini"><view><text class="mini-label">月均</text><text class="num">{{item.monthly}}</text></view><view><text class="mini-label">年均</text><text class="num">{{item.yearly}}</text></view><view><text class="mini-label">累计已花</text><text class="num">{{item.spent}}</text></view></view>
+        </view>
+        <view wx:if="{{view.value}}" class="value">近 30 天 API 等值估算 <text class="num">{{view.value.api}}</text>，是美元订阅月费 <text class="num">{{view.value.plan}}</text> 的 <text class="ratio num">{{view.value.ratio}} 倍</text></view>
+      </view>
+      <view wx:if="{{view.active.length}}" class="section">订阅中 <text>{{view.active.length}}</text></view>
+      <view wx:for="{{view.active}}" wx:key="id" class="row" bindtap="edit" data-id="{{item.id}}">
+        <view class="mark">{{item.initial}}</view>
+        <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view></view>
+        <view class="cost"><view class="num">{{item.daily}}</view><view class="unit">每天</view></view>
+      </view>
+      <view wx:if="{{view.inactive.length}}" class="section">已停用 <text>{{view.inactive.length}}</text></view>
+      <view wx:for="{{view.inactive}}" wx:key="id" class="row dim" bindtap="edit" data-id="{{item.id}}">
+        <view class="mark">{{item.initial}}</view>
+        <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view></view>
+        <view class="cost"><view class="num">{{item.spent}}</view><view class="unit">累计</view></view>
+      </view>
+      <view class="footnote">每天成本 = 每期价格 ÷ 周期天数；月均按 30.44 天、年均按 365 天换算。累计按开始日期起已扣的期数计算。人民币和美元分开统计。API 等值估算来自电脑端统计，不代表实际账单。订阅只有你自己能看到，不进入排名和分享。</view>
+      <view class="bottom"><button class="btn btn-primary add" bindtap="add">添加订阅</button></view>
+    </block>
+  </block>
+  <view wx:if="{{error}}" class="notice error" role="alert">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
+</view>
+<privacy-notice />

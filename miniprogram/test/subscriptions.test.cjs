@@ -1,0 +1,98 @@
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs'), vm = require('node:vm'), path = require('node:path');
+const S = require('../utils/subscriptions');
+
+const item = (extra = {}) => ({ id: 'a'.repeat(32), name: 'Claude', plan: 'Max 20x', price_minor: 20000, currency: 'USD', cycle: 'month', custom_days: null,
+  start_day: '2026-09-21', status: 'active', ended_day: null, notes: null, cycle_days: 30, daily_minor: 666.67, monthly_minor: 20293,
+  yearly_minor: 243333, paid_periods: 2, spent_minor: 40000, next_renewal_day: '2026-11-20', ...extra });
+const listData = (items, extra = {}) => ({ today: '2026-10-21', items, summary: { currencies: [{ currency: 'USD', active_count: 1, daily_minor: 666.67,
+  monthly_minor: 20293, yearly_minor: 243333, spent_minor: 40000 }], active_count: 1, inactive_count: 0, limit: 30 },
+  value: { ratio: 6.4, api_usd_micros: 1_294_610_000, usd_monthly_minor: 20293, cost_status: 'complete' }, ...extra });
+
+test('金额按币种格式化：整数去掉小数、千分位、每天成本保留两位', () => {
+  assert.equal(S.money(20000, 'USD'), '$200'); assert.equal(S.money(666.67, 'USD'), '$6.67'); assert.equal(S.money(5900, 'CNY'), '¥59');
+  assert.equal(S.money(243333, 'USD', 0), '$2,433'); assert.equal(S.money(1999, 'USD'), '$19.99');
+  const view = S.presentList(listData([item(), item({ id: 'b'.repeat(32), name: 'Cursor', plan: null, status: 'cancelled', ended_day: '2026-10-01', next_renewal_day: null, spent_minor: 2000 })]));
+  assert.equal(view.active.length, 1); assert.equal(view.inactive.length, 1);
+  assert.equal(view.active[0].title, 'Claude Max 20x'); assert.equal(view.active[0].meta, '$200/月 · 下次扣费 11-20'); assert.equal(view.active[0].daily, '$6.67');
+  assert.equal(view.inactive[0].title, 'Cursor'); assert.match(view.inactive[0].meta, /已取消/); assert.equal(view.inactive[0].initial, 'C');
+  assert.deepEqual(view.totals[0], { currency: 'USD', daily: '$6.67', monthly: '$203', yearly: '$2,433', spent: '$400', count: 1 });
+  assert.deepEqual(view.value, { api: '$1,295', plan: '$203', ratio: 6.4, partial: false });
+  assert.equal(S.presentList(listData([item()], { value: { ratio: null } })).value, null);
+});
+
+test('表单校验名称、价格、自定义天数和开始日期；停用时带停用日期', () => {
+  const today = '2026-10-21', form = S.formFromItem(null, today);
+  assert.equal(form.currency, 'USD'); assert.equal(form.start_day, today);
+  assert.equal(S.bodyFromForm(form, today).error, '请填写服务名称');
+  assert.equal(S.bodyFromForm({ ...form, name: 'Kimi', price: 'abc' }, today).error, '请填写有效的价格');
+  assert.equal(S.bodyFromForm({ ...form, name: 'Kimi', price: '9', cycle: 'custom', custom_days: '0' }, today).error, '自定义周期为 1 到 3650 天');
+  assert.equal(S.bodyFromForm({ ...form, name: 'Kimi', price: '9', start_day: '2026-10-22' }, today).error, '开始日期不能晚于今天');
+  const { body } = S.bodyFromForm({ ...form, name: ' Kimi ', plan: '', price: '199', currency: 'CNY' }, today);
+  assert.deepEqual(body, { name: 'Kimi', plan: null, price: 199, currency: 'CNY', cycle: 'month', custom_days: null, start_day: today, status: 'active', notes: null });
+  assert.equal(S.bodyFromForm({ ...S.formFromItem(item(), today), status: 'paused' }, today).body.ended_day, today);
+  assert.equal(S.formFromItem(item(), today).price, '200');
+});
+
+function cacheFixture() {
+  const calls = [], store = new Map([['session_token', 'session'], ['account_known', true]]), module = { exports: {} };
+  const wx = { getStorageSync: k => store.get(k), setStorageSync: (k, v) => store.set(k, v), removeStorageSync: k => store.delete(k), clearStorageSync: () => store.clear(), request: o => calls.push(o) };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../utils/api.js'), 'utf8'), { wx, module, Date, require: id => require(path.join(__dirname, '../utils', path.basename(id))) });
+  return { api: module.exports, calls };
+}
+const reply = (f, data) => f.calls.at(-1).success({ statusCode: 200, data });
+
+test('订阅列表复用缓存；增改删直接写回缓存，不清空用量缓存', async () => {
+  const f = cacheFixture();
+  let p = f.api.myUsage('day'); reply(f, { summary: { tokens: 1 } }); await p;
+  p = f.api.subscriptions(); reply(f, listData([])); await p; await f.api.subscriptions(); assert.equal(f.calls.length, 2);
+  p = f.api.createSubscription({ name: 'Claude' }); assert.equal(f.calls.at(-1).method, 'POST'); assert.match(f.calls.at(-1).url, /\/api\/subscriptions$/);
+  reply(f, listData([item()])); await p;
+  assert.equal(f.api.peekSubscriptions().items.length, 1); await f.api.myUsage('day'); await f.api.subscriptions(); assert.equal(f.calls.length, 3);
+  p = f.api.updateSubscription('a'.repeat(32), { name: 'Claude' }); assert.match(f.calls.at(-1).url, /\/api\/subscriptions\/a{32}$/); reply(f, listData([item({ plan: 'Pro' })])); await p;
+  assert.equal(f.api.peekSubscriptions().items[0].plan, 'Pro');
+  p = f.api.deleteSubscription('a'.repeat(32)); assert.equal(f.calls.at(-1).method, 'DELETE'); reply(f, listData([])); await p;
+  assert.equal(f.api.peekSubscriptions().items.length, 0);
+});
+
+function pageFixture(file, api) {
+  let definition; const navigation = [], modals = [], sheets = [], guards = [];
+  const wx = { navigateTo: o => navigation.push(o.url), navigateBack: () => navigation.push('back'), showToast() {}, stopPullDownRefresh() {}, setNavigationBarTitle() {},
+    showModal: o => modals.push(o), showActionSheet: o => sheets.push(o), enableAlertBeforeUnload: o => guards.push(o.message), disableAlertBeforeUnload: () => guards.push('off') };
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../pages', file), 'utf8'), { require: id => id.endsWith('/api') ? api : S, wx, Page: o => definition = o, Date });
+  const p = { ...definition, data: JSON.parse(JSON.stringify(definition.data)), setData(patch) {
+    for (const [k, v] of Object.entries(patch)) { const keys = k.split('.'); let o = this.data; while (keys.length > 1) o = o[keys.shift()]; o[keys[0]] = v; } } };
+  return { p, navigation, modals, sheets, guards };
+}
+const baseApi = (extra = {}) => ({ accountEpoch: () => 0, accountState: () => '', ensureSession: async () => {}, peekSubscriptions: () => null, ...extra });
+
+test('列表页空状态引导添加；有记录时点行进入编辑，满 30 个不再进入添加页', async () => {
+  const f = pageFixture('subscriptions/subscriptions.js', baseApi({ subscriptions: async () => listData([]) }));
+  await f.p.onShow(); assert.equal(f.p.data.view.active.length, 0); f.p.add(); assert.deepEqual(f.navigation, ['/pages/subscription-edit/subscription-edit']);
+  const full = pageFixture('subscriptions/subscriptions.js', baseApi({ subscriptions: async () => listData(Array.from({ length: 30 }, (_, i) => item({ id: String(i).padStart(32, '0') }))) }));
+  await full.p.onShow(); full.p.add(); assert.deepEqual(full.navigation, []);
+  full.p.edit({ currentTarget: { dataset: { id: 'x'.repeat(32) } } }); assert.match(full.navigation[0], /id=x{32}$/);
+});
+
+test('添加页选预设填入套餐和价格，校验失败不提交，保存成功解除离开提醒并返回', async () => {
+  const saved = [];
+  const f = pageFixture('subscription-edit/subscription-edit.js', baseApi({ createSubscription: async body => { saved.push(body); return listData([item()]); } }));
+  await f.p.onLoad({});
+  await f.p.save(); assert.equal(f.p.data.error, '请填写服务名称'); assert.equal(saved.length, 0);
+  f.p.choosePreset({ currentTarget: { dataset: { index: 0 } } }); assert.equal(f.sheets.length, 1); assert.match(f.sheets[0].itemList[2], /Max 20x · \$200\/月/);
+  f.sheets[0].success({ tapIndex: 2 });
+  assert.equal(f.p.data.form.name, 'Claude'); assert.equal(f.p.data.form.plan, 'Max 20x'); assert.equal(f.p.data.form.price, '200'); assert.equal(f.guards.length, 1);
+  await f.p.save(); assert.equal(saved[0].price, 200); assert.equal(saved[0].currency, 'USD'); assert.deepEqual(f.navigation, ['back']); assert.equal(f.guards.at(-1), 'off');
+});
+
+test('编辑页读取已有订阅，可删除；删除失败显示错误不返回', async () => {
+  const deleted = [];
+  const api = baseApi({ peekSubscriptions: () => listData([item()]), deleteSubscription: async id => { deleted.push(id); throw Object.assign(new Error('这条订阅已不存在，请刷新'), { code: 'SUBSCRIPTION_NOT_FOUND' }); } });
+  const f = pageFixture('subscription-edit/subscription-edit.js', api);
+  await f.p.onLoad({ id: 'a'.repeat(32) }); assert.equal(f.p.data.form.plan, 'Max 20x');
+  f.p.remove(); assert.match(f.modals[0].content, /Claude/); await f.modals[0].success({ confirm: true });
+  assert.deepEqual(deleted, ['a'.repeat(32)]); assert.match(f.p.data.error, /不存在/); assert.deepEqual(f.navigation, []); assert.equal(f.p.data.busy, false);
+  const missing = pageFixture('subscription-edit/subscription-edit.js', baseApi({ peekSubscriptions: () => listData([]) }));
+  await missing.p.onLoad({ id: 'b'.repeat(32) }); assert.match(missing.p.data.error, /不存在/);
+});
