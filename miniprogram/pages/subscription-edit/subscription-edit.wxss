@@ -1,26 +1,45 @@
-.page { padding-bottom: calc(24px + env(safe-area-inset-bottom)); }
-.state, .notice { padding: 20px 16px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
+page { background: var(--surface-muted); }
+.page { padding: 12px 12px calc(96px + env(safe-area-inset-bottom)); }
+.num { font-variant-numeric: tabular-nums; }
+.state, .notice { padding: 20px 4px; color: var(--text-secondary); font-size: 14px; line-height: 1.8; }
 .error { color: var(--danger); }
-.block { padding: 8px 16px 16px; border-bottom: 1rpx solid var(--separator); }
-.block + .block { padding-top: 0; }
+.group-label { padding: 6px 4px 10px; font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+.grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; }
+.tpl { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 2px 10px; border-radius: 12px; background: var(--surface); border: 1.5px solid transparent; }
+.tpl.on { border-color: var(--primary); }
+.tpl-icon { width: 36px; height: 36px; border-radius: 8px; }
+.tpl-name { max-width: 100%; font-size: 11px; color: var(--text); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+.hint { padding: 10px 4px 16px; font-size: 12px; color: var(--text-muted); }
+.card { background: var(--surface); border-radius: 16px; padding: 4px 16px; margin-bottom: 12px; }
+.name-row { display: flex; align-items: center; gap: 12px; padding: 14px 0; border-bottom: 1rpx solid var(--separator); }
+.icon { flex: none; width: 44px; height: 44px; border-radius: 10px; }
+.icon.ph { background: var(--surface-muted); color: var(--text-secondary); font-size: 18px; display: flex; align-items: center; justify-content: center; }
+.name { flex: 1; font-size: 18px; font-weight: 500; }
+.price-row { display: flex; align-items: center; gap: 8px; padding: 14px 0; border-bottom: 1rpx solid var(--separator); }
+.currency { width: auto !important; margin: 0 !important; padding: 0 14px; height: 40px; line-height: 40px; font-size: 20px; font-weight: 500; color: var(--text); background: var(--surface-muted); border-radius: 8px; }
+.currency::after { border: none; }
+.price { flex: 1; height: 40px; font-size: 26px; font-weight: 600; }
+.row { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 52px; border-bottom: 1rpx solid var(--separator); }
 .label { font-size: 14px; color: var(--text-secondary); }
-.block > .label { display: block; padding: 16px 0 10px; }
-.presets { display: flex; flex-wrap: wrap; gap: 8px; }
-.preset { width: auto !important; display: inline-block; margin: 0 !important; padding: 0 14px; height: 36px; line-height: 36px; font-size: 14px; font-weight: 400; color: var(--text); background: var(--surface-muted); border-radius: 18px; }
-.preset::after { border: none; }
-.hint { margin-top: 10px; font-size: 12px; color: var(--text-muted); }
-.field { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; border-bottom: 1rpx solid var(--separator); }
-.field:last-child { border-bottom: none; }
-.field .label { flex: none; width: 72px; }
-.field input { flex: 1; text-align: right; font-size: 16px; }
-.value { font-size: 16px; }
-.seg { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; padding: 8px 0; }
-.seg button { width: auto !important; display: inline-block; margin: 0 !important; padding: 0 12px; height: 32px; line-height: 32px; font-size: 13px; font-weight: 400; color: var(--text-secondary); background: var(--surface-muted); border-radius: 16px; }
-.seg button::after { border: none; }
-.seg button.on { color: #FFFFFF; background: var(--primary); }
-.actions { padding: 24px 16px 0; }
-.actions .btn { width: 100% !important; margin: 0; }
-.text-button { width: auto !important; display: block; margin: 12px auto 0; min-height: 44px; padding: 10px 0; line-height: 24px; font-size: 14px; color: var(--link); background: transparent; }
+.row-input { flex: 1; text-align: right; font-size: 15px; }
+.row-value { font-size: 15px; }
+.block { padding: 14px 0; border-bottom: 1rpx solid var(--separator); }
+.pills { display: flex; gap: 6px; margin-top: 10px; padding: 3px; border-radius: 10px; background: var(--surface-muted); }
+.pill { flex: 1; text-align: center; padding: 7px 0; font-size: 13px; color: var(--text-secondary); border-radius: 8px; }
+.pill.on { color: var(--text); font-weight: 500; background: var(--surface); box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+.days { margin-top: 10px; height: 40px; padding: 0 12px; border-radius: 8px; background: var(--surface-muted); font-size: 15px; }
+.card > picker:last-child .row, .card > .block:last-child { border-bottom: none; }
+.notes { width: 100%; min-height: 60px; padding: 14px 0; font-size: 15px; line-height: 1.6; }
+.text-button { width: auto !important; display: block; margin: 4px auto 0; min-height: 44px; padding: 10px 0; line-height: 24px; font-size: 14px; background: transparent; }
 .text-button::after { border: none; }
 .remove { color: var(--danger); }
-.footnote { padding: 18px 16px 0; color: var(--text-muted); font-size: 12px; line-height: 1.8; }
+.footnote { padding: 8px 4px 0; color: var(--text-muted); font-size: 12px; line-height: 1.8; text-align: center; }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); background: var(--surface); border-top: 1rpx solid var(--separator); z-index: 5; }
+.save { width: 100% !important; margin: 0 !important; }
+.mask { position: fixed; inset: 0; background: rgba(0,0,0,.4); z-index: 10; }
+.sheet { position: fixed; left: 0; right: 0; bottom: 0; z-index: 11; background: var(--surface); border-radius: 20px 20px 0 0; padding: 16px 20px calc(16px + env(safe-area-inset-bottom)); }
+.sheet-head { display: flex; align-items: center; gap: 10px; padding-bottom: 12px; border-bottom: 1rpx solid var(--separator); font-size: 18px; font-weight: 500; }
+.sheet-icon { width: 36px; height: 36px; border-radius: 8px; }
+.plan { display: flex; justify-content: space-between; align-items: center; min-height: 54px; font-size: 15px; border-bottom: 1rpx solid var(--separator); }
+.plan:last-child { border-bottom: none; }
+.plan-price { font-weight: 600; }

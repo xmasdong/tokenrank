@@ -191,15 +191,17 @@ node --test miniprogram/test/*.test.cjs
 
 接口：`GET /api/my/calendar?month=YYYY-MM` 与 `GET /api/my/weekly?week=YYYY-MM-DD` 仅允许本人会话；`week` 必须是周一，省略时取上个完整周。`GET /api/insights/trends?period=week|month&dimension=tools|models&metric=users|tokens&end=YYYY-MM-DD` 允许匿名读取；续页携带 `offset` 和 `snapshot`。`POST /api/shares` 的 `style=weekly` 必须携带 `week` 与读取周报得到的 `week_snapshot`，可选 `group_id`；数据变化返回 `409/WEEK_CHANGED`。GET 只读已有日桶，不触发重算或清理；生成分享仅写入本人的摘要快照。继续复用现有 0011 表结构和 0.2.16 同步数据，无需数据库迁移或客户端升级。
 
-## 我的订阅
+## 订阅
 
-「我的 → 我的订阅」记录用户为 AI 工具付的订阅费，交互参考本地「超值」App：首页是订阅中的每日成本大数字，下面是月均、年均和累计已花；列表分订阅中和已停用，每行显示每期价格、下次扣费日和每天成本，点行编辑。添加页可点常用 AI 服务（Claude、ChatGPT、Cursor、GitHub Copilot、Google AI、Windsurf）选套餐，自动填入参考价、美元和每月周期，参考价以实际账单为准，可修改。
+底部第三个标签「订阅」记录用户为 AI 工具付的订阅费，交互照搬本地「超值」App 的订阅页：
 
-- 换算：每天成本 = 每期价格 ÷ 周期天数（周 7、月 30、季 91、年 365、自定义 1–3650 天）；月均按 30.44 天、年均按 365 天。累计按开始日起已扣期数计算，续费当天计入新一期；暂停或取消后按停用日期截止。
-- 人民币和美元分开汇总，不做汇率换算。
-- 有美元订阅且近 30 天有费用数据时，显示「API 等值估算是美元订阅月费的几倍」，估算来自电脑端统计，不代表实际账单。
+- 列表页：「今天 Token 值多少钱」卡片显示当天 API 等值估算，与美元订阅每天成本比较，标出「已回本 N 倍」或「还差 $X」；下方是近 7 天格子，回本的天为绿色。第二张卡片是订阅每日成本、月均、年均和累计已花。订阅行带品牌图标、每期价格、下次扣费日和每天成本；Claude、ChatGPT、Gemini、Kimi、智谱等单一厂商的订阅另标「今天 $X · 已回本／未回本」，Cursor、Copilot、Windsurf 这类多模型工具不归属当天用量。右下角「+」添加。
+- 添加页：四列模板格子（图标 + 名称），多套餐的弹出底部套餐表，单套餐直接填入；Kimi 和智谱没有核实的价格，只填名称和图标。表单卡片为图标 + 名称、币种符号切换 + 大号价格、套餐、周期分段、开始日期，编辑时多出状态分段；备注单独一张卡片；底部固定「保存」，编辑页可删除。未保存离开会提示。
+- 图标在 `assets/subscriptions/`：Claude、ChatGPT、Cursor、GitHub 取自「超值」项目，Gemini、Windsurf、Kimi、智谱 GLM 取自各官网 favicon，统一为 128×128 PNG，仅用于识别服务。
+- 换算：每天成本 = 每期价格 ÷ 周期天数（周 7、月 30、季 91、年 365、自定义 1–3650 天）；月均按 30.44 天、年均按 365 天。累计按开始日起已扣期数计算，续费当天计入新一期；暂停或取消后按停用日期截止。人民币和美元分开汇总，不做汇率换算，回本只比较美元订阅。
+- 回本按北京时间自然日，用电脑端上传的 token-watcher 价格估算（`cost_json`），不代表实际账单；没有费用数据的日期不判断。
 - 订阅只在本人会话中读写，不进入排名、分享或公开分析；每人最多 30 条；注销账号时一并删除。金额以分／美分整数保存在 `user_subscriptions`（`0015_user_subscriptions.sql`）。
-- 接口：`GET/POST /api/subscriptions`，`POST/DELETE /api/subscriptions/:id`，均返回完整列表与汇总；小程序缓存直接写回，不清空用量缓存。
+- 接口：`GET/POST /api/subscriptions`，`POST/DELETE /api/subscriptions/:id`，均返回完整列表、汇总、近 7 天 `days` 和 `today_value`；小程序缓存直接写回，不清空用量缓存。
 
 ## 用量日报与消息提醒
 

@@ -66,7 +66,7 @@ test('日报公开卡片免登录展示原作者指定日期，转发保留作�
 
 test('导航拆为群榜、广场、我的，所有页面均已注册', () => {
   const app = JSON.parse(fs.readFileSync(path.join(root, 'app.json')));
-  assert.deepEqual(app.tabBar.list.map(x => x.text), ['群榜', '广场', '我的']);
+  assert.deepEqual(app.tabBar.list.map(x => x.text), ['群榜', '广场', '订阅', '我的']);
   for (const item of app.pages) for (const ext of ['js', 'json', 'wxml', 'wxss']) assert.ok(fs.existsSync(path.join(root, `${item}.${ext}`)));
 });
 

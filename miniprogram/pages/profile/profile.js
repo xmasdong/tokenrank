@@ -86,7 +86,6 @@ Page({
   goWeekly() { wx.navigateTo({ url: '/pages/weekly/weekly' }); },
   goAnalysis() { wx.navigateTo({ url: '/pages/analysis/analysis?scope=mine&period=' + this.data.period }); },
   goConnect() { wx.navigateTo({ url: flow.connectUrl() }); },
-  goSubscriptions() { wx.navigateTo({ url: '/pages/subscriptions/subscriptions' }); },
   goReminders() { wx.navigateTo({ url: '/pages/reminders/reminders' }); },
   goGroups() { wx.switchTab({ url: '/pages/index/index' }); },
   goAbout() { wx.navigateTo({ url: '/pages/about/about' }); },

@@ -18,8 +18,23 @@ test('金额按币种格式化：整数去掉小数、千分位、每天成本�
   assert.equal(view.active[0].title, 'Claude Max 20x'); assert.equal(view.active[0].meta, '$200/月 · 下次扣费 11-20'); assert.equal(view.active[0].daily, '$6.67');
   assert.equal(view.inactive[0].title, 'Cursor'); assert.match(view.inactive[0].meta, /已取消/); assert.equal(view.inactive[0].initial, 'C');
   assert.deepEqual(view.totals[0], { currency: 'USD', daily: '$6.67', monthly: '$203', yearly: '$2,433', spent: '$400', count: 1 });
-  assert.deepEqual(view.value, { api: '$1,295', plan: '$203', ratio: 6.4, partial: false });
+  assert.deepEqual(view.value, { api: '$1,295', plan: '$203', ratio: 6.4 });
   assert.equal(S.presentList(listData([item()], { value: { ratio: null } })).value, null);
+});
+
+test('今天 Token 值、近 7 天回本格子、行内图标与按厂商归属的今日价值', () => {
+  const days = Array.from({ length: 7 }, (_, i) => ({ day: `2026-10-${15 + i}`, api_usd_micros: i < 2 ? null : i * 10_000_000, paid_back: i < 2 ? null : i >= 4 }));
+  const view = S.presentList(listData([item({ today_usd_micros: 30_000_000, paid_back_today: true }), item({ id: 'c'.repeat(32), name: 'Cursor', plan: 'Pro', today_usd_micros: null, paid_back_today: null }),
+    item({ id: 'd'.repeat(32), name: '自建网关', plan: null })], { days, today_value: { api_usd_micros: 60_000_000, usd_daily_minor: 733.33, ratio: 8.2, paid_back: true } }));
+  assert.deepEqual(view.today, { value: '$60', hasValue: true, daily: '$7.33', paid: true, ratio: 8.2, gap: '' });
+  assert.deepEqual(view.week.cells.map(c => [c.label, c.value, c.state]), [['四', '—', 'none'], ['五', '—', 'none'], ['六', '$20', 'unpaid'], ['日', '$30', 'unpaid'], ['一', '$40', 'paid'], ['二', '$50', 'paid'], ['今天', '$60', 'paid']]);
+  assert.equal(view.week.paidDays, 3);
+  assert.equal(view.active[0].icon, '/assets/subscriptions/claude.png'); assert.deepEqual(view.active[0].today, { value: '$30', paid: true });
+  assert.equal(view.active[1].icon, '/assets/subscriptions/cursor.png'); assert.equal(view.active[1].today, null);
+  assert.equal(view.active[2].icon, ''); assert.equal(view.active[2].initial, '自');
+  const short = S.presentList(listData([item()], { today_value: { api_usd_micros: 2_000_000, usd_daily_minor: 666.67, ratio: 0.3, paid_back: false } }));
+  assert.equal(short.today.gap, '$4.67'); assert.equal(short.today.paid, false);
+  for (const p of S.PRESETS) assert.ok(fs.existsSync(path.join(__dirname, '..', p.icon)), p.icon);
 });
 
 test('表单校验名称、价格、自定义天数和开始日期；停用时带停用日期', () => {
@@ -80,9 +95,12 @@ test('添加页选预设填入套餐和价格，校验失败不提交，保存�
   const f = pageFixture('subscription-edit/subscription-edit.js', baseApi({ createSubscription: async body => { saved.push(body); return listData([item()]); } }));
   await f.p.onLoad({});
   await f.p.save(); assert.equal(f.p.data.error, '请填写服务名称'); assert.equal(saved.length, 0);
-  f.p.choosePreset({ currentTarget: { dataset: { index: 0 } } }); assert.equal(f.sheets.length, 1); assert.match(f.sheets[0].itemList[2], /Max 20x · \$200\/月/);
-  f.sheets[0].success({ tapIndex: 2 });
+  f.p.choosePreset({ currentTarget: { dataset: { index: 0 } } });
+  assert.equal(f.p.data.sheet.name, 'Claude'); assert.equal(f.p.data.sheet.icon, '/assets/subscriptions/claude.png'); assert.equal(f.p.data.sheet.plans[2].label, '$200/月');
+  f.p.choosePlan({ currentTarget: { dataset: { index: 2 } } }); assert.equal(f.p.data.sheet, null);
+  assert.equal(f.p.data.icon, '/assets/subscriptions/claude.png'); assert.equal(f.p.data.selected, 'claude');
   assert.equal(f.p.data.form.name, 'Claude'); assert.equal(f.p.data.form.plan, 'Max 20x'); assert.equal(f.p.data.form.price, '200'); assert.equal(f.guards.length, 1);
+  f.p.toggleCurrency(); assert.equal(f.p.data.symbol, '¥'); f.p.toggleCurrency(); assert.equal(f.p.data.form.currency, 'USD');
   await f.p.save(); assert.equal(saved[0].price, 200); assert.equal(saved[0].currency, 'USD'); assert.deepEqual(f.navigation, ['back']); assert.equal(f.guards.at(-1), 'off');
 });
 

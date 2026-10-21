@@ -1,29 +1,45 @@
 <view class="page">
   <view wx:if="{{loading}}" class="state">正在读取订阅…</view>
   <block wx:elif="{{form}}">
-    <view wx:if="{{!id}}" class="block">
-      <view class="label">常用 AI 服务</view>
-      <view class="presets"><button wx:for="{{presets}}" wx:key="*this" class="preset" data-index="{{index}}" bindtap="choosePreset" disabled="{{busy}}">{{item}}</button></view>
-      <view class="hint">参考价，以实际账单为准，可在下方修改。</view>
+    <block wx:if="{{!id}}">
+      <view class="group-label">选择模板或自定义</view>
+      <view class="grid">
+        <view wx:for="{{presets}}" wx:key="key" class="tpl {{selected === item.key ? 'on' : ''}}" data-index="{{index}}" bindtap="choosePreset">
+          <image class="tpl-icon" src="{{item.icon}}" mode="aspectFit" /><text class="tpl-name">{{item.name}}</text>
+        </view>
+      </view>
+      <view class="hint">美元套餐为参考价，Kimi 和智谱请按实际账单填写。</view>
+    </block>
+    <view class="card">
+      <view class="name-row">
+        <image wx:if="{{icon}}" class="icon" src="{{icon}}" mode="aspectFit" /><view wx:else class="icon ph">{{form.name ? form.name[0] : '+'}}</view>
+        <input class="name" value="{{form.name}}" data-field="name" bindinput="input" maxlength="40" placeholder="服务名称" disabled="{{busy}}" />
+      </view>
+      <view class="price-row">
+        <button class="currency" bindtap="toggleCurrency" disabled="{{busy}}" aria-label="切换币种">{{symbol}}</button>
+        <input class="price num" type="digit" value="{{form.price}}" data-field="price" bindinput="input" placeholder="0.00" disabled="{{busy}}" />
+      </view>
+      <view class="row"><text class="label">套餐</text><input class="row-input" value="{{form.plan}}" data-field="plan" bindinput="input" maxlength="30" placeholder="选填，如 Max" disabled="{{busy}}" /></view>
+      <view class="block"><text class="label">扣费周期</text>
+        <view class="pills"><view wx:for="{{cycles}}" wx:key="key" class="pill {{form.cycle === item.key ? 'on' : ''}}" data-field="cycle" data-key="{{item.key}}" bindtap="pick">{{item.label}}</view></view>
+        <input wx:if="{{form.cycle === 'custom'}}" class="days" type="number" value="{{form.custom_days}}" data-field="custom_days" bindinput="input" placeholder="每期天数（1–3650）" disabled="{{busy}}" />
+      </view>
+      <picker mode="date" end="{{today}}" value="{{form.start_day}}" data-field="start_day" bindchange="pickDate" disabled="{{busy}}"><view class="row"><text class="label">开始日期</text><text class="row-value">{{form.start_day}}</text></view></picker>
+      <view wx:if="{{id}}" class="block"><text class="label">状态</text>
+        <view class="pills"><view wx:for="{{statuses}}" wx:key="key" class="pill {{form.status === item.key ? 'on' : ''}}" data-field="status" data-key="{{item.key}}" bindtap="pick">{{item.label}}</view></view>
+      </view>
+      <picker wx:if="{{form.status !== 'active'}}" mode="date" start="{{form.start_day}}" end="{{today}}" value="{{form.ended_day || today}}" data-field="ended_day" bindchange="pickDate" disabled="{{busy}}"><view class="row"><text class="label">停用日期</text><text class="row-value">{{form.ended_day || today}}</text></view></picker>
     </view>
-    <view class="block">
-      <label class="field"><text class="label">服务名称</text><input value="{{form.name}}" data-field="name" bindinput="input" maxlength="40" placeholder="如 Claude" disabled="{{busy}}" /></label>
-      <label class="field"><text class="label">套餐</text><input value="{{form.plan}}" data-field="plan" bindinput="input" maxlength="30" placeholder="选填，如 Max" disabled="{{busy}}" /></label>
-      <label class="field"><text class="label">每期价格</text><input type="digit" value="{{form.price}}" data-field="price" bindinput="input" placeholder="0.00" disabled="{{busy}}" /></label>
-      <view class="field"><text class="label">币种</text><view class="seg"><button wx:for="{{currencies}}" wx:key="key" class="{{form.currency === item.key ? 'on' : ''}}" data-field="currency" data-key="{{item.key}}" bindtap="pick" disabled="{{busy}}">{{item.label}}</button></view></view>
-      <view class="field"><text class="label">扣费周期</text><view class="seg"><button wx:for="{{cycles}}" wx:key="key" class="{{form.cycle === item.key ? 'on' : ''}}" data-field="cycle" data-key="{{item.key}}" bindtap="pick" disabled="{{busy}}">{{item.label}}</button></view></view>
-      <label wx:if="{{form.cycle === 'custom'}}" class="field"><text class="label">每期天数</text><input type="number" value="{{form.custom_days}}" data-field="custom_days" bindinput="input" placeholder="1–3650" disabled="{{busy}}" /></label>
-      <picker mode="date" end="{{today}}" value="{{form.start_day}}" data-field="start_day" bindchange="pickDate" disabled="{{busy}}"><view class="field"><text class="label">开始日期</text><text class="value">{{form.start_day}}</text></view></picker>
-      <view wx:if="{{id}}" class="field"><text class="label">状态</text><view class="seg"><button wx:for="{{statuses}}" wx:key="key" class="{{form.status === item.key ? 'on' : ''}}" data-field="status" data-key="{{item.key}}" bindtap="pick" disabled="{{busy}}">{{item.label}}</button></view></view>
-      <picker wx:if="{{form.status !== 'active'}}" mode="date" start="{{form.start_day}}" end="{{today}}" value="{{form.ended_day || today}}" data-field="ended_day" bindchange="pickDate" disabled="{{busy}}"><view class="field"><text class="label">停用日期</text><text class="value">{{form.ended_day || today}}</text></view></picker>
-      <label class="field"><text class="label">备注</text><input value="{{form.notes}}" data-field="notes" bindinput="input" maxlength="100" placeholder="选填" disabled="{{busy}}" /></label>
-    </view>
-    <view class="actions">
-      <button class="btn btn-primary" bindtap="save" loading="{{busy}}" disabled="{{busy}}">保存</button>
-      <button wx:if="{{id}}" class="text-button remove" bindtap="remove" disabled="{{busy}}">删除这条订阅</button>
-    </view>
+    <view class="card"><textarea class="notes" value="{{form.notes}}" data-field="notes" bindinput="input" maxlength="100" placeholder="备注（选填）" disabled="{{busy}}" auto-height /></view>
+    <button wx:if="{{id}}" class="text-button remove" bindtap="remove" disabled="{{busy}}">删除这条订阅</button>
     <view class="footnote">只记录你填写的金额，不连接任何支付账户，也不会替你取消订阅。</view>
+    <view class="bar"><button class="btn btn-primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">保存</button></view>
   </block>
   <view wx:if="{{error}}" class="notice error" role="alert">{{error}}</view>
+</view>
+<view wx:if="{{sheet}}" class="mask" bindtap="closeSheet"></view>
+<view wx:if="{{sheet}}" class="sheet">
+  <view class="sheet-head"><image class="sheet-icon" src="{{sheet.icon}}" mode="aspectFit" /><text>{{sheet.name}}</text></view>
+  <view wx:for="{{sheet.plans}}" wx:key="plan" class="plan" data-index="{{index}}" bindtap="choosePlan"><text>{{item.plan}}</text><text class="plan-price num">{{item.label}}</text></view>
 </view>
 <privacy-notice />

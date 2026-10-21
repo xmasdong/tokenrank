@@ -1,5 +1,5 @@
 import { hexToken, jsonError, beijingDay, beijingDaysAgo } from './lib.js';
-import { buildCosts } from './costs.js';
+import { buildCosts, validateCost } from './costs.js';
 
 // A private ledger of what the user pays for AI tools; never shown on boards or shares.
 export const SUBSCRIPTION_LIMIT = 30;
@@ -16,6 +16,30 @@ const text = (value, max) => {
   const s = value.replace(/[\u0000-\u001f\u007f]/g, '').trim();
   return s && [...s].length <= max ? s : null;
 };
+
+// A subscription pays for one vendor's models; tools such as Cursor route to many vendors and get no attribution.
+const PROVIDERS = [['anthropic', /claude/i, /^claude/i], ['openai', /chatgpt|openai|codex/i, /^(gpt|o\d|codex|chatgpt)/i],
+  ['google', /gemini|google ai/i, /^gemini/i], ['moonshot', /kimi|moonshot/i, /^(kimi|moonshot)/i], ['zhipu', /glm|智谱/i, /^glm/i]];
+export const subscriptionProvider = name => PROVIDERS.find(([, byName]) => byName.test(name || ''))?.[0] || null;
+export const modelProvider = model => PROVIDERS.find(([, , byModel]) => byModel.test(model || ''))?.[0] || null;
+
+/** API-equivalent value per Beijing day, in USD micros, in total and per vendor. */
+export function dailyValues(rows, days) {
+  const byDay = new Map(days.map(day => [day, { day, api_usd_micros: null, providers: {} }]));
+  for (const row of rows) {
+    const entry = byDay.get(row.day);
+    if (!entry) continue;
+    let cost;
+    try { cost = JSON.parse(row.cost_json || 'null'); validateCost(cost, row.tokens); } catch { cost = null; }
+    if (!cost) continue;
+    entry.api_usd_micros = (entry.api_usd_micros || 0) + cost.usd_micros;
+    for (const [model, micros] of cost.models) {
+      const provider = modelProvider(model);
+      if (provider) entry.providers[provider] = (entry.providers[provider] || 0) + micros;
+    }
+  }
+  return days.map(day => byDay.get(day));
+}
 
 export function cycleDays(sub) { return sub.cycle === 'custom' ? sub.custom_days : CYCLE_DAYS[sub.cycle]; }
 
@@ -66,7 +90,14 @@ export async function listSubscriptions(env, userId, now = Date.now()) {
       FROM user_subscriptions WHERE user_id=?1 ORDER BY CASE status WHEN 'active' THEN 0 ELSE 1 END, created_at, id`).bind(userId).all(),
     env.DB.prepare(`SELECT day,tokens,requests,cost_json FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3`).bind(userId, from, today).all(),
   ]);
-  const items = rows.results.map(row => ({ ...row, ...subscriptionFigures(row, today) }));
+  const week = Array.from({ length: 7 }, (_, i) => beijingDaysAgo(6 - i, now));
+  const values = dailyValues(usage.results, week), todayValue = values.at(-1);
+  const items = rows.results.map(row => {
+    const provider = subscriptionProvider(row.name), figures = subscriptionFigures(row, today);
+    const micros = provider && row.status === 'active' ? todayValue.providers[provider] ?? null : null;
+    return { ...row, ...figures, provider, today_usd_micros: micros,
+      paid_back_today: micros != null && row.currency === 'USD' ? micros / 10_000 >= figures.daily_minor : null };
+  });
   const totals = new Map();
   for (const item of items) {
     const t = totals.get(item.currency) || { currency: item.currency, active_count: 0, daily: 0, monthly_minor: 0, yearly_minor: 0, spent_minor: 0 };
@@ -82,7 +113,12 @@ export async function listSubscriptions(env, userId, now = Date.now()) {
   const cost = buildCosts(usage.results);
   const usdMonthly = totals.get('USD')?.monthly_minor || 0;
   const apiCents = cost.usd_micros == null ? null : cost.usd_micros / 10_000;
-  return { today, items, summary: { currencies, active_count: items.filter(i => i.status === 'active').length,
+  const usdDaily = totals.get('USD')?.daily || 0;
+  const paid = v => v.api_usd_micros != null && usdDaily > 0 ? v.api_usd_micros / 10_000 >= usdDaily : null;
+  const days = values.map(v => ({ day: v.day, api_usd_micros: v.api_usd_micros, paid_back: paid(v) }));
+  return { today, items, days, today_value: { api_usd_micros: todayValue.api_usd_micros, usd_daily_minor: Math.round(usdDaily * 100) / 100,
+    ratio: todayValue.api_usd_micros != null && usdDaily ? Math.round(todayValue.api_usd_micros / 10_000 / usdDaily * 10) / 10 : null,
+    paid_back: paid(todayValue) }, summary: { currencies, active_count: items.filter(i => i.status === 'active').length,
     inactive_count: items.filter(i => i.status !== 'active').length, limit: SUBSCRIPTION_LIMIT },
     value: { from, to: today, cost_status: cost.status, api_usd_micros: cost.usd_micros, usd_monthly_minor: usdMonthly,
       ratio: apiCents && usdMonthly ? Math.round(apiCents / usdMonthly * 10) / 10 : null } };

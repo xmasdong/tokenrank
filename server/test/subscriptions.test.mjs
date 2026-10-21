@@ -105,3 +105,27 @@ test('近 30 天 API 等值估算只和美元订阅月费比较，没有费用�
   await f.request('POST', { name: 'Kimi', price: 199, currency: 'CNY', cycle: 'month', start_day: beijingDay() });
   assert.equal((await (await f.request('GET')).json()).value.ratio, 6.4);
 });
+
+test('近 7 天每天的 API 等值和是否回本；按厂商归属今天的价值，Cursor 这类多模型工具不归属', async t => {
+  const f = fixture(t);
+  await f.request('POST', claude({ price: 200 }));
+  await f.request('POST', { name: 'Cursor', plan: 'Pro', price: 20, currency: 'USD', cycle: 'month', start_day: beijingDaysAgo(3) });
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  const day = (d, models) => {
+    const total = models.reduce((a, [, m]) => a + m, 0);
+    const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: total, models, unpriced_models: [], unpriced_tokens: 0 };
+    f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
+      VALUES(1,'device-1',?,1000,10,10,980,0,5,'[]','[]',1,1,?)`).run(d, JSON.stringify(cost));
+  };
+  day(beijingDay(), [['claude-opus-5-5', 30_000_000], ['gpt-6.1-sol', 5_000_000]]);
+  day(beijingDaysAgo(1), [['gpt-6.1-sol', 2_000_000]]);
+  const data = await (await f.request('GET')).json();
+  assert.equal(data.days.length, 7); assert.equal(data.days[6].day, beijingDay());
+  // daily cost: 20000/30 + 2000/30 = 733.33 cents
+  assert.equal(data.today_value.usd_daily_minor, 733.33); assert.equal(data.today_value.api_usd_micros, 35_000_000);
+  assert.equal(data.today_value.ratio, 4.8); assert.equal(data.today_value.paid_back, true);
+  assert.equal(data.days[5].paid_back, false); assert.equal(data.days[0].api_usd_micros, null); assert.equal(data.days[0].paid_back, null);
+  const byName = Object.fromEntries(data.items.map(i => [i.name, i]));
+  assert.equal(byName.Claude.provider, 'anthropic'); assert.equal(byName.Claude.today_usd_micros, 30_000_000); assert.equal(byName.Claude.paid_back_today, true);
+  assert.equal(byName.Cursor.provider, null); assert.equal(byName.Cursor.today_usd_micros, null); assert.equal(byName.Cursor.paid_back_today, null);
+});

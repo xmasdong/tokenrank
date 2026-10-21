@@ -40,6 +40,7 @@
         "pagePath": "pages/square/square",
         "text": "广场"
       },
+      { "pagePath": "pages/subscriptions/subscriptions", "text": "订阅" },
       {
         "pagePath": "pages/profile/profile",
         "text": "我的"
