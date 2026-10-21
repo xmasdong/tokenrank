@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { DatabaseSync } from 'node:sqlite';
 import { readFileSync } from 'node:fs';
 import worker from '../src/worker.js';
-import { subscriptionFigures, normalizeSubscription, suggestSubscriptions, getRates, FALLBACK_RATES, SUBSCRIPTION_LIMIT } from '../src/subscriptions.js';
+import { subscriptionFigures, normalizeSubscription, suggestSubscriptions, dailyValues, usageVendor, getRates, FALLBACK_RATES, SUBSCRIPTION_LIMIT } from '../src/subscriptions.js';
 import { beijingDay, beijingDaysAgo } from '../src/lib.js';
 
 function fixture(t) {
@@ -110,7 +110,7 @@ test('近 30 天 API 等值估算只和美元订阅月费比较，没有费用�
   assert.equal(data.value.ratio, 5.6); assert.equal(data.fx.source, 'fallback'); assert.equal(data.summary.usd.monthly_minor, 23317);
 });
 
-test('近 7 天每天的 API 等值和是否回本；按厂商归属今天的价值，Cursor 这类多模型工具不归属', async t => {
+test('近 7 天每天的 API 等值和是否回本；只计订阅厂商的价值，没有工具明细时 Cursor 拿不到模型价值', async t => {
   const f = fixture(t);
   await f.request('POST', claude({ price: 200 }));
   await f.request('POST', { name: 'Cursor', plan: 'Pro', price: 20, currency: 'USD', cycle: 'month', start_day: beijingDaysAgo(3) });
@@ -126,12 +126,13 @@ test('近 7 天每天的 API 等值和是否回本；按厂商归属今天的价
   const data = await (await f.request('GET')).json();
   assert.equal(data.days.length, 7); assert.equal(data.days[6].day, beijingDay());
   // daily cost: 20000/30 + 2000/30 = 733.33 cents
-  assert.equal(data.today_value.usd_daily_minor, 733.33); assert.equal(data.today_value.api_usd_micros, 35_000_000);
-  assert.equal(data.today_value.ratio, 4.8); assert.equal(data.today_value.paid_back, true);
+  // Claude and the X Subscription (Cursor) are covered; the GPT usage has no plan here.
+  assert.equal(data.today_value.usd_daily_minor, 733.33); assert.equal(data.today_value.api_usd_micros, 30_000_000);
+  assert.equal(data.today_value.ratio, 4.1); assert.equal(data.today_value.paid_back, true);
   assert.equal(data.days[5].paid_back, false); assert.equal(data.days[0].api_usd_micros, null); assert.equal(data.days[0].paid_back, null);
   const byName = Object.fromEntries(data.items.map(i => [i.name, i]));
   assert.equal(byName.Claude.provider, 'claude'); assert.equal(byName.Claude.today_usd_micros, 30_000_000); assert.equal(byName.Claude.paid_back_today, true);
-  assert.equal(byName.Cursor.provider, 'cursor'); assert.equal(byName.Cursor.today_usd_micros, null); assert.equal(byName.Cursor.paid_back_today, null);
+  assert.equal(byName.Cursor.provider, 'xai'); assert.equal(byName.Cursor.today_usd_micros, null); assert.equal(byName.Cursor.paid_back_today, null);
 });
 
 test('同一厂商多个订阅合并判断回本，今日价值不重复计算', async t => {
@@ -157,10 +158,10 @@ test('按近 7 天的工具和模型推测订阅：同一份用量不重复计�
     [['gpt-6.1-sol', 900], ['claude-opus-5-5', 300], ['wecoding/claude-sonnet-5-5', 50], ['workbuddy/hy4-preview', 40]]),
     row([['zcode', 70]], [['zhipu-anthropic/glm-5.3', 70]])];
   const list = suggestSubscriptions(rows, new Set());
-  assert.deepEqual(list.map(s => [s.key, s.tokens]), [['chatgpt', 900], ['claude', 350], ['glm', 70], ['cursor', 50], ['other', 40]]);
-  assert.deepEqual(list.find(s => s.key === 'claude').evidence, ['claude-code', 'claude-opus-5-5', 'claude-sonnet-5-5']);
+  assert.deepEqual(list.map(s => [s.key, s.tokens]), [['chatgpt', 900], ['claude', 350], ['glm', 70], ['xai', 50], ['other', 40]]);
+  assert.deepEqual(list.find(s => s.key === 'claude').evidence, ['claude-opus-5-5', 'claude-sonnet-5-5']);
   assert.deepEqual(list.at(-1).evidence, ['hy4-preview']);
-  assert.deepEqual(suggestSubscriptions(rows, new Set(['chatgpt', 'other'])).map(s => s.key), ['claude', 'glm', 'cursor']);
+  assert.deepEqual(suggestSubscriptions(rows, new Set(['chatgpt', 'other'])).map(s => s.key), ['claude', 'glm', 'xai']);
 });
 
 test('汇率取 ECB 参考价并缓存，失败或缺币种时用标注过日期的备用汇率', async t => {
@@ -220,9 +221,10 @@ test('回本按本期累计：本期开始后该厂商的价值和这一期价�
   assert.equal(item.period.start, beijingDaysAgo(10)); assert.equal(item.period.days_left, 20);
   assert.equal(item.period.value_usd_micros, 120_000_000); assert.equal(item.period.ratio, 0.6); assert.equal(item.period.paid_back, false);
   assert.equal(item.period.gap_usd_minor, 8000);
+  assert.equal(item.period.unpriced_tokens, 0); assert.equal(item.period.exact, false);
 });
 
-test('标记为走 API Key 的订阅只算成本不认领用量；Cursor 这类多模型工具覆盖除充值外的全部用量', async t => {
+test('标记为走 API Key 的订阅只算成本不认领用量；Copilot 这类多模型工具覆盖除充值外的全部用量', async t => {
   const f = fixture(t);
   await f.request('POST', claude({ price: 200, api_key: true }));
   f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
@@ -230,7 +232,7 @@ test('标记为走 API Key 的订阅只算成本不认领用量；Cursor 这类�
   let data = await (await f.request('GET')).json();
   assert.equal(data.items[0].api_key, true); assert.equal(data.items[0].period, null); assert.equal(data.items[0].today_usd_micros, null);
   assert.equal(data.today_value.api_usd_micros, null);
-  await f.request('POST', { name: 'Cursor', plan: 'Premium', price: 30, currency: 'USD', cycle: 'month', start_day: beijingDay() });
+  await f.request('POST', { name: 'GitHub Copilot', plan: 'Pro+', price: 39, currency: 'USD', cycle: 'month', start_day: beijingDay() });
   data = await (await f.request('GET')).json();
   // everything except the prepaid DeepSeek balance and the API-key-paid Claude usage: $10 of GPT
   assert.equal(data.today_value.api_usd_micros, 10_000_000);
@@ -267,4 +269,38 @@ test('近 7 天出现 dsh 或官方 DeepSeek 模型时建议记一笔充值，�
   const row = (tools, models) => ({ day: '2026-10-20', tools_json: JSON.stringify(tools), models_json: JSON.stringify(models) });
   assert.deepEqual(suggestSubscriptions([row([['dsh', 500]], [['deepseek-v4.1-flash', 500]])], new Set()).map(s => [s.key, s.tokens]), [['deepseek', 500]]);
   assert.deepEqual(suggestSubscriptions([row([['workbuddy', 80]], [['workbuddy-ai/deepseek-v4.1-flash', 80]])], new Set()).map(s => s.key), ['other']);
+});
+
+test('按工具优先归属：Cursor 里跑的 Claude 和 Grok、以及 grok-bot 都算 X 订阅；成本按 token 份额拆分；无价格的单独统计', () => {
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 130_000_000,
+    models: [['claude-opus-5-5', 100_000_000], ['grok-4.7', 30_000_000]], unpriced_models: ['grok-bot-default', 'composer-2.5'], unpriced_tokens: 700 };
+  const row = { day: '2026-10-20', tokens: 2000, cost_json: JSON.stringify(cost), models_json: '[]', tools_json: '[]',
+    tool_models_json: JSON.stringify([['claude-code', 'claude-opus-5-5', 750], ['cursor', 'claude-opus-5-5', 250], ['cursor', 'grok-4.7', 300], ['cursor', 'grok-bot-default', 500], ['cursor', 'composer-2.5', 200]]) };
+  const [v] = dailyValues([row], ['2026-10-20']);
+  assert.deepEqual(v.providers, { claude: 75_000_000, xai: 55_000_000 }); assert.deepEqual(v.unpriced, { xai: 700 }); assert.equal(v.exact, true);
+  assert.equal(usageVendor('grok', 'grok-4.7-build'), 'xai'); assert.equal(usageVendor('pi', 'grok-bot-cua'), 'xai'); assert.equal(usageVendor('cursor', 'auto'), 'xai');
+  assert.equal(usageVendor(null, 'auto'), null);
+  for (const [tool, model, vendor] of [['claude-code', 'glm5.3', 'glm'], ['claude-code', 'kimik03', 'kimi'], ['claude-code', 'deepseek-v4.1-flash', 'deepseek'],
+    ['claude-code', 'custom-model-a10', null], ['antigravity', 'claude-sonnet-4-6', 'gemini'], ['codex', 'workbuddy/hy4-preview-f', null], ['codex', 'codex-auto-review', 'chatgpt'],
+    ['zcode', 'glm-5.3-flash', 'glm'], ['kimi', 'unknown-k', 'kimi']]) assert.equal(usageVendor(tool, model), vendor, tool + ' ' + model); assert.equal(usageVendor('dsh', 'deepseek-v4.1-flash'), 'deepseek'); assert.equal(usageVendor('workbuddy', 'workbuddy-ai/deepseek-v4.1-flash'), null);
+  // older rows without the joint split fall back to models
+  const [old] = dailyValues([{ ...row, tool_models_json: null, models_json: JSON.stringify([['claude-opus-5-5', 1000], ['grok-4.7', 300]]) }], ['2026-10-20']);
+  assert.deepEqual(old.providers, { claude: 100_000_000, xai: 30_000_000 }); assert.equal(old.exact, false);
+  const list = suggestSubscriptions([row], new Set());
+  assert.deepEqual(list.map(s => [s.key, s.tokens]), [['xai', 1250], ['claude', 750]]);
+  assert.deepEqual(list[0].evidence, ['cursor', 'grok-bot-default', 'grok-4.7']);
+});
+
+test('接口读取工具明细：Cursor 里的 Claude 算 X 订阅，不再抬高 Claude 订阅的回本', async t => {
+  const f = fixture(t);
+  await f.request('POST', claude({ price: 200, start_day: beijingDay() }));
+  await f.request('POST', { name: 'Cursor', plan: 'X 订阅 Premium', price: 30, currency: 'USD', cycle: 'month', start_day: beijingDay() });
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 40_000_000, models: [['claude-opus-5-5', 40_000_000]], unpriced_models: ['grok-bot-default'], unpriced_tokens: 500 };
+  f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json,tool_models_json)
+    VALUES(1,'device-1',?,1500,10,10,980,0,5,'[]','[]',1,1,?,?)`).run(beijingDay(), JSON.stringify(cost),
+    JSON.stringify([['claude-code', 'claude-opus-5-5', 750], ['cursor', 'claude-opus-5-5', 250], ['cursor', 'grok-bot-default', 500]]));
+  const data = await (await f.request('GET')).json(), byName = Object.fromEntries(data.items.map(i => [i.name, i]));
+  assert.equal(byName.Claude.period.value_usd_micros, 30_000_000); assert.equal(byName.Claude.period.exact, true);
+  assert.equal(byName.Cursor.period.value_usd_micros, 10_000_000); assert.equal(byName.Cursor.period.unpriced_tokens, 500);
 });

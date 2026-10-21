@@ -5,11 +5,16 @@
 // the official page renders client-side) come from secondary sources. The user edits the price to match the real bill.
 const ICON_DIR = '/assets/subscriptions/';
 const m = (name, price) => [name, price, 'month'];
+const X_PLANS = [m('X 订阅 Plus', 8), m('X 订阅 Premium', 30), m('X 订阅 Super', 100), m('X 订阅 Ultra', 200),
+  ['X 订阅 Plus 年付', 80, 'year'], ['X 订阅 Premium 年付', 300, 'year'], ['X 订阅 Super 年付', 1000, 'year']];
 const PRESETS = [
   { key: 'claude', name: 'Claude', match: /claude/i, currency: 'USD', plans: [m('Pro', 20), ['Pro 年付', 200, 'year'], m('Max 5x', 100), m('Max 20x', 200)] },
   { key: 'chatgpt', name: 'ChatGPT', match: /chatgpt|openai|codex/i, currency: 'USD', plans: [m('Go', 8), m('Plus', 20), m('Pro 100', 100), m('Pro 200', 200), m('Pro 500', 500)] },
-  { key: 'cursor', name: 'Cursor', match: /cursor/i, currency: 'USD', plans: [m('Plus', 8), m('Premium', 30), m('Super', 100), m('Ultra', 200),
-    ['Plus 年付', 80, 'year'], ['Premium 年付', 300, 'year'], ['Super 年付', 1000, 'year']] },
+  // The X Subscription (x.ai/news/x-subscription, 2026-10-12): Grok, Grok Bot, Cursor and X Premium share one weekly pool.
+  // Grok Bot needs Premium or above (docs.x.ai/x-subscription/grok-bot). Existing Cursor and SuperGrok plans continue.
+  { key: 'cursor', name: 'Cursor', match: /cursor/i, currency: 'USD', plans: [...X_PLANS, m('Pro（老套餐）', 20), m('Pro+（老套餐）', 60), m('Ultra（老套餐）', 200)] },
+  { key: 'grokbot', name: 'Grok Bot', match: /grok ?bot/i, currency: 'USD', plans: X_PLANS.filter(([n]) => !/Plus/.test(n)) },
+  { key: 'grok', name: 'Grok', match: /grok/i, currency: 'USD', plans: [...X_PLANS, m('SuperGrok（老套餐）', 30), m('SuperGrok Heavy（老套餐）', 300)] },
   { key: 'copilot', name: 'GitHub Copilot', match: /copilot|github/i, currency: 'USD', plans: [m('Pro', 10), m('Pro+', 39), m('Max', 100)] },
   { key: 'gemini', name: 'Google AI', match: /gemini|google ai/i, currency: 'USD', plans: [m('Plus', 4.99), m('Pro', 19.99), m('Ultra', 99.99), m('Ultra 20x', 199.99)] },
   { key: 'windsurf', name: 'Windsurf', match: /windsurf/i, currency: 'USD', plans: [m('Pro', 20), m('Max', 200)] },
@@ -74,7 +79,8 @@ function presentItem(item, ctx = { display: item.currency, fx: FALLBACK_FX }) {
     shared: item.vendor_count > 1 ? `${item.vendor_count} 个订阅合计` : '' };
   const p = item.period;
   const period = p ? { paid: p.paid_back, text: p.paid_back ? `本期已回本 ${p.ratio} 倍` : `本期还差 ${shown(p.gap_usd_minor, 'USD', ctx)}`,
-    left: `还剩 ${p.days_left} 天` } : null;
+    left: `还剩 ${p.days_left} 天`,
+    note: [p.unpriced_tokens > 0 ? `另有 ${formatTokens(p.unpriced_tokens)} token 的模型无价格，回本偏低` : '', p.exact === false ? '部分天数没有工具明细，按模型估算' : ''].filter(Boolean).join('；') } : null;
   return { id: item.id, title: item.plan ? `${item.name} ${item.plan}` : item.name, icon: iconFor(item.name), initial: initial(item.name), period,
     apiKey: !!item.api_key,
     meta: item.status === 'active' ? `${price} · 下次扣费 ${item.next_renewal_day.slice(5)}` : `${price} · ${status.label}`,
@@ -99,10 +105,13 @@ function presentWeek(data, ctx) {
 
 function presentSuggestions(data) {
   return (data?.suggestions || []).map(s => {
-    const topup = TOPUP_PRESETS.find(p => p.key === s.key), preset = topup || PRESETS.find(p => p.key === s.key);
-    return preset && { key: s.key, name: preset.name, icon: preset.icon, tokens: formatTokens(s.tokens), evidence: (s.evidence || []).join(' · '),
+    // The X Subscription is suggested through the product the usage came from.
+    const key = s.key === 'xai' ? ((s.evidence || []).some(e => /^grok-bot/.test(e)) ? 'grokbot' : (s.evidence || []).some(e => /^grok/.test(e)) && !(s.evidence || []).includes('cursor') ? 'grok' : 'cursor') : s.key;
+    const topup = TOPUP_PRESETS.find(p => p.key === key), preset = topup || PRESETS.find(p => p.key === key);
+    return preset && { key: preset.key, name: s.key === 'xai' ? preset.name + '（X 订阅）' : preset.name, icon: preset.icon, tokens: formatTokens(s.tokens), evidence: (s.evidence || []).join(' · '),
       topup: !!topup, action: topup ? '记一笔充值' : '记一笔',
-      hint: s.key === 'other' ? '没有对应订阅的用量，可按月估算填写' : topup ? '按量充值，记下充值金额就能估算余额' : '' };
+      hint: s.key === 'other' ? '没有对应订阅的用量，可按月估算填写' : topup ? '按量充值，记下充值金额就能估算余额'
+        : s.key === 'xai' ? 'Cursor、Grok、Grok Bot 共用 X 订阅的额度' : '' };
   }).filter(Boolean);
 }
 

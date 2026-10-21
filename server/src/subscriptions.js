@@ -42,7 +42,9 @@ const toUsd = (minor, currency, fx) => minor / (fx.rates[currency] || 1);
 const VENDORS = [
   { key: 'claude', name: /claude/i, tools: ['claude-code'], model: /^claude/i },
   { key: 'chatgpt', name: /chatgpt|openai|codex/i, tools: ['codex'], model: /^(gpt|o\d|codex|chatgpt)/i },
-  { key: 'cursor', name: /cursor/i, tools: ['cursor'], model: null },
+  // The X Subscription (2026-10-12) bills Cursor, Grok and Grok Bot from one weekly pool; legacy Cursor and
+  // SuperGrok plans are grouped with it. Everything run inside Cursor is Cursor's, whatever the model.
+  { key: 'xai', name: /cursor|grok|x ?订阅|x subscription/i, tools: ['cursor', 'grok'], model: /^(grok|composer|agent_review)/i },
   { key: 'copilot', name: /copilot|github/i, tools: ['copilot'], model: null },
   { key: 'gemini', name: /gemini|google ai/i, tools: ['antigravity', 'gemini', 'gemini-cli'], model: /^gemini/i },
   { key: 'windsurf', name: /windsurf/i, tools: ['windsurf'], model: null },
@@ -52,7 +54,7 @@ const VENDORS = [
   { key: 'deepseek', name: /deepseek/i, tools: ['dsh'], model: null, prepaid: true },
 ];
 export const PREPAID = new Set(VENDORS.filter(v => v.prepaid).map(v => v.key));
-const MULTI_VENDOR = new Set(['cursor', 'copilot', 'windsurf']);
+const MULTI_VENDOR = new Set(['copilot', 'windsurf']);
 const bareModel = model => String(model || '').split('/').pop();
 export const subscriptionProvider = name => VENDORS.find(v => !v.prepaid && v.name.test(name || ''))?.key || null;
 export function modelProvider(model) {
@@ -61,11 +63,34 @@ export function modelProvider(model) {
   return VENDORS.find(v => v.model && v.model.test(bare))?.key || null;
 }
 const toolProvider = tool => VENDORS.find(v => v.tools.includes(tool))?.key || null;
+// Tools that bill everything run inside them (Cursor's Claude, Antigravity's Claude). Other agents such as Claude Code and
+// Codex also drive GLM, Kimi, DeepSeek or custom endpoints through compatible APIs; those are billed by the model's vendor.
+const BILLING_TOOLS = new Set(['cursor', 'grok', 'antigravity', 'copilot', 'windsurf']);
+const AGENT_TOOLS = new Set(['claude-code', 'codex']);
+/** Who bills a slice of usage. Grok Bot models are always the X Subscription's. */
+export function usageVendor(tool, model) {
+  if (/^grok-bot/i.test(bareModel(model))) return 'xai';
+  if (tool && BILLING_TOOLS.has(tool)) return toolProvider(tool);
+  const byModel = modelProvider(model);
+  if (byModel || !tool || AGENT_TOOLS.has(tool)) return byModel;
+  return toolProvider(tool);
+}
 const parsePairs = json => { try { const v = JSON.parse(json || '[]'); return Array.isArray(v) ? v.filter(p => Array.isArray(p) && typeof p[0] === 'string' && p[1] > 0) : []; } catch { return []; } };
+const parseTriples = json => { try { const v = JSON.parse(json || 'null'); return Array.isArray(v) ? v.filter(p => Array.isArray(p) && typeof p[0] === 'string' && typeof p[1] === 'string' && p[2] > 0) : null; } catch { return null; } };
 
-/** API-equivalent value per Beijing day, in USD micros, in total and per vendor. */
+/**
+ * A day's usage as (tool, model, tokens) slices. Newer clients upload the tool × model split;
+ * older rows only have model totals, so their slices carry no tool and fall back to the model.
+ */
+export function usageSlices(row) {
+  const joint = parseTriples(row.tool_models_json);
+  if (joint && joint.length) return { exact: true, slices: joint.map(([tool, model, tokens]) => ({ tool, model, tokens })) };
+  return { exact: false, slices: parsePairs(row.models_json).map(([model, tokens]) => ({ tool: null, model, tokens })) };
+}
+
+/** API-equivalent value per Beijing day in USD micros, in total and per vendor; unpriced tokens per vendor. */
 export function dailyValues(rows, days) {
-  const byDay = new Map(days.map(day => [day, { day, api_usd_micros: null, providers: {} }]));
+  const byDay = new Map(days.map(day => [day, { day, api_usd_micros: null, providers: {}, unpriced: {}, exact: true }]));
   for (const row of rows) {
     const entry = byDay.get(row.day);
     if (!entry) continue;
@@ -73,40 +98,50 @@ export function dailyValues(rows, days) {
     try { cost = JSON.parse(row.cost_json || 'null'); validateCost(cost, row.tokens); } catch { cost = null; }
     if (!cost) continue;
     entry.api_usd_micros = (entry.api_usd_micros || 0) + cost.usd_micros;
-    for (const [model, micros] of cost.models) {
-      // Models no subscription vendor claims belong to the user's "综合" entry, if there is one.
-      const provider = modelProvider(model) || 'other';
-      entry.providers[provider] = (entry.providers[provider] || 0) + micros;
+    const { exact, slices } = usageSlices(row);
+    if (!exact) entry.exact = false;
+    const priced = new Map(cost.models), unpriced = new Set(cost.unpriced_models);
+    const modelTokens = new Map();
+    for (const s of slices) modelTokens.set(s.model, (modelTokens.get(s.model) || 0) + s.tokens);
+    const assigned = new Set();
+    // A model's cost is split between the tools that ran it by their share of its tokens.
+    for (const s of slices) {
+      const vendor = usageVendor(s.tool, s.model) || 'other';
+      if (priced.has(s.model)) {
+        entry.providers[vendor] = (entry.providers[vendor] || 0) + priced.get(s.model) * s.tokens / modelTokens.get(s.model);
+        assigned.add(s.model);
+      } else if (unpriced.has(s.model)) entry.unpriced[vendor] = (entry.unpriced[vendor] || 0) + s.tokens;
+    }
+    // Priced models missing from the slices (older uploads) still count, by model.
+    for (const [model, micros] of priced) if (!assigned.has(model)) {
+      const vendor = modelProvider(model) || 'other';
+      entry.providers[vendor] = (entry.providers[vendor] || 0) + micros;
     }
   }
+  for (const entry of byDay.values()) for (const k of Object.keys(entry.providers)) entry.providers[k] = Math.round(entry.providers[k]);
   return days.map(day => byDay.get(day));
 }
 
 /** What the last seven days of usage suggest the user pays for; usage no plan claims becomes "综合". */
 export function suggestSubscriptions(rows, activeKeys) {
-  const found = new Map(), other = { tokens: 0, names: new Map() };
-  // A tool and its models describe the same tokens: keep the larger of the two counts, not their sum.
-  const add = (key, tokens, name, kind) => {
-    const f = found.get(key) || { key, tool: 0, model: 0, names: new Map() };
-    f[kind] += tokens; f.names.set(name, (f.names.get(name) || 0) + tokens); found.set(key, f);
+  const found = new Map();
+  const add = (key, tokens, names) => {
+    const f = found.get(key) || { key, tokens: 0, names: new Map() };
+    f.tokens += tokens; for (const n of names) if (n) f.names.set(n, (f.names.get(n) || 0) + tokens); found.set(key, f);
   };
   for (const row of rows) {
-    for (const [tool, tokens] of parsePairs(row.tools_json)) {
+    const { exact, slices } = usageSlices(row);
+    for (const s of slices) add(usageVendor(s.tool, s.model) || 'other', s.tokens, [s.tool, bareModel(s.model)]);
+    // Without the joint split a tool-only vendor (Cursor) is still visible from the tool totals.
+    if (!exact) for (const [tool, tokens] of parsePairs(row.tools_json)) {
       const key = toolProvider(tool);
-      if (key) add(key, tokens, tool, 'tool');
-      else if (!parsePairs(row.models_json).length) { other.tokens += tokens; other.names.set(tool, (other.names.get(tool) || 0) + tokens); }
-    }
-    for (const [model, tokens] of parsePairs(row.models_json)) {
-      const key = modelProvider(model);
-      if (key) add(key, tokens, bareModel(model), 'model');
-      else { other.tokens += tokens; other.names.set(bareModel(model), (other.names.get(bareModel(model)) || 0) + tokens); }
+      if (key && !slices.some(s => usageVendor(null, s.model) === key)) add(key, tokens, [tool]);
     }
   }
   const top = names => [...names].sort((a, b) => b[1] - a[1]).slice(0, 3).map(([n]) => n);
-  const list = [...found.values()].map(f => ({ key: f.key, tokens: Math.max(f.tool, f.model), evidence: top(f.names) }))
-    .filter(f => !activeKeys.has(f.key)).sort((a, b) => b.tokens - a.tokens);
-  if (other.tokens > 0 && !activeKeys.has('other')) list.push({ key: 'other', tokens: other.tokens, evidence: top(other.names) });
-  return list;
+  return [...found.values()].filter(f => !activeKeys.has(f.key))
+    .sort((a, b) => (a.key === 'other') - (b.key === 'other') || b.tokens - a.tokens)
+    .map(f => ({ key: f.key, tokens: f.tokens, evidence: top(f.names) }));
 }
 
 export function cycleDays(sub) { return sub.cycle === 'custom' ? sub.custom_days : CYCLE_DAYS[sub.cycle]; }
@@ -174,7 +209,7 @@ export async function listSubscriptions(env, userId, now = Date.now(), fx = FALL
   const earliest = [month, ...active.map(i => i.period_start).filter(Boolean), ...topupRows.results.map(r => r.day)]
     .reduce((a, b) => (b < a ? b : a), month);
   const from = earliest < beijingDaysAgo(365, now) ? beijingDaysAgo(365, now) : earliest;
-  const usage = await env.DB.prepare(`SELECT day,tokens,requests,cost_json,models_json,tools_json FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3`)
+  const usage = await env.DB.prepare(`SELECT day,tokens,requests,cost_json,models_json,tools_json,tool_models_json FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3`)
     .bind(userId, from, today).all();
   const values = new Map(dailyValues(usage.results, daysBetween(from, today)).map(v => [v.day, v]));
   const usdDailyOf = item => toUsd(item.price_minor / item.cycle_days, item.currency, fx);
@@ -204,12 +239,17 @@ export async function listSubscriptions(env, userId, now = Date.now(), fx = FALL
     // A plan pays for one billing period: compare its share of the vendor's value since the period began.
     if (v && item.period_start) {
       const share = usdDailyOf(item) / v.usd_daily;
-      let value = 0;
-      for (const d of daysBetween(item.period_start, today)) value += (values.get(d)?.providers[item.provider] || 0) * share;
+      let value = 0, unpriced = 0, exact = true;
+      for (const d of daysBetween(item.period_start, today)) {
+        const day = values.get(d);
+        if (!day) continue;
+        value += (day.providers[item.provider] || 0) * share; unpriced += (day.unpriced[item.provider] || 0) * share;
+        if (day.api_usd_micros != null && !day.exact) exact = false;
+      }
       const priceCents = toUsd(item.price_minor, item.currency, fx), ratio = value / 10_000 / priceCents;
       period = { start: item.period_start, end: addDays(item.next_renewal_day, -1), days_left: dayNumber(item.next_renewal_day) - dayNumber(today),
         value_usd_micros: Math.round(value), ratio: Math.round(ratio * 10) / 10, paid_back: ratio >= 1,
-        gap_usd_minor: ratio >= 1 ? 0 : round2(priceCents - value / 10_000) };
+        gap_usd_minor: ratio >= 1 ? 0 : round2(priceCents - value / 10_000), unpriced_tokens: Math.round(unpriced), exact };
     }
     const { period_start, ...rest } = item;
     return { ...rest, today_usd_micros: micros, vendor_count: v ? v.count : 0, period,

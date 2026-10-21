@@ -43,6 +43,7 @@
         <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view>
           <view wx:if="{{item.period}}" class="today-tag {{item.period.paid ? 'paid' : 'unpaid'}}">{{item.period.text}} · {{item.period.left}}{{item.today && item.today.shared ? ' · ' + item.today.shared : ''}}</view>
           <view wx:elif="{{item.apiKey}}" class="today-tag">走 API Key 付费，不计入回本</view>
+          <view wx:if="{{item.period && item.period.note}}" class="today-small">{{item.period.note}}</view>
           <view wx:if="{{item.today}}" class="today-small">今天 {{item.today.value}}</view>
         </view>
         <view class="cost"><view class="num">{{item.daily}}</view><view class="unit">每天</view></view>

@@ -195,7 +195,9 @@ node --test miniprogram/test/*.test.cjs
 
 底部第三个标签「订阅」记录用户为 AI 工具付的订阅费，交互照搬本地「超值」App 的订阅页。
 
-- 用量推测：按近 7 天上报的工具和模型推测正在用的服务（claude-code／claude 模型 → Claude，codex／gpt → ChatGPT，cursor → Cursor，antigravity／gemini → Google AI，zcode／glm → 智谱，kimi → Kimi），没有对应订阅的用量（dsh、WorkBuddy、DeepSeek、Grok 等）归为「综合」。已记录的服务不再推荐；点「记一笔」直接打开该服务的套餐表，「综合」按月估算填写。工具与其模型描述的是同一份用量，取两者较大值，不相加。
+- 用量归属：新版电脑端上传「工具 × 模型」明细（`tool_models_json`），按它判断谁计费：Cursor、Grok、Antigravity、Copilot、Windsurf 内运行的全部模型归该工具的订阅（如 Cursor 里的 Claude、Grok 归 X 订阅，Antigravity 里的 Claude 归 Google AI）；Claude Code、Codex 等代理按模型归属（其中接入的 GLM、Kimi、DeepSeek 由对应厂商计费，自定义模型归「综合」）；`grok-bot-*` 模型一律归 X 订阅。模型费用按各工具的 token 份额拆分。没有明细的旧数据按模型归属，并在订阅行注明「按模型估算」；无价格模型（Grok Bot、Cursor 自有的 composer、auto 等）的 token 单独统计并提示「回本偏低」。
+- X 订阅：2026-10-12 起 xAI 的 The X Subscription 把 Grok、Grok Bot、Cursor、X Premium 合成一份订阅，共用每周额度（Plus $8、Premium $30、Super $100、Ultra $200，Grok Bot 需 Premium 及以上）。模板里 Cursor、Grok、Grok Bot 各有图标和入口，都归同一组；Cursor Pro／Pro+／旧 Ultra 和 SuperGrok 老套餐也归这一组。Grok Bot 暂用 Grok 图标。
+- 用量推测：按近 7 天的归属推测正在用的服务，没有对应订阅的用量归为「综合」。已记录的服务不再推荐；点「记一笔」直接打开该服务的套餐表，「综合」按月估算填写。
 - 列表页：右上角切换金额单位（人民币、美元、欧元、英镑、港币、日元），所有汇总、每天成本和 Token 价值按欧洲央行参考汇率（frankfurter.dev，缓存 6 小时；取不到时用标注日期的备用汇率）换算成同一单位，并注明汇率来源；每行仍显示原币价格。「今天 Token 值多少钱」与全部订阅的每天成本比较，标「已回本 N 倍」或「还差」；下面是近 7 天格子。订阅行带品牌图标、下次扣费日、每天成本，单一厂商的订阅另标该厂商模型今天的价值；同一厂商的多个订阅合并判断，标「N 个订阅合计」；「综合」对应其余模型的价值；Cursor、Copilot、Windsurf 不归属当天用量。
 - 添加页：四列模板格子；多套餐弹出底部套餐表（含年付、包季），单套餐直接填入；币种可选六种；「保存并继续添加」连续录入多个订阅，「保存并返回」回到列表。套餐价格于 2026-10-21 核对：Claude、Cursor、GitHub Copilot、Google AI、Kimi 取官网，ChatGPT、Windsurf、智谱 GLM 官网无法直接读取，取多方二手资料，均可修改。
 - 图标在 `assets/subscriptions/`：Claude、ChatGPT、Cursor、GitHub 取自「超值」项目，Gemini、Windsurf、Kimi、智谱 GLM 取自各官网 favicon，「综合」为自绘中性图标，统一 128×128 PNG。

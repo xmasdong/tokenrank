@@ -150,8 +150,8 @@ test('从用量建议进入直接弹出套餐；综合只填名称；保存并�
 test('订阅行显示本期回本状态与剩余天数；走 API Key 的只标注不判断', () => {
   const view = S.presentList(listData([item({ period: { start: '2026-10-11', end: '2026-11-09', days_left: 20, value_usd_micros: 120_000_000, ratio: 0.6, paid_back: false, gap_usd_minor: 8000 } }),
     item({ id: 'e'.repeat(32), period: { days_left: 3, ratio: 18.2, paid_back: true, gap_usd_minor: 0 } }), item({ id: 'f'.repeat(32), api_key: true, period: null })]), 'USD');
-  assert.deepEqual(view.active[0].period, { paid: false, text: '本期还差 $80', left: '还剩 20 天' });
-  assert.deepEqual(view.active[1].period, { paid: true, text: '本期已回本 18.2 倍', left: '还剩 3 天' });
+  assert.deepEqual(view.active[0].period, { paid: false, text: '本期还差 $80', left: '还剩 20 天', note: '' });
+  assert.deepEqual(view.active[1].period, { paid: true, text: '本期已回本 18.2 倍', left: '还剩 3 天', note: '' });
   assert.equal(view.active[2].period, null); assert.equal(view.active[2].apiKey, true);
 });
 
@@ -183,4 +183,18 @@ test('充值页：默认沿用上次币种，校准余额允许 0；保存后返
   const g = pageFixture('topup-edit/topup-edit.js', api);
   await g.p.onLoad({ id: 'r'.repeat(32) }); assert.equal(g.p.data.form.amount, '20'); g.p.pickKind({ currentTarget: { dataset: { key: 'topup' } } });
   g.p.remove(); assert.match(g.modals[0].content, /不影响 DeepSeek 账户/); await g.modals[0].success({ confirm: true }); assert.deepEqual(g.navigation, ['back']);
+});
+
+test('X 订阅：Cursor、Grok、Grok Bot 各有图标和套餐，Grok Bot 只有 Premium 起；建议按用量来源选入口', () => {
+  const plans = key => S.PRESETS.find(p => p.key === key).plans.map(([n, price]) => n + ' ' + price);
+  assert.deepEqual(plans('grokbot'), ['X 订阅 Premium 30', 'X 订阅 Super 100', 'X 订阅 Ultra 200', 'X 订阅 Premium 年付 300', 'X 订阅 Super 年付 1000']);
+  assert.ok(plans('cursor').includes('X 订阅 Plus 8')); assert.ok(plans('cursor').includes('Pro（老套餐） 20'));
+  assert.ok(plans('grok').includes('SuperGrok（老套餐） 30'));
+  assert.equal(S.iconFor('Grok Bot'), '/assets/subscriptions/grokbot.png'); assert.equal(S.iconFor('Grok'), '/assets/subscriptions/grok.png');
+  const sg = evidence => S.presentList(listData([], { suggestions: [{ key: 'xai', tokens: 1, evidence }] }), 'CNY').suggestions[0];
+  assert.equal(sg(['cursor', 'grok-bot-default']).key, 'grokbot'); assert.equal(sg(['cursor', 'grok-bot-default']).name, 'Grok Bot（X 订阅）');
+  assert.equal(sg(['grok', 'grok-4.7-build']).key, 'grok'); assert.equal(sg(['cursor', 'auto']).key, 'cursor');
+  assert.match(sg(['cursor']).hint, /共用 X 订阅/);
+  const row = S.presentList(listData([item({ name: 'Cursor', plan: 'X 订阅 Premium', period: { days_left: 9, ratio: 0.4, paid_back: false, gap_usd_minor: 1800, unpriced_tokens: 232_000_000, exact: false } })]), 'USD').active[0];
+  assert.equal(row.period.note, '另有 2.32 亿 token 的模型无价格，回本偏低；部分天数没有工具明细，按模型估算');
 });
