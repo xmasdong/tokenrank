@@ -35,6 +35,7 @@
           <view class="daily"><text class="mid num">{{view.total.daily}}</text><text class="per">/天</text><text class="count">{{view.total.count}} 个订阅中</text></view>
           <view class="mini"><view><text class="mini-label">月均</text><text class="num">{{view.total.monthly}}</text></view><view><text class="mini-label">年均</text><text class="num">{{view.total.yearly}}</text></view><view><text class="mini-label">累计已花</text><text class="num">{{view.total.spent}}</text></view></view>
         </view>
+        <button class="share-btn" bindtap="sharePoster" loading="{{posterBusy}}" disabled="{{posterBusy}}">分享我的 AI 订阅清单</button>
         <view wx:if="{{view.value}}" class="value">近 30 天 API 等值 <text class="num">{{view.value.api}}</text>，是订阅月费 <text class="num">{{view.value.plan}}</text> 的 <text class="ratio num">{{view.value.ratio}} 倍</text></view>
       </view>
       <view wx:if="{{view.active.length}}" class="section">订阅中 <text>{{view.active.length}}</text></view>
@@ -71,4 +72,5 @@
   <view wx:if="{{error}}" class="notice error" role="alert">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>
   <button wx:if="{{view && !view.empty}}" class="fab" bindtap="add" aria-label="添加订阅">+</button>
 </view>
+<canvas type="2d" id="subPoster" class="export-canvas"></canvas>
 <privacy-notice />

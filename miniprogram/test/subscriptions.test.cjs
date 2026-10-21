@@ -198,3 +198,21 @@ test('X 订阅：Cursor、Grok、Grok Bot 各有图标和套餐，Grok Bot 只�
   const row = S.presentList(listData([item({ name: 'Cursor', plan: 'X 订阅 Premium', period: { days_left: 9, ratio: 0.4, paid_back: false, gap_usd_minor: 1800, unpriced_tokens: 232_000_000, exact: false } })]), 'USD').active[0];
   assert.equal(row.period.note, '另有 2.32 亿 token 的模型无价格，回本偏低；部分天数没有工具明细，按模型估算');
 });
+
+test('订阅清单海报：同款合并 ×N、主力取本期价值最高、月付显示原价、充值按日均折月、隐藏金额只留回本', () => {
+  const P = require('../utils/subscription-poster');
+  const gpt = (id) => item({ id, name: 'ChatGPT', plan: 'Pro 200', period: { value_usd_micros: 50_000_000, ratio: 0.3, paid_back: false, gap_usd_minor: 1, days_left: 9 } });
+  const data = listData([gpt('a'.repeat(32)), gpt('b'.repeat(32)), item({ id: 'c'.repeat(32), period: { value_usd_micros: 1_360_000_000, ratio: 6.8, paid_back: true, days_left: 22 } }),
+    item({ id: 'd'.repeat(32), name: 'Kimi', plan: 'Pro 年付', price_minor: 190800, currency: 'CNY', cycle: 'year', monthly_minor: 15912, period: null })],
+    { topups: [{ vendor: 'deepseek', currency: 'CNY', avg_daily_minor: 1032.88 }] });
+  const model = P.posterModel(data, 'CNY', { day: '2026-10-21' });
+  assert.deepEqual(model.rows.map(r => [r.name, r.count, r.main, r.price, r.payback]), [
+    ['ChatGPT', 2, false, '$400/月', '本期回本 30%'], ['Claude', 1, true, '$200/月', '本期回本 6.8 倍'],
+    ['Kimi', 1, false, '¥159.12/月', ''], ['DeepSeek API', 1, false, '约 ¥310/月', '']]);
+  assert.equal(model.rows[2].plan, 'Pro 年付 · 年付折合');
+  // $600 × 6.678 + ¥159.12 + ¥309.86
+  assert.equal(model.total, '合计约 ¥4,476 / 月'); assert.deepEqual(model.hook, { api: '¥8,645', ratio: 6.4 });
+  const hidden = P.posterModel(data, 'CNY', { hideAmounts: true });
+  assert.ok(hidden.rows.every(r => r.price === '•••')); assert.equal(hidden.total, '•••'); assert.equal(hidden.rows[1].payback, '本期回本 6.8 倍');
+  assert.equal(P.posterHeight(model), 360 + 4 * P.ROW + 330);
+});

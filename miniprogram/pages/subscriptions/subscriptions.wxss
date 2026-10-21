@@ -81,3 +81,5 @@ page { background: var(--surface-muted); }
 .tp-records { margin-top: 10px; border-top: 1rpx solid var(--separator); }
 .tp-record { display: flex; justify-content: space-between; padding: 10px 0; font-size: 13px; color: var(--text-secondary); border-bottom: 1rpx solid var(--separator); }
 .tp-record:last-child { border-bottom: none; }
+.share-btn { width: 100% !important; margin: 16px 0 0 !important; height: 40px; line-height: 40px; padding: 0; font-size: 14px; font-weight: 500; border-radius: 8px; color: var(--amount); background: #FBEEDD; }
+.share-btn::after { border: none; }
