@@ -1,0 +1,23 @@
+<view class="page">
+  <view wx:if="{{loading}}" class="state">正在读取…</view>
+  <block wx:elif="{{form}}">
+    <view class="card">
+      <view class="name-row"><image class="icon" src="{{icon}}" mode="aspectFit" /><text class="name">{{name}}</text></view>
+      <view class="block">
+        <view class="pills"><view wx:for="{{kinds}}" wx:key="key" class="pill {{form.kind === item.key ? 'on' : ''}}" data-key="{{item.key}}" bindtap="pickKind">{{item.label}}</view></view>
+        <view class="explain">{{form.kind === 'topup' ? '记下这次充值的金额，余额按电脑端上报的用量估算。' : '把 DeepSeek 后台显示的当前余额填进来，估算从这一天之后重新累计。'}}</view>
+      </view>
+      <view class="price-row">
+        <picker range="{{currencyLabels}}" value="{{currencyIndex}}" bindchange="pickCurrency" disabled="{{busy}}"><view class="currency">{{symbol}}<text class="caret">▾</text></view></picker>
+        <input class="price num" type="digit" value="{{form.amount}}" data-field="amount" bindinput="input" placeholder="{{form.kind === 'topup' ? '充值金额' : '当前余额'}}" disabled="{{busy}}" />
+      </view>
+      <picker mode="date" end="{{today}}" value="{{form.day}}" bindchange="pickDate" disabled="{{busy}}"><view class="row"><text class="label">{{form.kind === 'topup' ? '充值日期' : '余额日期'}}</text><text class="row-value">{{form.day}}</text></view></picker>
+      <view class="row last"><text class="label">备注</text><input class="row-input" value="{{form.notes}}" data-field="notes" bindinput="input" maxlength="100" placeholder="选填" disabled="{{busy}}" /></view>
+    </view>
+    <button wx:if="{{id}}" class="text-button remove" bindtap="remove" disabled="{{busy}}">删除这条记录</button>
+    <view class="footnote">只记录你填写的金额，不连接 DeepSeek 账户。估算按北京时间自然日，只计官方 deepseek 模型（如 dsh），经其他平台转发或免费版本不扣你的余额，不计入。</view>
+    <view class="bar"><button class="btn btn-primary save" bindtap="save" loading="{{busy}}" disabled="{{busy}}">保存</button></view>
+  </block>
+  <view wx:if="{{error}}" class="notice error" role="alert">{{error}}</view>
+</view>
+<privacy-notice />

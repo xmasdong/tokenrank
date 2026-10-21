@@ -21,6 +21,8 @@ const PRESETS = [
   // Usage no plan claims (dsh, WorkBuddy, DeepSeek API…): the user enters roughly what it costs a month.
   { key: 'other', name: '综合', match: /综合/, currency: 'CNY', plans: [] },
 ].map(p => ({ ...p, icon: ICON_DIR + p.key + '.png' }));
+// Prepaid API balances: recorded as top-ups, not as plans.
+const TOPUP_PRESETS = [{ key: 'deepseek', name: 'DeepSeek', currency: 'CNY', icon: ICON_DIR + 'deepseek.png' }];
 
 const CYCLES = [
   { key: 'week', label: '每周', unit: '周' },
@@ -70,7 +72,11 @@ function presentItem(item, ctx = { display: item.currency, fx: FALLBACK_FX }) {
   const price = `${money(item.price_minor, item.currency)}/${cycleUnit(item)}`;
   const today = item.today_usd_micros == null ? null : { value: fromUsdMicros(item.today_usd_micros, ctx), paid: item.paid_back_today,
     shared: item.vendor_count > 1 ? `${item.vendor_count} 个订阅合计` : '' };
-  return { id: item.id, title: item.plan ? `${item.name} ${item.plan}` : item.name, icon: iconFor(item.name), initial: initial(item.name),
+  const p = item.period;
+  const period = p ? { paid: p.paid_back, text: p.paid_back ? `本期已回本 ${p.ratio} 倍` : `本期还差 ${shown(p.gap_usd_minor, 'USD', ctx)}`,
+    left: `还剩 ${p.days_left} 天` } : null;
+  return { id: item.id, title: item.plan ? `${item.name} ${item.plan}` : item.name, icon: iconFor(item.name), initial: initial(item.name), period,
+    apiKey: !!item.api_key,
     meta: item.status === 'active' ? `${price} · 下次扣费 ${item.next_renewal_day.slice(5)}` : `${price} · ${status.label}`,
     active: item.status === 'active', daily: shown(item.daily_minor, item.currency, ctx), spent: shown(item.spent_minor, item.currency, ctx, 0), today };
 }
@@ -93,10 +99,26 @@ function presentWeek(data, ctx) {
 
 function presentSuggestions(data) {
   return (data?.suggestions || []).map(s => {
-    const preset = PRESETS.find(p => p.key === s.key);
+    const topup = TOPUP_PRESETS.find(p => p.key === s.key), preset = topup || PRESETS.find(p => p.key === s.key);
     return preset && { key: s.key, name: preset.name, icon: preset.icon, tokens: formatTokens(s.tokens), evidence: (s.evidence || []).join(' · '),
-      hint: s.key === 'other' ? '没有对应订阅的用量，可按月估算填写' : '' };
+      topup: !!topup, action: topup ? '记一笔充值' : '记一笔',
+      hint: s.key === 'other' ? '没有对应订阅的用量，可按月估算填写' : topup ? '按量充值，记下充值金额就能估算余额' : '' };
   }).filter(Boolean);
+}
+
+/** Prepaid balances in their own currency: estimated remaining, burn rate and the records behind them. */
+function presentTopups(data) {
+  return (data?.topups || []).map(t => {
+    const preset = TOPUP_PRESETS.find(p => p.key === t.vendor) || { name: t.vendor, icon: '' };
+    const m = (minor, d = 2) => money(minor, t.currency, d);
+    const low = t.remaining_minor <= 0;
+    return { vendor: t.vendor, name: preset.name, icon: preset.icon, currency: t.currency,
+      remaining: m(Math.max(0, t.remaining_minor)), low, total: m(t.total_minor, 0), count: t.count, spent: m(t.spent_minor),
+      percent: t.used_percent == null ? 0 : t.used_percent, today: m(t.today_minor), avg: m(t.avg_daily_minor),
+      daysLeft: low ? '' : t.days_left == null ? '近 7 天没有用量' : `约还能用 ${t.days_left} 天`,
+      basis: t.calibrated_day ? `${t.calibrated_day} 校准后估算` : `自 ${t.since} 首次充值起估算`,
+      records: t.records.map(r => ({ id: r.id, day: r.day, kind: r.kind, label: r.kind === 'balance' ? '校准余额' : '充值', amount: m(r.amount_minor), notes: r.notes || '' })) };
+  });
 }
 
 function fxLine(fx) {
@@ -117,15 +139,16 @@ function presentList(data, display = 'CNY') {
   const value = v && v.ratio != null ? { api: fromUsdMicros(v.api_usd_micros, ctx, 0), plan: shown(v.usd_monthly_minor, 'USD', ctx, 0), ratio: v.ratio } : null;
   return { active: items.filter(i => i.active), inactive: items.filter(i => !i.active), total, value, display,
     displayLabel: currencyOf(display).label, fx: mixed ? fxLine(fx) : '',
-    today: presentToday(data, ctx), week: presentWeek(data, ctx), suggestions: presentSuggestions(data), empty: !items.length,
+    today: presentToday(data, ctx), week: presentWeek(data, ctx), suggestions: presentSuggestions(data), topups: presentTopups(data),
+    empty: !items.length && !(data?.topups || []).length,
     full: (data?.items?.length || 0) >= (data?.summary?.limit || 30) };
 }
 
 function formFromItem(item, today, currency = 'USD') {
-  if (!item) return { name: '', plan: '', price: '', currency, cycle: 'month', custom_days: '', start_day: today, status: 'active', ended_day: '', notes: '' };
+  if (!item) return { name: '', plan: '', price: '', currency, cycle: 'month', custom_days: '', start_day: today, status: 'active', ended_day: '', notes: '', api_key: false };
   return { name: item.name, plan: item.plan || '', price: String(item.price_minor / 100), currency: item.currency, cycle: item.cycle,
     custom_days: item.custom_days ? String(item.custom_days) : '', start_day: item.start_day, status: item.status,
-    ended_day: item.ended_day || '', notes: item.notes || '' };
+    ended_day: item.ended_day || '', notes: item.notes || '', api_key: !!item.api_key };
 }
 
 function bodyFromForm(form, today) {
@@ -140,11 +163,24 @@ function bodyFromForm(form, today) {
   }
   if (!form.start_day || form.start_day > today) return { error: '开始日期不能晚于今天' };
   const body = { name, plan: String(form.plan || '').trim() || null, price: Math.round(price * 100) / 100, currency: form.currency,
-    cycle: form.cycle, custom_days: customDays, start_day: form.start_day, status: form.status, notes: String(form.notes || '').trim() || null };
+    cycle: form.cycle, custom_days: customDays, start_day: form.start_day, status: form.status, notes: String(form.notes || '').trim() || null,
+    api_key: !!form.api_key };
   if (form.status !== 'active') body.ended_day = form.ended_day || today;
   return { body };
 }
 
+function topupForm(record, today, currency = 'CNY') {
+  return record ? { kind: record.kind, amount: String(record.amount_minor / 100), currency: record.currency, day: record.day, notes: record.notes || '' }
+    : { kind: 'topup', amount: '', currency, day: today, notes: '' };
+}
+function topupBody(form, vendor, today) {
+  const amount = Number(String(form.amount).trim());
+  const min = form.kind === 'topup' ? 0.01 : 0;
+  if (!String(form.amount).trim() || !Number.isFinite(amount) || amount < min || amount > 1_000_000_000) return { error: form.kind === 'topup' ? '请填写有效的充值金额' : '请填写有效的余额' };
+  if (!form.day || form.day > today) return { error: '日期不能晚于今天' };
+  return { body: { vendor, kind: form.kind, amount: Math.round(amount * 100) / 100, currency: form.currency, day: form.day, notes: String(form.notes || '').trim() || null } };
+}
+
 function planLabel(currency, price, cycle) { return `${symbol(currency)}${price}/${(CYCLES.find(c => c.key === cycle) || CYCLES[1]).unit}`; }
 
-module.exports = { planLabel, convert, PRESETS, CYCLES, CURRENCIES, STATUSES, money, symbol, iconFor, presetFor, presentList, presentItem, formFromItem, bodyFromForm };
+module.exports = { topupForm, topupBody, TOPUP_PRESETS, planLabel, convert, PRESETS, CYCLES, CURRENCIES, STATUSES, money, symbol, iconFor, presetFor, presentList, presentItem, formFromItem, bodyFromForm };

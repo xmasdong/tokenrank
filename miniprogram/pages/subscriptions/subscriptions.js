@@ -24,7 +24,12 @@ Page({
     try { wx.setStorageSync(DISPLAY_KEY, c.key); } catch { /* the choice still applies to this view */ }
     if (this._data) this.setData({ view: presentList(this._data, c.key), currencyIndex: Number(e.detail.value) });
   },
-  addSuggested(e) { wx.navigateTo({ url: '/pages/subscription-edit/subscription-edit?preset=' + encodeURIComponent(e.currentTarget.dataset.key) }); },
+  addSuggested(e) {
+    const { key, topup } = e.currentTarget.dataset;
+    wx.navigateTo({ url: topup ? '/pages/topup-edit/topup-edit?vendor=' + encodeURIComponent(key) : '/pages/subscription-edit/subscription-edit?preset=' + encodeURIComponent(key) });
+  },
+  addTopup(e) { wx.navigateTo({ url: `/pages/topup-edit/topup-edit?vendor=${encodeURIComponent(e.currentTarget.dataset.vendor)}&kind=${e.currentTarget.dataset.kind || 'topup'}` }); },
+  editTopup(e) { wx.navigateTo({ url: '/pages/topup-edit/topup-edit?id=' + encodeURIComponent(e.currentTarget.dataset.id) }); },
   current(epoch) { return this._visible && epoch === api.accountEpoch() && !api.accountState(); },
   async load(options = {}) {
     const epoch = api.accountEpoch(), request = this._request = (this._request || 0) + 1;

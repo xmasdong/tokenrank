@@ -62,7 +62,7 @@ test('表单校验名称、价格、自定义天数和开始日期；停用时�
   assert.equal(S.bodyFromForm({ ...form, name: 'Kimi', price: '9', cycle: 'custom', custom_days: '0' }, today).error, '自定义周期为 1 到 3650 天');
   assert.equal(S.bodyFromForm({ ...form, name: 'Kimi', price: '9', start_day: '2026-10-22' }, today).error, '开始日期不能晚于今天');
   const { body } = S.bodyFromForm({ ...form, name: ' Kimi ', plan: '', price: '199', currency: 'CNY' }, today);
-  assert.deepEqual(body, { name: 'Kimi', plan: null, price: 199, currency: 'CNY', cycle: 'month', custom_days: null, start_day: today, status: 'active', notes: null });
+  assert.deepEqual(body, { name: 'Kimi', plan: null, price: 199, currency: 'CNY', cycle: 'month', custom_days: null, start_day: today, status: 'active', notes: null, api_key: false });
   assert.equal(S.bodyFromForm({ ...S.formFromItem(item(), today), status: 'paused' }, today).body.ended_day, today);
   assert.equal(S.formFromItem(item(), today).price, '200');
 });
@@ -145,4 +145,42 @@ test('从用量建议进入直接弹出套餐；综合只填名称；保存并�
   await f.p.saveAndNext();
   assert.equal(saved[0].name, '综合'); assert.equal(saved[0].currency, 'CNY'); assert.deepEqual(f.navigation, []);
   assert.equal(f.p.data.form.name, ''); assert.equal(f.p.data.added, 1); assert.equal(f.guards.at(-1), 'off');
+});
+
+test('订阅行显示本期回本状态与剩余天数；走 API Key 的只标注不判断', () => {
+  const view = S.presentList(listData([item({ period: { start: '2026-10-11', end: '2026-11-09', days_left: 20, value_usd_micros: 120_000_000, ratio: 0.6, paid_back: false, gap_usd_minor: 8000 } }),
+    item({ id: 'e'.repeat(32), period: { days_left: 3, ratio: 18.2, paid_back: true, gap_usd_minor: 0 } }), item({ id: 'f'.repeat(32), api_key: true, period: null })]), 'USD');
+  assert.deepEqual(view.active[0].period, { paid: false, text: '本期还差 $80', left: '还剩 20 天' });
+  assert.deepEqual(view.active[1].period, { paid: true, text: '本期已回本 18.2 倍', left: '还剩 3 天' });
+  assert.equal(view.active[2].period, null); assert.equal(view.active[2].apiKey, true);
+});
+
+test('DeepSeek 充值卡：估算余额、进度、日均与可用天数；余额用完提示校准', () => {
+  const topup = { vendor: 'deepseek', currency: 'CNY', since: '2026-10-16', calibrated_day: null, total_minor: 10000, count: 1, spent_minor: 2671, remaining_minor: 7329,
+    used_percent: 27, avg_daily_minor: 381.6, days_left: 19, today_minor: 667.8, records: [{ id: 'r1', kind: 'topup', amount_minor: 10000, currency: 'CNY', day: '2026-10-16', notes: null }] };
+  const view = S.presentList(listData([], { topups: [topup], summary: { currencies: [], usd: { daily_minor: 0, monthly_minor: 0, yearly_minor: 0, spent_minor: 0 }, active_count: 0, limit: 30 } }), 'USD');
+  assert.equal(view.empty, false);
+  const t = view.topups[0];
+  assert.equal(t.name, 'DeepSeek'); assert.equal(t.remaining, '¥73.29'); assert.equal(t.total, '¥100'); assert.equal(t.percent, 27);
+  assert.equal(t.daysLeft, '约还能用 19 天'); assert.equal(t.avg, '¥3.82'); assert.equal(t.basis, '自 2026-10-16 首次充值起估算');
+  assert.deepEqual(t.records[0], { id: 'r1', day: '2026-10-16', kind: 'topup', label: '充值', amount: '¥100', notes: '' });
+  const low = S.presentList(listData([], { topups: [{ ...topup, remaining_minor: -500, calibrated_day: '2026-10-20' }] }), 'CNY').topups[0];
+  assert.equal(low.low, true); assert.equal(low.remaining, '¥0'); assert.equal(low.basis, '2026-10-20 校准后估算');
+  const sg = S.presentList(listData([], { suggestions: [{ key: 'deepseek', tokens: 2_829_000_000, evidence: ['dsh', 'deepseek-v4.1-flash'] }] }), 'CNY').suggestions[0];
+  assert.equal(sg.topup, true); assert.equal(sg.action, '记一笔充值'); assert.equal(sg.icon, '/assets/subscriptions/deepseek.png');
+});
+
+test('充值页：默认沿用上次币种，校准余额允许 0；保存后返回，删除需确认', async () => {
+  const saved = [];
+  const api = baseApi({ peekSubscriptions: () => listData([], { topups: [{ vendor: 'deepseek', currency: 'USD', records: [{ id: 'r'.repeat(32), kind: 'topup', amount_minor: 2000, currency: 'USD', day: '2026-10-10', notes: null }] }] }),
+    createTopup: async body => { saved.push(body); return listData([]); }, deleteTopup: async () => listData([]) });
+  const f = pageFixture('topup-edit/topup-edit.js', api);
+  await f.p.onLoad({ vendor: 'deepseek', kind: 'balance' });
+  assert.equal(f.p.data.form.kind, 'balance'); assert.equal(f.p.data.form.currency, 'USD'); assert.equal(f.p.data.symbol, '$');
+  await f.p.save(); assert.equal(f.p.data.error, '请填写有效的余额');
+  f.p.input({ currentTarget: { dataset: { field: 'amount' } }, detail: { value: '0' } });
+  await f.p.save(); assert.deepEqual(saved[0], { vendor: 'deepseek', kind: 'balance', amount: 0, currency: 'USD', day: f.p.data.today, notes: null }); assert.deepEqual(f.navigation, ['back']);
+  const g = pageFixture('topup-edit/topup-edit.js', api);
+  await g.p.onLoad({ id: 'r'.repeat(32) }); assert.equal(g.p.data.form.amount, '20'); g.p.pickKind({ currentTarget: { dataset: { key: 'topup' } } });
+  g.p.remove(); assert.match(g.modals[0].content, /不影响 DeepSeek 账户/); await g.modals[0].success({ confirm: true }); assert.deepEqual(g.navigation, ['back']);
 });

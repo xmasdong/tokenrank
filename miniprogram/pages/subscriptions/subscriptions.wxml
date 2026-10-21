@@ -8,10 +8,10 @@
     </view>
     <view wx:if="{{view.suggestions.length}}" class="card suggest">
       <view class="card-label">根据近 7 天的用量，你可能在用</view>
-      <view wx:for="{{view.suggestions}}" wx:key="key" class="sg" data-key="{{item.key}}" bindtap="addSuggested">
+      <view wx:for="{{view.suggestions}}" wx:key="key" class="sg" data-key="{{item.key}}" data-topup="{{item.topup}}" bindtap="addSuggested">
         <image class="icon" src="{{item.icon}}" mode="aspectFit" />
         <view class="body"><view class="title">{{item.name}}</view><view class="meta">{{item.hint || '近 7 天 ' + item.tokens + ' · ' + item.evidence}}</view><view wx:if="{{item.hint}}" class="meta">近 7 天 {{item.tokens}} · {{item.evidence}}</view></view>
-        <view class="sg-add">记一笔</view>
+        <view class="sg-add">{{item.action}}</view>
       </view>
     </view>
     <block wx:if="{{!view.empty}}">
@@ -41,9 +41,21 @@
       <view wx:for="{{view.active}}" wx:key="id" class="tile" bindtap="edit" data-id="{{item.id}}">
         <image wx:if="{{item.icon}}" class="icon" src="{{item.icon}}" mode="aspectFit" /><view wx:else class="icon ph">{{item.initial}}</view>
         <view class="body"><view class="title">{{item.title}}</view><view class="meta">{{item.meta}}</view>
-          <view wx:if="{{item.today}}" class="today-tag {{item.today.paid === true ? 'paid' : item.today.paid === false ? 'unpaid' : ''}}">今天 {{item.today.value}}{{item.today.shared ? ' · ' + item.today.shared : ''}}{{item.today.paid === true ? ' · 已回本' : item.today.paid === false ? ' · 未回本' : ''}}</view>
+          <view wx:if="{{item.period}}" class="today-tag {{item.period.paid ? 'paid' : 'unpaid'}}">{{item.period.text}} · {{item.period.left}}{{item.today && item.today.shared ? ' · ' + item.today.shared : ''}}</view>
+          <view wx:elif="{{item.apiKey}}" class="today-tag">走 API Key 付费，不计入回本</view>
+          <view wx:if="{{item.today}}" class="today-small">今天 {{item.today.value}}</view>
         </view>
         <view class="cost"><view class="num">{{item.daily}}</view><view class="unit">每天</view></view>
+      </view>
+      <view wx:if="{{view.topups.length}}" class="section">按量充值</view>
+      <view wx:for="{{view.topups}}" wx:key="vendor" class="card topup">
+        <view class="tp-head"><image class="icon" src="{{item.icon}}" mode="aspectFit" /><text class="title">{{item.name}}</text><text class="tp-label">估算余额</text></view>
+        <view class="tp-remain"><text class="big2 num {{item.low ? 'warn' : ''}}">{{item.remaining}}</text><text wx:if="{{item.low}}" class="tp-low">可能已用完，请校准</text><text wx:else class="tp-days">{{item.daysLeft}}</text></view>
+        <view class="bar-track"><view class="bar-fill" style="width: {{item.percent}}%"></view></view>
+        <view class="tp-meta">累计充值 {{item.total}}（{{item.count}} 次）· 估算已用 {{item.spent}} · 已用 {{item.percent}}%</view>
+        <view class="tp-meta">近 7 天日均 {{item.avg}} · 今天约 {{item.today}} · {{item.basis}}</view>
+        <view class="tp-actions"><button class="tp-btn" data-vendor="{{item.vendor}}" data-kind="topup" bindtap="addTopup">记一笔充值</button><button class="tp-btn ghost" data-vendor="{{item.vendor}}" data-kind="balance" bindtap="addTopup">校准余额</button></view>
+        <view class="tp-records"><view wx:for="{{item.records}}" wx:for-item="r" wx:key="id" class="tp-record" data-id="{{r.id}}" bindtap="editTopup"><text>{{r.day}} {{r.label}}</text><text class="num">{{r.amount}}</text></view></view>
       </view>
       <view wx:if="{{view.inactive.length}}" class="section">已停用 <text>{{view.inactive.length}}</text></view>
       <view wx:for="{{view.inactive}}" wx:key="id" class="tile dim" bindtap="edit" data-id="{{item.id}}">
@@ -52,7 +64,7 @@
         <view class="cost"><view class="num">{{item.spent}}</view><view class="unit">累计</view></view>
       </view>
       <view wx:if="{{view.fx}}" class="footnote">按 {{view.fx}} 换算。</view>
-      <view class="footnote">每天成本 = 每期价格 ÷ 周期天数，月均按 30.44 天、年均按 365 天换算，累计按开始日起已扣的期数计算。回本比较的是当天 API 等值估算和全部订阅的每日成本；Claude、ChatGPT、Gemini、Kimi、智谱的订阅另按该厂商模型单独判断，同一厂商的多个订阅合并计算。估算不代表实际账单。订阅只有你自己能看到，不进入排名和分享。</view>
+      <view class="footnote">每天成本 = 每期价格 ÷ 周期天数，月均按 30.44 天、年均按 365 天换算，累计按开始日起已扣的期数计算。每个订阅按本期累计判断：从本期开始到今天，该厂商模型的 API 等值估算与这一期价格比较；顶部卡片是今天的价值与全部订阅每天成本的对照。按量充值（DeepSeek）是实际花费，不计入订阅回本；标记走 API Key 的订阅只算成本。Claude、ChatGPT、Gemini、Kimi、智谱的订阅另按该厂商模型单独判断，同一厂商的多个订阅合并计算。估算不代表实际账单。订阅只有你自己能看到，不进入排名和分享。</view>
     </block>
   </block>
   <view wx:if="{{error}}" class="notice error" role="alert">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>

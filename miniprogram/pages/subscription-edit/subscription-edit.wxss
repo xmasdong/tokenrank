@@ -46,3 +46,5 @@ page { background: var(--surface-muted); }
 .plan:last-child { border-bottom: none; }
 .plan-price { font-weight: 600; }
 .sheet-scroll { max-height: 60vh; }
+.switch-text { display: flex; flex-direction: column; gap: 2px; padding: 10px 0; flex: 1; }
+.sub-label { font-size: 11px; color: var(--text-muted); line-height: 1.5; }

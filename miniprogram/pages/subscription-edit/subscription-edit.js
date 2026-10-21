@@ -43,6 +43,8 @@ Page({
   },
   pickCurrency(e) { const c = CURRENCIES[Number(e.detail.value)]; if (c) this.changed({ 'form.currency': c.key, ...this.withCurrency(c.key) }); },
   pick(e) { const { field, key } = e.currentTarget.dataset; this.changed({ ['form.' + field]: key }); },
+  toggleApiKey(e) { this.changed({ 'form.api_key': !!e.detail.value }); },
+  goTopup() { wx.redirectTo({ url: '/pages/topup-edit/topup-edit?vendor=deepseek' }); },
   pickDate(e) { this.changed({ ['form.' + e.currentTarget.dataset.field]: e.detail.value }); },
   choosePreset(e) {
     const preset = PRESETS[e.currentTarget.dataset.index];

@@ -17,6 +17,7 @@ import { trendQuery, trendReport } from './trends.js';
 import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeReminderPrompt, reserveReminder, cancelReminder, runReminders } from './reminders.js';
 import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
 import { listSubscriptions, createSubscription, updateSubscription, deleteSubscription, getRates } from './subscriptions.js';
+import { createTopup, updateTopup, deleteTopup } from './topups.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -101,6 +102,22 @@ async function route(request, env, url, path) {
     let body;
     try { body = JSON.parse(text); } catch { return withCors(jsonError(400, '订阅内容格式有误')); }
     return withCors(await (id ? updateSubscription(env, user.id, id, body) : createSubscription(env, user.id, body)));
+  }
+
+  const topupPath = path.match(/^\/api\/topups(?:\/([a-f0-9]{32}))?$/);
+  if (topupPath) {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    if (user.disabled_at) return withCors(jsonError(403, '账号已停用'));
+    const id = topupPath[1], now = Date.now(), fx = await getRates();
+    const list = () => listSubscriptions(env, user.id, now, fx);
+    if (id && method === 'DELETE') return withCors(await deleteTopup(env, user.id, id, list));
+    if (method !== 'POST') return withCors(jsonError(405, 'method not allowed'));
+    const text = await request.text();
+    if (new TextEncoder().encode(text).length > 2048) return withCors(jsonError(413, '充值内容过长'));
+    let body;
+    try { body = JSON.parse(text); } catch { return withCors(jsonError(400, '充值内容格式有误')); }
+    return withCors(await (id ? updateTopup(env, user.id, id, body, now, list) : createTopup(env, user.id, body, now, list)));
   }
 
   if (path === '/api/email-registration') {

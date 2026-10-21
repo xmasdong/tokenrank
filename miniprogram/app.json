@@ -18,6 +18,7 @@
     "pages/email/email",
     "pages/subscriptions/subscriptions",
     "pages/subscription-edit/subscription-edit",
+    "pages/topup-edit/topup-edit",
     "pages/daily/daily"
   ],
   "window": {

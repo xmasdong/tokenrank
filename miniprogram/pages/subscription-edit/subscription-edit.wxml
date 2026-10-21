@@ -8,6 +8,8 @@
           <image class="tpl-icon" src="{{item.icon}}" mode="aspectFit" /><text class="tpl-name">{{item.name}}</text>
         </view>
       </view>
+      <view class="group-label">按量充值</view>
+      <view class="grid"><view class="tpl" bindtap="goTopup"><image class="tpl-icon" src="/assets/subscriptions/deepseek.png" mode="aspectFit" /><text class="tpl-name">DeepSeek</text></view></view>
       <view class="hint">套餐价格于 2026-10-21 按官网核对，可能有优惠或调价，请按实际扣款修改；没有对应订阅的用量选「综合」，按月估算填写。<text wx:if="{{added}}">本次已添加 {{added}} 个。</text></view>
     </block>
     <view class="card">
@@ -25,6 +27,7 @@
         <input wx:if="{{form.cycle === 'custom'}}" class="days" type="number" value="{{form.custom_days}}" data-field="custom_days" bindinput="input" placeholder="每期天数（1–3650）" disabled="{{busy}}" />
       </view>
       <picker mode="date" end="{{today}}" value="{{form.start_day}}" data-field="start_day" bindchange="pickDate" disabled="{{busy}}"><view class="row"><text class="label">开始日期</text><text class="row-value">{{form.start_day}}</text></view></picker>
+      <view class="row"><view class="switch-text"><text class="label">走 API Key 付费</text><text class="sub-label">该服务的用量用 API Key 结算时打开，不计入这份订阅的回本</text></view><switch checked="{{form.api_key}}" color="#07C160" bindchange="toggleApiKey" disabled="{{busy}}" /></view>
       <view wx:if="{{id}}" class="block"><text class="label">状态</text>
         <view class="pills"><view wx:for="{{statuses}}" wx:key="key" class="pill {{form.status === item.key ? 'on' : ''}}" data-field="status" data-key="{{item.key}}" bindtap="pick">{{item.label}}</view></view>
       </view>

@@ -193,10 +193,78 @@ test('没有对应厂商的模型用量归入「综合」，用来判断综合�
   const f = fixture(t);
   await f.request('POST', { name: '综合', plan: '按月估算', price: 300, currency: 'CNY', cycle: 'month', start_day: beijingDaysAgo(3) });
   f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
-  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 3_000_000, models: [['deepseek-v4.1-flash', 1_000_000], ['claude-opus-5-5', 2_000_000]], unpriced_models: [], unpriced_tokens: 0 };
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: 3_000_000, models: [['minimax-m3', 1_000_000], ['claude-opus-5-5', 2_000_000]], unpriced_models: [], unpriced_tokens: 0 };
   f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
     VALUES(1,'device-1',?,1000,10,10,980,0,5,'[]','[]',1,1,?)`).run(beijingDay(), JSON.stringify(cost));
   const item = (await (await f.request('GET')).json()).items[0];
-  // ¥300 / 30 days / 6.678 = $1.50 a day against $1.00 of DeepSeek today
+  // ¥300 / 30 days / 6.678 = $1.50 a day against $1.00 of MiniMax today
   assert.equal(item.provider, 'other'); assert.equal(item.today_usd_micros, 1_000_000); assert.equal(item.paid_back_today, false);
+});
+
+const insertDay = (f, day, models) => {
+  const total = models.reduce((a, [, m]) => a + m, 0);
+  const cost = { basis: 'token_watcher_api_estimate', currency: 'USD', usd_micros: total, models, unpriced_models: [], unpriced_tokens: 0 };
+  f.db.prepare(`INSERT INTO daily_totals(user_id,device_id,day,tokens,input_tokens,output_tokens,cache_read,cache_write,requests,models_json,tools_json,source_at,updated_at,cost_json)
+    VALUES(1,'device-1',?,1000,10,10,980,0,5,?,'[]',1,1,?)`).run(day, JSON.stringify(models.map(([m]) => [m, 100])), JSON.stringify(cost));
+};
+
+test('回本按本期累计：本期开始后该厂商的价值和这一期价格比较，并给出剩余天数', async t => {
+  const f = fixture(t);
+  // started 40 days ago, monthly: the current period began 10 days ago and renews in 20 days
+  await f.request('POST', claude({ price: 200, start_day: beijingDaysAgo(40) }));
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  insertDay(f, beijingDaysAgo(15), [['claude-opus-5-5', 900_000_000]]); // previous period, ignored
+  insertDay(f, beijingDaysAgo(5), [['claude-opus-5-5', 100_000_000]]);
+  insertDay(f, beijingDay(), [['claude-opus-5-5', 20_000_000], ['gpt-6.1-sol', 50_000_000]]);
+  const item = (await (await f.request('GET')).json()).items[0];
+  assert.equal(item.period.start, beijingDaysAgo(10)); assert.equal(item.period.days_left, 20);
+  assert.equal(item.period.value_usd_micros, 120_000_000); assert.equal(item.period.ratio, 0.6); assert.equal(item.period.paid_back, false);
+  assert.equal(item.period.gap_usd_minor, 8000);
+});
+
+test('标记为走 API Key 的订阅只算成本不认领用量；Cursor 这类多模型工具覆盖除充值外的全部用量', async t => {
+  const f = fixture(t);
+  await f.request('POST', claude({ price: 200, api_key: true }));
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  insertDay(f, beijingDay(), [['claude-opus-5-5', 40_000_000], ['deepseek-v4.1-flash', 5_000_000], ['gpt-6.1-sol', 10_000_000]]);
+  let data = await (await f.request('GET')).json();
+  assert.equal(data.items[0].api_key, true); assert.equal(data.items[0].period, null); assert.equal(data.items[0].today_usd_micros, null);
+  assert.equal(data.today_value.api_usd_micros, null);
+  await f.request('POST', { name: 'Cursor', plan: 'Premium', price: 30, currency: 'USD', cycle: 'month', start_day: beijingDay() });
+  data = await (await f.request('GET')).json();
+  // everything except the prepaid DeepSeek balance and the API-key-paid Claude usage: $10 of GPT
+  assert.equal(data.today_value.api_usd_micros, 10_000_000);
+  assert.equal((await f.request('POST', claude({ api_key: 'yes' }))).status, 400);
+});
+
+test('DeepSeek 充值：只算官方模型，余额 = 充值 − 估算花费；校准后从校准日次日重新累计', async t => {
+  const f = fixture(t);
+  f.db.prepare('INSERT INTO usage_sync_state VALUES(1,?,1,1)').run('device-1');
+  // ¥ at the fallback rate 6.678: $1.00 = ¥6.678
+  insertDay(f, beijingDaysAgo(3), [['deepseek-v4.1-flash', 3_000_000], ['workbuddy-ai/deepseek-v4.1-flash', 9_000_000], ['deepseek-v4.1-flash-free', 9_000_000]]);
+  insertDay(f, beijingDay(), [['deepseek-v4-pro', 1_000_000]]);
+  const topup = (extra) => f.request('POST', { vendor: 'deepseek', kind: 'topup', amount: 100, currency: 'CNY', day: beijingDaysAgo(5), ...extra }, 'session-1', '/api/topups');
+  let res = await topup(); assert.equal(res.status, 200);
+  let data = await res.json(), d = data.topups[0];
+  assert.equal(d.vendor, 'deepseek'); assert.equal(d.total_minor, 10000); assert.equal(d.count, 1);
+  assert.equal(d.spent_minor, 2671); assert.equal(d.remaining_minor, 7329); assert.equal(d.used_percent, 27);
+  assert.equal(d.today_minor, 667.8); assert.equal(d.avg_daily_minor, 381.6); assert.equal(d.days_left, 19);
+  assert.ok(!data.suggestions.some(s => s.key === 'deepseek'));
+  data = await (await f.request('POST', { vendor: 'deepseek', kind: 'balance', amount: 80, currency: 'CNY', day: beijingDaysAgo(1) }, 'session-1', '/api/topups')).json();
+  d = data.topups[0];
+  assert.equal(d.calibrated_day, beijingDaysAgo(1)); assert.equal(d.spent_minor, 668); assert.equal(d.remaining_minor, 7332);
+  data = await (await topup({ amount: 50, day: beijingDay() })).json();
+  assert.equal(data.topups[0].remaining_minor, 12332); assert.equal(data.topups[0].total_minor, 15000); assert.equal(data.topups[0].records.length, 3);
+  const id = data.topups[0].records[0].id;
+  assert.equal((await f.request('DELETE', undefined, 'session-2', '/api/topups/' + id)).status, 404);
+  assert.equal((await (await f.request('DELETE', undefined, 'session-1', '/api/topups/' + id)).json()).topups[0].records.length, 2);
+  for (const bad of [{ vendor: 'openai' }, { amount: 0 }, { kind: 'refund' }, { currency: 'XYZ' }, { day: beijingDaysAgo(-1) }])
+    assert.equal((await topup(bad)).status, 400, JSON.stringify(bad));
+  assert.equal((await f.request('POST', { vendor: 'deepseek', kind: 'balance', amount: 0, currency: 'CNY', day: beijingDay() }, 'session-1', '/api/topups')).status, 200);
+});
+
+test('近 7 天出现 dsh 或官方 DeepSeek 模型时建议记一笔充值，经其他平台转发的不算', () => {
+  const row = (tools, models) => ({ day: '2026-10-20', tools_json: JSON.stringify(tools), models_json: JSON.stringify(models) });
+  assert.deepEqual(suggestSubscriptions([row([['dsh', 500]], [['deepseek-v4.1-flash', 500]])], new Set()).map(s => [s.key, s.tokens]), [['deepseek', 500]]);
+  assert.deepEqual(suggestSubscriptions([row([['workbuddy', 80]], [['workbuddy-ai/deepseek-v4.1-flash', 80]])], new Set()).map(s => s.key), ['other']);
 });
