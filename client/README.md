@@ -1,6 +1,6 @@
 # TokenRank 独立同步器
 
-v0.2.19 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
+v0.2.20 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
 
 更换服务器、接入码或统计库后，会重新全量上传本机保留的历史用量，包含注销后重新接入的情况。上传中断可分批续传；重复执行同一账号的接入命令不会重传未变化的日期。
 
@@ -149,3 +149,7 @@ Windows 上的原版采集计划任务 `TokenWatcherForTokenRank` 被手动或�
 ## zstd 预检（0.2.19）
 
 原版读取 dsh 的多帧压缩会话（`.jsonl.zstd`）依赖系统 `zstd` 程序，Node 内置解码只能读第一帧。本机存在 `~/.dsh/sessions` 而找不到 `zstd` 时：更新命令在下载和停止任何服务之前就停下，给出对应系统的安装命令（Windows `winget install -e --id Meta.Zstandard` 或 `scoop install zstd`，macOS `brew install zstd`，Linux 用包管理器）；接入时只提示，不阻断安装，因为缺少 zstd 时日常采集仍可运行，只是 dsh 用量会漏算。查找顺序与原版一致。
+
+## Windows 自动准备 zstd（0.2.20）
+
+Windows 上存在 dsh 会话（`~/.dsh/sessions`）而找不到 `zstd` 时，接入和更新会从 TokenRank 服务器下载官方 zstd 1.5.7 Windows 版（facebook/zstd 发布的 `zstd-v1.5.7-win64.zip` 中的 `zstd.exe`，BSD 许可），按固定 SHA-256 校验后只放在 `~/.tokenrank/bin`：不需要管理员权限，不改系统 PATH，不调用 winget。原版的首次扫描、更新重算和 `TokenWatcherForTokenRank` 采集任务都把这个目录放在 PATH 最前；已接入用户的采集启动脚本会在下次接入或更新时改写并重启一次。下载失败或校验不符时不使用该文件，并给出手动安装命令。macOS 与 Linux 仍只提示 `brew install zstd` 或用包管理器安装。删除 `~/.tokenrank/bin/zstd.exe` 即可移除。

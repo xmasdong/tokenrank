@@ -4,6 +4,7 @@ import { homedir, totalmem } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { readConfig, writeConfig, SYNC_DIR, rejectSharedDirectory } from './config.js';
 import { readDays } from './source.js';
+import { ensureZstd, zstdBin } from './zstd-check.js';
 
 // Install/update floor includes upstream's stalled-collector watchdog.
 export const UPSTREAM_VERSION = '1.8.3';
@@ -151,14 +152,25 @@ export async function prepareUpstream({ home = homedir(), platform = process.pla
   if (!existsSync(db) || (managed && !state.scanned)) {
     if (!same(db, defaultDB)) throw new Error('自定义统计库不存在，请先确认原版采集器的数据路径');
     log('调用原版完成首次采集；统计库由原版自行维护，首次扫描可能需要几分钟…');
+    const { problem, env } = await ensureZstd({ home, dir, platform, runner, fetcher, log });
+    if (problem) log(problem);
     const heap = heapArgs();
-    try { runner(process.execPath, [...heap, '--no-warnings', found.entry, 'scan'], { stdio: 'inherit' }); }
+    try { runner(process.execPath, [...heap, '--no-warnings', found.entry, 'scan'], { stdio: 'inherit', env }); }
     catch (err) { throw explainScanFailure(err, heap); }
     if (managed) { state.scanned = true; saveState(prefix, state); }
   }
   readDays(db);
   writeConfig({ ...readConfig(dir), db_path: canonical(db), upstream_entry: found.entry, upstream_version: found.version }, dir);
   return { ...found, managed, prefix };
+}
+
+// Windows wrapper around the unmodified serve command. ~/.tokenrank/bin comes first on PATH so the zstd copy
+// TokenRank fetches for dsh sessions is found; the system PATH is left alone.
+function collectorScript(found, dir) {
+  const quote = s => '"' + s.replaceAll('"', '""') + '"';
+  return 'Set shell = CreateObject("WScript.Shell")\r\n'
+    + `shell.Environment("Process")("PATH") = ${quote(zstdBin(dir) + ';')} & shell.Environment("Process")("PATH")\r\n`
+    + `shell.Run ${quote(quote(process.execPath) + ' --no-warnings ' + quote(found.entry) + ' serve --no-open')}, 0, True\r\n`;
 }
 
 /** Only a collector installed by this bootstrap gets a new background service. Existing installs are left alone. */
@@ -197,7 +209,19 @@ export function startPreparedUpstream({ home = homedir(), platform = process.pla
   const taskGone = platform === 'win32' && state.collector && !String(runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
     `if(Get-ScheduledTask -TaskName 'TokenWatcherForTokenRank' -ErrorAction SilentlyContinue){'present'}`])).includes('present');
   if (taskGone) log('原版采集计划任务已不在，重新注册。');
-  else if (state.collector) { log('原版后台已配置，跳过重复安装。'); return { reused: true }; }
+  else if (state.collector) {
+    // Older installs wrote a script without ~/.tokenrank/bin on PATH; refresh it and restart so dsh can use zstd.
+    const vbs = join(prefix, 'collector.vbs'), script = '\uFEFF' + collectorScript(found, dir);
+    if (platform === 'win32' && (existsSync(vbs) ? readFileSync(vbs, 'utf16le') : '') !== script) {
+      writeFileSync(vbs, script, 'utf16le');
+      runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', `$ErrorActionPreference='Stop'; $name='TokenWatcherForTokenRank'; `
+        + `Stop-ScheduledTask -TaskName $name; Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | `
+        + `Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"' + ${ps(found.entry)} + '"') } | ForEach-Object { Stop-Process -Id $_.ProcessId }; `
+        + `Start-ScheduledTask -TaskName $name`]);
+      log('已更新原版采集后台的启动脚本并重启。');
+    } else log('原版后台已配置，跳过重复安装。');
+    return { reused: true };
+  }
   if (platform === 'darwin') {
     // Original install-agent rewrites its own label, so refuse pre-existing services of any ownership.
     let ownService = null;
@@ -220,9 +244,8 @@ export function startPreparedUpstream({ home = homedir(), platform = process.pla
     else runner(process.execPath, ['--no-warnings', found.entry, 'install-agent'], { stdio: 'inherit' });
   } else if (platform === 'win32') {
     // Upstream 1.8.0 only provides launchd; wrap the unmodified serve command on Windows.
-    const vbs = join(prefix, 'collector.vbs'), quote = s => '"' + s.replaceAll('"', '""') + '"';
-    const script = `CreateObject("WScript.Shell").Run ${quote(quote(process.execPath) + ' --no-warnings ' + quote(found.entry) + ' serve --no-open')}, 0, True\r\n`;
-    writeFileSync(vbs, '\uFEFF' + script, 'utf16le');
+    const vbs = join(prefix, 'collector.vbs');
+    writeFileSync(vbs, '\uFEFF' + collectorScript(found, dir), 'utf16le');
     const command = `$ErrorActionPreference='Stop'; $name='TokenWatcherForTokenRank'; `
       + `$existing=Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue; `
       + `if($existing){if((($existing.Actions | Out-String).Contains(${ps(vbs)}))){Start-ScheduledTask -TaskName $name; exit 0}else{throw '同名采集任务已存在，未覆盖'}}; `

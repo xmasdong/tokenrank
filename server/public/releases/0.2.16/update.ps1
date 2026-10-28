@@ -10,11 +10,11 @@ $stage = Join-Path $tmp 'stage'
 New-Item -ItemType Directory -Path $stage -Force | Out-Null
 try {
   Write-Host '下载更新工具，保留现有账号绑定…'
-  Invoke-WebRequest -Uri 'https://tokenrank.xmasdong.cn/dl/tokenrank-client-0.2.19.tar.gz' -OutFile (Join-Path $tmp 'app.tar.gz') -UseBasicParsing -TimeoutSec 180
+  Invoke-WebRequest -Uri 'https://tokenrank.xmasdong.cn/dl/tokenrank-client-0.2.20.tar.gz' -OutFile (Join-Path $tmp 'app.tar.gz') -UseBasicParsing -TimeoutSec 180
   tar -xzf (Join-Path $tmp 'app.tar.gz') -C $stage
   if ($LASTEXITCODE -ne 0) { throw '下载包解压失败，尚未更改原版' }
   $pkg = Get-Content (Join-Path $stage 'package.json') -Raw | ConvertFrom-Json
-  if ($pkg.name -ne 'tokenrank-client' -or $pkg.version -ne '0.2.19') { throw '下载内容不是预期更新工具' }
+  if ($pkg.name -ne 'tokenrank-client' -or $pkg.version -ne '0.2.20') { throw '下载内容不是预期更新工具' }
   & $node --no-warnings (Join-Path $stage 'bin\tokenrank.js') update-and-resync
   if ($LASTEXITCODE -ne 0) { throw '更新或回传未完成，请处理上述错误后重试' }
 } finally { Remove-Item -LiteralPath $tmp -Recurse -Force }

@@ -173,6 +173,24 @@ test('Windows registers the collector task again when it was deleted after setup
   assert.ok(!calls.some(c=>c.includes('Register-ScheduledTask')));
 });
 
+test('Windows rewrites an older collector script with ~/.tokenrank/bin on PATH and restarts it once',async t=>{
+  const f=fixture(t);await prepareUpstream(f.options);
+  const winPrefix=upstreamPrefix(f.home,'win32');mkdirSync(winPrefix,{recursive:true});
+  const entry=pkg(join(winPrefix,'node_modules/token-watcher'));
+  writeFileSync(join(winPrefix,'tokenrank-bootstrap.json'),JSON.stringify({owner:'tokenrank-upstream-bootstrap-v1',scanned:true,collector:true,ready:true}));
+  writeConfig({...readConfig(f.dir),upstream_entry:entry},f.dir);
+  const vbs=join(winPrefix,'collector.vbs');writeFileSync(vbs,'\uFEFFCreateObject("WScript.Shell").Run "old", 0, True\r\n','utf16le');
+  const calls=[];const runner=(command,args)=>{calls.push(args.at(-1));return args.at(-1).includes("{'present'}")?'present':'';};
+  assert.deepEqual(startPreparedUpstream({...f.options,platform:'win32',runner}),{reused:true});
+  const script=readFileSync(vbs,'utf16le');
+  assert.ok(script.includes(`("PATH") = "${join(f.dir,'bin')};" & shell.Environment("Process")("PATH")`));
+  assert.match(script,/serve --no-open/);
+  const restart=calls.find(c=>c.includes('Start-ScheduledTask'));
+  assert.ok(restart&&restart.includes('Stop-ScheduledTask')&&restart.includes(entry));assert.ok(!calls.some(c=>c.includes('Register-ScheduledTask')));
+  calls.length=0;startPreparedUpstream({...f.options,platform:'win32',runner});
+  assert.ok(!calls.some(c=>c.includes('Start-ScheduledTask')),'unchanged script does not restart again');
+});
+
 test('retiring the verified legacy collector starts the existing original once without reinstalling it',async t=>{
   const f=fixture(t,'darwin');source(f.db);const entry=pkg(join(f.home,'original'));symlinkSync(entry,join(f.bin,'token-watcher'));
   await prepareUpstream(f.options);writeConfig({...readConfig(f.dir),legacy_collector_retired:true},f.dir);
