@@ -4,7 +4,7 @@ import { homedir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { DatabaseSync } from 'node:sqlite';
 import { SYNC_DIR, readConfig, writeConfig, normalizeUrl, normalizeToken, rejectSharedDirectory } from './config.js';
-import { findUpstream, findNpm, inspectUpstream, REGISTRY, UPSTREAM_VERSION as FIXED_VERSION, compareVersions, resolveUpdate, heapArgs, explainScanFailure } from './upstream.js';
+import { findUpstream, findNpm, inspectUpstream, REGISTRY, UPSTREAM_VERSION as FIXED_VERSION, compareVersions, resolveUpdate, heapArgs, explainScanFailure, startPreparedUpstream } from './upstream.js';
 import { updateServices, assertCollectorStopped } from './update-services.js';
 import { acquireLock } from './lock.js';
 import { readDays } from './source.js';
@@ -26,7 +26,7 @@ export function backupSource(dbPath, destination) {
 /** Explicit user-triggered upgrade, upstream rescan and full replacement upload. */
 export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platform = process.platform, path,
   runner = run, fetcher = fetch, upload = sync, services = updateServices, stopped = assertCollectorStopped,
-  sleep = wait, log = console.log, onlyIfOutdated = false } = {}) {
+  sleep = wait, log = console.log, onlyIfOutdated = false, restore = startPreparedUpstream } = {}) {
   if (process.env.TOKENRANK_OFFLINE === '1' || process.env.TOKENMETER_OFFLINE === '1') throw new Error('当前为离线模式，未执行更新或回传');
   const config = readConfig(dir);
   if (!config.server || !config.token || !config.device_id) throw new Error('尚未绑定小程序，请先执行小程序里的接入命令');
@@ -37,6 +37,8 @@ export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platfo
   try {
     let found = findUpstream({ home, platform, path, preferred: config.upstream_entry, runner });
     if (!found) throw new Error('未找到已安装的原版 token-watcher，请先完成接入');
+    // A deleted Windows collector task is registered again before the services are verified.
+    if (platform === 'win32') restore({ home, platform, dir, runner, log });
     plan = services({ home, dir, platform, found, runner, log, requireServices: !onlyIfOutdated });
     found = plan.found || found;
     log('检查 token-watcher 官方最新稳定版…');

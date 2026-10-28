@@ -84,7 +84,7 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   assert.equal(f.bodies[0].full, true); assert.equal(f.bodies[0].complete, true);
   assert.equal(f.bodies[0].days[0].tokens, 100); assert.equal(f.bodies[0].device_id, 'same-device');
   const c = readConfig(f.dir); assert.equal(c.token, 'a'.repeat(32)); assert.equal(c.last_update.status, 'complete');
-  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.16');
+  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.17');
   assert.equal(readFileSync(join(c.last_update.adapter_backup,'bin/tokenrank.js'),'utf8'),'// previous sync');
   const backup = new DatabaseSync(c.last_update.backup, { readOnly: true });
   assert.equal(backup.prepare('SELECT SUM(total_tokens) t FROM events').get().t, 200); backup.close();
@@ -94,6 +94,17 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   f.actions.length = 0;
   await updateAndResync(f.options); assert.equal(f.actions.includes('download'), false); assert.equal(f.bodies.length, 2);
   assert.equal(f.bodies[1].days[0].tokens, 100);
+});
+
+test('Windows update restores a deleted collector task before verifying services', async t => {
+  const f = fixture(t), order = [];
+  await assert.rejects(updateAndResync({ ...f.options, platform: 'win32',
+    restore: () => order.push('restore'), services: () => { order.push('services'); throw new Error('stop here'); } }), /stop here/);
+  assert.deepEqual(order, ['restore', 'services']);
+  order.length = 0;
+  await assert.rejects(updateAndResync({ ...f.options, platform: 'darwin',
+    restore: () => order.push('restore'), services: () => { order.push('services'); throw new Error('stop here'); } }), /stop here/);
+  assert.deepEqual(order, ['services']);
 });
 
 test('install checks upgrade a statistically valid 1.8.2 collector to the reliability release', async t => {
