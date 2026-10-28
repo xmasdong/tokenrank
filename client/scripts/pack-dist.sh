@@ -8,7 +8,7 @@ trap 'rm -rf "$TMP"' EXIT HUP INT TERM
 mkdir -p "$DL" "$TMP/bin"
 cp "$ROOT/bin/tokenrank.js" "$ROOT/bin/tokenwatcher.js" "$TMP/bin/"
 cp -R "$ROOT/sync" "$ROOT/package.json" "$ROOT/README.md" "$ROOT/LICENSE" "$TMP/"
-tar -czf "$DL/tokenrank-client.tar.gz" -C "$TMP" .
+COPYFILE_DISABLE=1 tar -czf "$DL/tokenrank-client.tar.gz" -C "$TMP" .
 node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1])).version)' "$ROOT/package.json" > "$DL/version.txt"
 VERSION=$(cat "$DL/version.txt")
 cp "$DL/tokenrank-client.tar.gz" "$DL/tokenrank-client-$VERSION.tar.gz"

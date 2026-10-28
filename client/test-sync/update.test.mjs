@@ -9,6 +9,7 @@ import { updateAndResync, resolveUpdate, FIXED_SOURCE, backupSource } from '../s
 import { readConfig, writeConfig } from '../sync/config.js';
 import { acquireLock } from '../sync/lock.js';
 import { sync } from '../sync/report.js';
+import { describeScanErrors } from '../sync/scan-errors.js';
 import { updateServices } from '../sync/update-services.js';
 
 function pkg(root, version = '1.8.0') {
@@ -84,7 +85,7 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   assert.equal(f.bodies[0].full, true); assert.equal(f.bodies[0].complete, true);
   assert.equal(f.bodies[0].days[0].tokens, 100); assert.equal(f.bodies[0].device_id, 'same-device');
   const c = readConfig(f.dir); assert.equal(c.token, 'a'.repeat(32)); assert.equal(c.last_update.status, 'complete');
-  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.17');
+  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.18');
   assert.equal(readFileSync(join(c.last_update.adapter_backup,'bin/tokenrank.js'),'utf8'),'// previous sync');
   const backup = new DatabaseSync(c.last_update.backup, { readOnly: true });
   assert.equal(backup.prepare('SELECT SUM(total_tokens) t FROM events').get().t, 200); backup.close();
@@ -400,7 +401,15 @@ test('rescan helper treats upstream swallowed parse errors as failure, without l
   const f = fixture(t), root = join(f.home, 'scan-fixture'); mkdirSync(join(root, 'src'), { recursive: true });
   writeFileSync(join(root, 'package.json'), '{"type":"module"}');
   writeFileSync(join(root, 'src/store.js'), 'export class Store {close(){}}');
-  writeFileSync(join(root, 'src/scanner.js'), 'export class Scanner {stats={dsh:{parse_errors:1,last_error:"private-session-path"}};async scanAll(){return {files:1}}}');
+  writeFileSync(join(root, 'src/scanner.js'), 'export class Scanner {stats={dsh:{parse_errors:1,last_error:"2026-10-28T01:02:03.000Z ENOENT /Users/me/private-session-path.jsonl"}};async scanAll(){return {files:1}}}');
   const result = spawnSync(process.execPath, ['--no-warnings', new URL('../sync/rescan-worker.js', import.meta.url).pathname, root, f.dbPath], { encoding: 'utf8' });
   assert.equal(result.status, 1); assert.match(result.stderr, /1 个文件扫描失败/); assert.doesNotMatch(result.stderr, /private-session-path/);
+});
+
+test('scan failures name the tool and reason but never a path', () => {
+  const out = describeScanErrors({ codex: { parse_errors: 2, last_error: '2026-10-28T01:02:03.000Z EBUSY: resource busy or locked, open \'C:\\Users\\me\\.codex\\sessions\\a.jsonl\'' },
+    cursor: { parse_errors: 0 }, dsh: { parse_errors: 1, last_error: '2026-10-28T01:02:03.000Z bad /Users/me/proj/x.jsonl' } });
+  assert.equal(out.total, 3);
+  assert.equal(out.text, "原版有 3 个文件扫描失败（codex 2 个：EBUSY: resource busy or locked, open '<路径>'；dsh 1 个：bad <路径>）");
+  assert.equal(describeScanErrors({ codex: { parse_errors: 0 } }), null);
 });

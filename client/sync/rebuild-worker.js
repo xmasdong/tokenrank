@@ -2,6 +2,7 @@
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
+import { describeScanErrors } from './scan-errors.js';
 const [root, dbPath] = process.argv.slice(2);
 try {
   const { Store } = await import(pathToFileURL(join(root,'src/store.js')).href);
@@ -31,7 +32,8 @@ try {
       console.log(`[tokenrank] 重建仍在进行：已处理 ${files} 个文件，用时 ${Math.round((Date.now()-start)/1000)} 秒…`);
     }, 15000);
     const result = await scanner.scanAll();
-    if (Object.values(scanner.stats).some(s => s.parse_errors)) throw new Error('原版扫描存在文件错误，未替换原库或云端数据；请检查原版采集状态');
+    const failed = describeScanErrors(scanner.stats);
+    if (failed) throw new Error(`${failed.text}，未替换原库或云端数据；请检查原版采集状态`);
     // token-watcher 1.8 keeps a one-time Codex key migration archive keyed by row id. The Codex rows it
     // points at were deleted above and rescanned under new ids, so it can no longer restore anything,
     // yet it is most of the database and is copied into every daily snapshot. The pre-update database

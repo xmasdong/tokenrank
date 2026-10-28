@@ -64,7 +64,7 @@ tokenrank rank push --full --dry-run
 
 | 目录 | 内容 |
 |---|---|
-| `client/sync` | 电脑端同步器（当前 0.2.17）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
+| `client/sync` | 电脑端同步器（当前 0.2.18）：接入、只读同步、心跳、超时恢复、更新重算、备份清理 |
 | `client/bin/tokenrank.js` | 同步器命令行入口 |
 | `server` | Cloudflare Worker、D1 表结构与迁移、安装和更新脚本 |
 | `miniprogram` | 原生微信小程序 |
