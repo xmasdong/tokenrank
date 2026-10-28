@@ -193,7 +193,11 @@ export function startPreparedUpstream({ home = homedir(), platform = process.pla
     }
     log('复用已有原版安装，保留其后台配置；请保持原版采集器运行。'); return { reused: true };
   }
-  if (state.collector) { log('原版后台已配置，跳过重复安装。'); return { reused: true }; }
+  // A Windows task can be deleted while the script and state remain; register it again instead of trusting the state.
+  const taskGone = platform === 'win32' && state.collector && !String(runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command',
+    `if(Get-ScheduledTask -TaskName 'TokenWatcherForTokenRank' -ErrorAction SilentlyContinue){'present'}`])).includes('present');
+  if (taskGone) log('原版采集计划任务已不在，重新注册。');
+  else if (state.collector) { log('原版后台已配置，跳过重复安装。'); return { reused: true }; }
   if (platform === 'darwin') {
     // Original install-agent rewrites its own label, so refuse pre-existing services of any ownership.
     let ownService = null;

@@ -105,7 +105,10 @@ export function updateServices({ home, dir, platform, found, runner, log = () =>
       const bytes = readFileSync(file), text = bytes[0] === 0xff && bytes[1] === 0xfe ? bytes.toString('utf16le') : bytes.toString('utf8');
       if (!text.includes(entry.replaceAll('"', '""'))) throw new Error(`无法确认 ${name} 的脚本归属`);
       const powershell = command => runner('powershell.exe', ['-NoProfile', '-NonInteractive', '-Command', "$ErrorActionPreference='Stop'; " + command]);
-      const task = JSON.parse(powershell(`Get-ScheduledTask -TaskName ${ps(name)} | Select-Object -ExpandProperty Actions | ConvertTo-Json -Compress`));
+      const actions = String(powershell(`Get-ScheduledTask -TaskName ${ps(name)} -ErrorAction SilentlyContinue | Select-Object -ExpandProperty Actions | ConvertTo-Json -Compress`)).trim();
+      // The script can outlive its task (removed by hand or by a cleanup tool); that service is simply not running.
+      if (!actions) { log(`未找到计划任务 ${name}，跳过该后台。`); continue; }
+      const task = JSON.parse(actions);
       if (Array.isArray(task) || !/wscript(?:\.exe)?$/i.test(task.Execute) || task.Arguments !== `"${file}"`)
         throw new Error(`无法确认 ${name} 的计划任务归属`);
       const processes = `Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" | Where-Object { $_.CommandLine -and $_.CommandLine.Contains('"' + ${ps(entry)} + '"') }`;

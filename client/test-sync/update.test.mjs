@@ -351,6 +351,24 @@ test('Windows update verifies the exact scheduled task and script before stoppin
   unrelated = true; assert.throws(() => updateServices(options), /归属/);
 });
 
+test('Windows update skips a collector task that was deleted while its script remains', t => {
+  const f = fixture(t), syncEntry = join(f.dir, 'app/bin/tokenrank.js');
+  mkdirSync(join(f.dir, 'app/bin'), { recursive: true }); writeFileSync(syncEntry, '// sync');
+  writeFileSync(join(f.dir, 'app/package.json'), '{"name":"tokenrank-client"}');
+  const vbs = join(f.home, 'AppData/Local/TokenWatcher/collector.vbs'); mkdirSync(join(vbs, '..'), { recursive: true });
+  writeFileSync(vbs, '\uFEFF' + f.entry, 'utf16le'); writeFileSync(join(f.dir, 'sync.vbs'), syncEntry);
+  const runner = (cmd, args) => {
+    const script = args.at(-1);
+    if (script.includes('ConvertTo-Json')) return script.includes('TokenWatcherForTokenRank') ? ''
+      : JSON.stringify({ Execute: 'wscript.exe', Arguments: `"${join(f.dir, 'sync.vbs')}"` });
+    return '';
+  };
+  const options = { home: f.home, dir: f.dir, platform: 'win32', found: { entry: f.entry }, runner };
+  const plans = updateServices({ ...options, requireServices: false });
+  assert.equal(plans.collector.length, 0); assert.equal(plans.sync.length, 1);
+  assert.throws(() => updateServices(options), /未找到可验证的采集和同步后台/);
+});
+
 test('Linux update checks the effective unit executable and preserves both unit files', t => {
   const f = fixture(t), syncEntry = join(f.dir, 'app/bin/tokenrank.js'), unitDir = join(f.home, '.config/systemd/user');
   mkdirSync(join(f.dir, 'app/bin'), { recursive: true }); writeFileSync(syncEntry, '// sync');

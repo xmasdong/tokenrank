@@ -158,6 +158,21 @@ test('Windows wrapper launches original serve separately from sync and can resta
   assert.match(readFileSync(join(winPrefix,'collector.vbs'),'utf16le'),/serve --no-open/);
 });
 
+test('Windows registers the collector task again when it was deleted after setup',async t=>{
+  const f=fixture(t);await prepareUpstream(f.options);
+  const winPrefix=upstreamPrefix(f.home,'win32');mkdirSync(winPrefix,{recursive:true});
+  const entry=pkg(join(winPrefix,'node_modules/token-watcher'));
+  writeFileSync(join(winPrefix,'tokenrank-bootstrap.json'),JSON.stringify({owner:'tokenrank-upstream-bootstrap-v1',scanned:true,collector:true,ready:true}));
+  writeConfig({...readConfig(f.dir),upstream_entry:entry},f.dir);
+  let present=false;const calls=[];
+  const runner=(command,args)=>{calls.push(args.at(-1));return args.at(-1).includes("{'present'}")&&present?'present':'';};
+  assert.deepEqual(startPreparedUpstream({...f.options,platform:'win32',runner}),{started:true});
+  assert.ok(calls.some(c=>c.includes('Register-ScheduledTask')));
+  present=true;calls.length=0;
+  assert.deepEqual(startPreparedUpstream({...f.options,platform:'win32',runner}),{reused:true});
+  assert.ok(!calls.some(c=>c.includes('Register-ScheduledTask')));
+});
+
 test('retiring the verified legacy collector starts the existing original once without reinstalling it',async t=>{
   const f=fixture(t,'darwin');source(f.db);const entry=pkg(join(f.home,'original'));symlinkSync(entry,join(f.bin,'token-watcher'));
   await prepareUpstream(f.options);writeConfig({...readConfig(f.dir),legacy_collector_retired:true},f.dir);
