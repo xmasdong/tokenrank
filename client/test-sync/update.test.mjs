@@ -10,6 +10,7 @@ import { readConfig, writeConfig } from '../sync/config.js';
 import { acquireLock } from '../sync/lock.js';
 import { sync } from '../sync/report.js';
 import { describeScanErrors } from '../sync/scan-errors.js';
+import { zstdProblem } from '../sync/zstd-check.js';
 import { updateServices } from '../sync/update-services.js';
 
 function pkg(root, version = '1.8.0') {
@@ -85,7 +86,7 @@ test('explicit update backs up old totals, upgrades and restarts, uploads reduce
   assert.equal(f.bodies[0].full, true); assert.equal(f.bodies[0].complete, true);
   assert.equal(f.bodies[0].days[0].tokens, 100); assert.equal(f.bodies[0].device_id, 'same-device');
   const c = readConfig(f.dir); assert.equal(c.token, 'a'.repeat(32)); assert.equal(c.last_update.status, 'complete');
-  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.18');
+  assert.equal(JSON.parse(readFileSync(join(f.dir,'app/package.json'))).version,'0.2.19');
   assert.equal(readFileSync(join(c.last_update.adapter_backup,'bin/tokenrank.js'),'utf8'),'// previous sync');
   const backup = new DatabaseSync(c.last_update.backup, { readOnly: true });
   assert.equal(backup.prepare('SELECT SUM(total_tokens) t FROM events').get().t, 200); backup.close();
@@ -106,6 +107,27 @@ test('Windows update restores a deleted collector task before verifying services
   await assert.rejects(updateAndResync({ ...f.options, platform: 'darwin',
     restore: () => order.push('restore'), services: () => { order.push('services'); throw new Error('stop here'); } }), /stop here/);
   assert.deepEqual(order, ['services']);
+});
+
+test('zstd precheck only speaks up when dsh sessions exist and no zstd program runs', t => {
+  const home = mkdtempSync(join(tmpdir(), 'tokenrank-zstd-')); t.after(() => rmSync(home, { recursive: true, force: true }));
+  const tried = [], missing = (bin) => { tried.push(bin); throw Object.assign(new Error('not found'), { code: 'ENOENT' }); };
+  assert.equal(zstdProblem({ home, platform: 'win32', runner: missing }), null); assert.deepEqual(tried, []);
+  mkdirSync(join(home, '.dsh/sessions'), { recursive: true });
+  assert.match(zstdProblem({ home, platform: 'win32', runner: missing }), /winget install -e --id Meta\.Zstandard/);
+  assert.deepEqual(tried, ['zstd']);
+  tried.length = 0; assert.match(zstdProblem({ home, platform: 'darwin', runner: missing }), /brew install zstd/);
+  assert.deepEqual(tried, ['zstd', '/opt/homebrew/bin/zstd', '/usr/local/bin/zstd', '/usr/bin/zstd']);
+  assert.equal(zstdProblem({ home, platform: 'win32', runner: () => 'zstd v1.5.7' }), null);
+});
+
+test('update refuses before downloading or stopping anything when zstd is missing, install check only warns', async t => {
+  const f = fixture(t);
+  await assert.rejects(updateAndResync({ ...f.options, zstd: () => '缺少 zstd' }), /缺少 zstd；本次未更改程序或数据/);
+  assert.deepEqual(f.actions, []);
+  const g = fixture(t, '1.8.3'), logs = [];
+  const result = await updateAndResync({ ...g.options, onlyIfOutdated: true, zstd: () => '缺少 zstd', log: line => logs.push(line) });
+  assert.equal(result.skipped, 'up-to-date'); assert.ok(logs.includes('缺少 zstd'));
 });
 
 test('install checks upgrade a statistically valid 1.8.2 collector to the reliability release', async t => {

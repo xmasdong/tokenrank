@@ -11,6 +11,7 @@ import { readDays } from './source.js';
 import { sync } from './report.js';
 import { stageAdapter, activateRebuild } from './update-adapter.js';
 import { pruneBackups } from './cleanup.js';
+import { zstdProblem } from './zstd-check.js';
 
 export { UPSTREAM_VERSION as FIXED_VERSION, FIXED_COMMIT, FIXED_SOURCE, compareVersions, resolveUpdate } from './upstream.js';
 const run = (command, args, options = {}) => execFileSync(command, args, { encoding: 'utf8', timeout: 60000, ...options });
@@ -26,7 +27,7 @@ export function backupSource(dbPath, destination) {
 /** Explicit user-triggered upgrade, upstream rescan and full replacement upload. */
 export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platform = process.platform, path,
   runner = run, fetcher = fetch, upload = sync, services = updateServices, stopped = assertCollectorStopped,
-  sleep = wait, log = console.log, onlyIfOutdated = false, restore = startPreparedUpstream } = {}) {
+  sleep = wait, log = console.log, onlyIfOutdated = false, restore = startPreparedUpstream, zstd = zstdProblem } = {}) {
   if (process.env.TOKENRANK_OFFLINE === '1' || process.env.TOKENMETER_OFFLINE === '1') throw new Error('当前为离线模式，未执行更新或回传');
   const config = readConfig(dir);
   if (!config.server || !config.token || !config.device_id) throw new Error('尚未绑定小程序，请先执行小程序里的接入命令');
@@ -47,10 +48,14 @@ export async function updateAndResync({ home = homedir(), dir = SYNC_DIR, platfo
     const needsUpdate = compareVersions(found.version, target.version) < 0;
     // A failed previous rebuild must be retried even if the package was already upgraded.
     const incompleteUpdate = config.last_update && config.last_update.status !== 'complete';
+    const missingZstd = zstd({ home, platform, runner });
     if (onlyIfOutdated && !needsUpdate && !incompleteUpdate) {
+      if (missingZstd) log(missingZstd);
       log(`统计内核 ${found.version} 已达到最新稳定版要求，无需重复升级或重算。`);
       return { skipped: 'up-to-date', version: found.version };
     }
+    // A rebuild without zstd fails after stopping services; refuse before touching anything.
+    if (missingZstd) throw new Error(`${missingZstd}；本次未更改程序或数据`);
     if (!plan.collector.length || !plan.sync.length) throw new Error('未找到可验证的采集和同步后台。请先完成小程序一键接入；自定义后台需先按其启动方式升级');
     const dbPath = rejectSharedDirectory(config.db_path, dir);
     if (dbPath !== realpathSync(join(home, '.tokenmeter/tokenmeter.db'))) throw new Error('自定义统计库需按原采集服务的配置升级；本命令未修改数据');

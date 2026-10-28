@@ -1,6 +1,6 @@
 # TokenRank 独立同步器
 
-v0.2.18 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
+v0.2.19 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
 
 更换服务器、接入码或统计库后，会重新全量上传本机保留的历史用量，包含注销后重新接入的情况。上传中断可分批续传；重复执行同一账号的接入命令不会重传未变化的日期。
 
@@ -145,3 +145,7 @@ Windows 上的原版采集计划任务 `TokenWatcherForTokenRank` 被手动或�
 ## 扫描失败说明与打包（0.2.18）
 
 更新重算或回传前的扫描如有文件失败，提示按工具列出失败数量和原版给出的原因（如 `codex 2 个：EBUSY …`），文件路径一律替换为 `<路径>`，便于用户把报错直接发出来排查，不泄露项目或会话名称。打包时不再带入 macOS 的 `._*` 元数据文件，Windows 更新结束时不会再因无法删除 `._.` 而报错。
+
+## zstd 预检（0.2.19）
+
+原版读取 dsh 的多帧压缩会话（`.jsonl.zstd`）依赖系统 `zstd` 程序，Node 内置解码只能读第一帧。本机存在 `~/.dsh/sessions` 而找不到 `zstd` 时：更新命令在下载和停止任何服务之前就停下，给出对应系统的安装命令（Windows `winget install -e --id Meta.Zstandard` 或 `scoop install zstd`，macOS `brew install zstd`，Linux 用包管理器）；接入时只提示，不阻断安装，因为缺少 zstd 时日常采集仍可运行，只是 dsh 用量会漏算。查找顺序与原版一致。
