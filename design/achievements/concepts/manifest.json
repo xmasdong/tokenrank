@@ -1,0 +1,29 @@
+{
+  "status": "visual-exploration-not-integrated",
+  "recommended": "enamel",
+  "generation": "built-in-image_gen",
+  "assets": [
+    {
+      "name": "enamel",
+      "file": "code-creation-enamel.webp",
+      "size": [
+        768,
+        768
+      ],
+      "alpha": true,
+      "bytes": 70918,
+      "sha256": "72df6b379de0dc5e6252fe9768fc238f44af8a29ea1c835e211ed1a47d6357a5"
+    },
+    {
+      "name": "relief",
+      "file": "code-creation-relief.webp",
+      "size": [
+        768,
+        768
+      ],
+      "alpha": true,
+      "bytes": 66256,
+      "sha256": "2b6cbf3b0d32239effa881eabf506a084202ee83a720e15ef49bc3fa45a267a7"
+    }
+  ]
+}
