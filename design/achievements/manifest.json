@@ -1,0 +1,42 @@
+{
+  "status": "design-assets-not-integrated",
+  "generation": "built-in-image_gen",
+  "assets": [
+    {
+      "tier": "bronze",
+      "file": "badges/bronze.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 112218,
+      "sha256": "2f8f5ac83628d918c5ba308251f8f51b0187f9bdb7eb03738b6aa24f14fc4569"
+    },
+    {
+      "tier": "platinum",
+      "file": "badges/platinum.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 106726,
+      "sha256": "28dc9df6f88cbca957456fcddb5159f574593016ebeb78d8a16e7c80032370b9"
+    },
+    {
+      "tier": "gold",
+      "file": "badges/gold.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 126122,
+      "sha256": "55b75f3b06d0d0bb2a8776ac9a91035e640a04a2d2128ed2da63eff976e00fd9"
+    },
+    {
+      "tier": "crystal",
+      "file": "badges/crystal.webp",
+      "width": 768,
+      "height": 768,
+      "alpha": true,
+      "bytes": 148110,
+      "sha256": "49d5243a915e4aceb2119ceffb46fbc8c0dfa85db427d8dbd8dc85520ff1c18e"
+    }
+  ]
+}
