@@ -479,5 +479,10 @@ module.exports = {
   /** 发起者改名 */
   renameGroup: (id, name) => mutate(`/api/groups/${id}/rename`, { method: 'POST', data: { name } }),
   groupInfo: (id, options) => read(groupPath(id), options),
+  groupInsights: (id, period = 'day', options) => read(`/api/groups/${encodeURIComponent(id)}/insights?period=${encodeURIComponent(period)}`,options),
+  peekGroupInsights: (id, period = 'day') => peek(`/api/groups/${encodeURIComponent(id)}/insights?period=${encodeURIComponent(period)}`),
+  createGroupInsightsShare: (id, period, snapshot, options) => read(`/api/groups/${encodeURIComponent(id)}/insights/share`,options,
+    {method:'POST',data:{period,snapshot}},`/api/groups/${encodeURIComponent(id)}/insights/share?period=${encodeURIComponent(period)}&snapshot=${snapshot}`),
+
   myGroups: () => request('/api/groups/mine'),
 };

@@ -30,7 +30,7 @@ function personalRanking(record, board) {
 }
 
 function rankingAvatarUrls(data) {
-  return [...new Set([...data.entries.slice(0, 5).map(e => e.avatar_url), data.user?.avatar_url].filter(Boolean))];
+  return [...new Set([...data.entries.slice(0, 5).map(e => e.avatar_url), data.user?.avatar_url || data.me?.avatar_url].filter(Boolean))];
 }
 
 function drawRankingPoster(ctx, { data, cover = false, codeImage, avatarImages = {}, previewOnly = false }) {
@@ -113,7 +113,7 @@ function drawRankingPoster(ctx, { data, cover = false, codeImage, avatarImages =
   rows.forEach((entry, i) => row(entry, start + i * rowH, rowH));
   if (!rows.length) text('本周期暂无排名', L, start + 90, 32, C.soft);
   const ownY = start + (cover ? shown : Math.max(1, rows.length)) * rowH + 12, ownH = cover ? 142 : 160;
-  row({ ...(data.me || {}), nickname: data.user?.nickname || '我', avatar_url: data.user?.avatar_url }, ownY, ownH, true, cover ? 750 : R);
+  row({ ...(data.me || {}), nickname: data.user?.nickname || data.me?.nickname || '我', avatar_url: data.user?.avatar_url || data.me?.avatar_url }, ownY, ownH, true, cover ? 750 : R);
   const codeSize = cover ? 160 : 252, codeX = R - codeSize, codeY = cover ? ownY - 6 : ownY + ownH + 38;
   drawCodeBadge(ctx, codeImage, codeX, codeY, codeSize);
   if (!codeImage) text('小程序码区域', codeX + codeSize / 2, codeY + codeSize / 2 + 8, 20, C.soft, codeSize, 'center');

@@ -1,12 +1,17 @@
 import { jsonError } from './lib.js';
+import { groupShareValid } from './group-insights.js';
 export const SHARE_ID = /^[0-9a-f]{24}$/;
 const TTL = 90 * 86400000;
 export async function readShare(env, id, allowComparison = true) {
   if (!SHARE_ID.test(id || '')) return null;
-  const row = await env.DB.prepare('SELECT id, snapshot_json, created_at, expires_at FROM usage_shares WHERE id = ?1 AND expires_at > ?2 AND revoked_at IS NULL')
+  const row = await env.DB.prepare('SELECT id, user_id, snapshot_json, created_at, expires_at FROM usage_shares WHERE id = ?1 AND expires_at > ?2 AND revoked_at IS NULL')
     .bind(id, Date.now()).first();
   if (!row) return null;
   const record = { id: row.id, ...JSON.parse(row.snapshot_json), created_at: row.created_at, expires_at: row.expires_at };
+  if (record.style === 'group-insights') {
+    if (!await groupShareValid(env,row.user_id,record._group)) return null;
+    delete record._group;
+  }
   if (record.style === 'comparison') {
     if (!allowComparison) return null;
     const source = await readShare(env, record.comparison?.source_id, false);
@@ -90,17 +95,21 @@ export async function createShare(env, user, usage, style = 'usage', source = nu
       other_model_count: Math.max(0, cost.models.length - 5), model_count: new Set([...cost.models.map(m=>m.name), ...cost.unpriced_models]).size,
       unpriced_count: cost.unpriced_models.length, missing_days: cost.missing_days };
   }
+  return saveShare(env,user.user_id,snapshot,source);
+}
+
+export async function saveShare(env, ownerId, snapshot, source = null) {
   const json = JSON.stringify(snapshot);
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(json));
   const fingerprint = [...new Uint8Array(digest)].map(n => n.toString(16).padStart(2,'0')).join('');
   const previous = await env.DB.prepare('SELECT id FROM usage_shares WHERE user_id = ?1 AND fingerprint = ?2 AND expires_at > ?3 AND revoked_at IS NULL')
-    .bind(user.user_id, fingerprint, Date.now()).first();
+    .bind(ownerId, fingerprint, Date.now()).first();
   if (previous) {
     const record = await readShare(env, previous.id);
     return record ? Response.json(record) : jsonError(404, '分享记录已失效，请重新打开卡片');
   }
   const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM usage_shares WHERE user_id = ?1 AND created_at > ?2')
-    .bind(user.user_id, Date.now() - 86400000).first();
+    .bind(ownerId, Date.now() - 86400000).first();
   if (count.n >= 50) return jsonError(429, '今天生成的分享记录较多，请明天再试');
   const id = crypto.randomUUID().replaceAll('-','').slice(0,24), now = Date.now();
   const expiresAt = source ? Math.min(now + TTL, source.expires_at) : now + TTL;
@@ -108,8 +117,8 @@ export async function createShare(env, user, usage, style = 'usage', source = nu
     VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(user_id,fingerprint) DO UPDATE SET
     id=excluded.id,snapshot_json=excluded.snapshot_json,created_at=excluded.created_at,expires_at=excluded.expires_at,revoked_at=NULL
     WHERE usage_shares.expires_at <= excluded.created_at OR usage_shares.revoked_at IS NOT NULL`)
-    .bind(id, user.user_id, fingerprint, json, now, expiresAt).run();
-  const saved = await env.DB.prepare('SELECT id FROM usage_shares WHERE user_id=?1 AND fingerprint=?2').bind(user.user_id, fingerprint).first();
+    .bind(id, ownerId, fingerprint, json, now, expiresAt).run();
+  const saved = await env.DB.prepare('SELECT id FROM usage_shares WHERE user_id=?1 AND fingerprint=?2').bind(ownerId, fingerprint).first();
   const record = await readShare(env, saved.id);
   return record ? Response.json(record) : jsonError(404, '分享记录已失效，请重新打开卡片');
 }

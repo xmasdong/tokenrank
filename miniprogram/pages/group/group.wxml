@@ -50,6 +50,16 @@
       <view wx:elif="{{joined === false}}" class="connection-panel"><view class="hero-tip">从群里的卡片进入后可以加入本群排名。</view><button class="btn btn-primary hero-cta" bindtap="tryEnterGroup">识别本群</button></view>
     </view>
     <view class="tabs" wx:if="{{joined === true}}"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+    <view wx:if="{{joined === true}}" class="group-overview">
+      <view class="overview-heading"><text>本群用量</text><button class="overview-link" bindtap="openGroupReport">分析与分享 ›</button></view>
+      <block wx:if="{{insights}}">
+        <view class="overview-metrics"><view><view class="overview-value">{{insights.amount.value}}<text class="overview-unit">{{insights.amount.unit}}</text></view><view class="overview-label">Tokens · 含缓存</view></view><view><view class="overview-value">{{insights.costText}}</view><view class="overview-label">{{insights.costLabel}} · USD</view></view><view><view class="overview-value">{{insights.summary.active_users}}<text class="overview-unit">人</text></view><view class="overview-label">活跃 / {{members}} 人加入</view></view></view>
+        <view class="overview-preference"><text class="overview-preference-label">用量最多的工具</text><text class="overview-preference-value">{{insights.topTool}}</text></view><view class="overview-preference"><text class="overview-preference-label">用量最多的模型</text><text class="overview-preference-value">{{insights.topModel}}</text></view>
+        <view class="overview-note" wx:if="{{insights.costNote}}">{{insights.costNote}}</view>
+      </block>
+      <view wx:elif="{{insightsLoading}}" class="overview-note">正在汇总本群用量…</view>
+      <view wx:else class="overview-note">{{insightsError || '群数据暂不可用'}}<button class="overview-link" bindtap="retryInsights">重试</button></view>
+    </view>
     <view wx:if="{{loading}}" class="hint hint-sm">正在加载本群榜单…</view>
     <view wx:elif="{{error}}" class="hint hint-sm"><view class="hint-sub">{{error}}</view><button class="btn btn-ghost hero-cta" bindtap="load">重新加载</button></view>
     <block wx:elif="{{joined === true}}">

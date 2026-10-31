@@ -1,6 +1,6 @@
 /** Group codes open the app; joining a real WeChat group still requires its in-chat card. */
 const { drawCodeBadge } = require('./share-code');
-function drawGroupPoster(ctx, { data, cover = false, codeImage, previewOnly = false }) {
+function drawGroupPoster(ctx, { data, cover = false, codeImage, avatarImages = {}, previewOnly = false }) {
   // Chat covers already open the app when tapped; only saved posters carry the mini program code.
   if (!cover && !codeImage && !previewOnly) throw new Error('小程序码尚未就绪，请重试');
   const W = 750, H = cover ? 600 : 1150, L = 46, R = 704;
@@ -27,9 +27,15 @@ function drawGroupPoster(ctx, { data, cover = false, codeImage, previewOnly = fa
   rows.forEach((e,i)=>{
     const y=start+i*gap;
     text(String(e.rank).padStart(2,'0'),L,y,cover?28:34,C.accent,65);
-    text(e.nickname||'AI 玩家',L+65,y,cover?24:28,C.ink,cover?255:280);
+    const size=cover?42:54, x=L+60, top=y-size+8;
+    ctx.save();ctx.beginPath();ctx.arc(x+size/2,top+size/2,size/2,0,Math.PI*2);ctx.clip();
+    const image=avatarImages[e.avatar_url];
+    if(image)ctx.drawImage(image,x,top,size,size);
+    else{ctx.fillStyle='#EDEDED';ctx.fillRect(x,top,size,size);text([...(e.nickname||'群友')][0],x+size/2,top+size*.68,size*.43,C.soft,size,'center');}
+    ctx.restore();
+    text(e.nickname||'AI 玩家',x+size+14,y,cover?24:28,C.ink,cover?190:215);
     text(e.tokens_fmt,R,y,cover?29:34,e.rank===1?C.accent:C.ink,270,'right');
-    text(`${e.requests} 次调用`,L+65,y+28,18,C.soft,330);
+    if(e.top_model)text(e.top_model,L+(cover?116:128),y+28,18,C.soft,310);
     text('Tokens',R,y+28,17,C.soft,150,'right');
     if(i<rows.length-1)rule(y+(cover?44:62));
   });

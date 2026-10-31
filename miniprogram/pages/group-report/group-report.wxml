@@ -1,0 +1,41 @@
+<view class="report-page">
+  <view wx:if="{{loading}}" class="state">正在汇总本群用量…</view>
+  <view wx:elif="{{error}}" class="state"><view>{{error}}</view><button class="btn btn-ghost" bindtap="retry">重新加载</button><button wx:if="{{public}}" class="text-button" bindtap="goMine">去看我的用量</button></view>
+  <block wx:elif="{{report}}">
+    <view class="heading"><view class="group-name">{{report.group.name}}</view><view class="sub">{{report.group.members}} 人加入 · {{public ? '分享时的数据快照' : '本群用量分析'}}</view></view>
+    <view wx:if="{{!public}}" class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
+    <view class="range">{{report.range}} · 北京时间</view>
+    <view class="summary">
+      <view class="token-number num-font">{{report.amount.value}}<text class="token-unit">{{report.amount.unit}}</text></view><view class="sub">Tokens · 含缓存总用量</view>
+      <view class="metrics"><view class="metric-column"><view class="metric-value">{{report.costText}}</view><view class="sub">{{report.costLabel}} · USD</view></view><view class="metric-column"><view class="metric-value">{{report.summary.active_users}}<text class="metric-unit"> 人</text></view><view class="sub">{{report.periodLabel}}活跃 · {{report.summary.reported_users}} 人已同步</view></view></view>
+      <view class="sub cost-note">API 等值估算 · 非实际账单<text wx:if="{{report.costNote}}">\n{{report.costNote}}</text></view>
+    </view>
+    <view class="share-actions"><button class="btn btn-primary" open-type="share" disabled="{{!record}}">{{sharePreparing ? '准备中…' : '转发群数据'}}</button><button class="btn btn-ghost" bindtap="shareImage" disabled="{{!posterPath}}">{{imagePreparing ? '生成图片中…' : '分享数据图片'}}</button></view>
+    <button wx:if="{{shareError}}" class="retry" bindtap="retry">{{shareError}} · 重试</button><button wx:if="{{imageError}}" class="retry" bindtap="buildImages">{{imageError}}</button>
+    <view class="section">
+      <view class="section-title">用量构成</view>
+      <view class="composition"><view class="composition-row"><text class="composition-label">输入</text><text class="composition-amount">{{report.inputText}}</text></view><view class="composition-row"><text class="composition-label">输出</text><text class="composition-amount">{{report.outputText}}</text></view><view class="composition-row"><text class="composition-label">缓存读取</text><text class="composition-amount">{{report.cacheRead}}</text></view><view class="composition-row"><text class="composition-label">缓存写入</text><text class="composition-amount">{{report.cacheWrite}}</text></view></view>
+    </view>
+    <view class="section preferences">
+      <view class="section-title">本群偏好</view><view class="sub">按{{report.periodLabel}} Token 用量统计</view>
+      <view class="tabs dimension-tabs"><view class="tab {{dimension === 'models' ? 'tab-active' : ''}}" data-key="models" bindtap="switchDimension">模型</view><view class="tab {{dimension === 'tools' ? 'tab-active' : ''}}" data-key="tools" bindtap="switchDimension">工具</view></view>
+      <usage-chart segments="{{analysis.segments}}" center-value="{{analysis.centerValue}}" center-label="{{analysis.centerLabel}}" bindselect="selectCategory" />
+      <view wx:if="{{selectedCategory}}" class="selection">{{selectedCategory.name}} · {{selectedCategory.amount.value}}{{selectedCategory.amount.unit}} Tokens · {{selectedCategory.users}} 人使用</view>
+      <view wx:if="{{analysis.has_overlap}}" class="sub">上游分类明细存在重叠，占比按分类明细合计计算。</view>
+      <view wx:if="{{!analysis.items.length}}" class="state small">{{report.summary.tokens ? '用量已同步，分类明细暂缺' : '本周期暂无用量'}}</view>
+      <block wx:for="{{analysis.items}}" wx:key="key"><view wx:if="{{expanded || index < 5}}" class="category" data-key="{{item.key}}" bindtap="selectCategory"><view class="category-main"><view class="category-title"><view class="color-dot" style="background:{{item.color}}"></view><text>{{item.name}}</text></view><text class="category-percent">{{item.percent}}%</text></view><view class="category-meta"><text>{{item.users}} 人使用 · {{item.preferred_users}} 人本期主用</text><text class="category-amount">{{item.amount.value}}{{item.amount.unit}} Tokens</text></view><view class="bar-track"><view class="bar" style="width:{{item.percent > 100 ? 100 : item.percent}}%;background:{{item.color}}"></view></view></view></block>
+      <button wx:if="{{analysis.items.length > 5}}" class="text-button" bindtap="toggleRows">{{expanded ? '收起明细' : '查看全部 ' + analysis.items.length + ' 项'}}</button>
+      <view class="sub">主用人数：该成员同期用量最多的{{dimension === 'models' ? '模型' : '工具'}}。未分类部分更多时，不推断其偏好。</view>
+    </view>
+    <view class="section">
+      <view class="section-title">近 {{analysis.trend_days}} 天群用量</view><view class="sub">全体可统计成员按日汇总 · 点折线查看当天</view>
+      <usage-chart mode="trend" daily="{{analysis.daily}}" bindpoint="selectDay" />
+      <view wx:if="{{selectedDay}}" class="selected-day"><text>{{selectedDay.day}}</text><text class="selected-day-amount">{{selectedDay.reported ? selectedDay.amount.value + selectedDay.amount.unit + ' Tokens · ' + selectedDay.reported_users + ' 人同步' : '未同步'}}</text></view>
+      <view class="sub">断点表示没有同步记录，已同步的零用量保留为 0。</view>
+    </view>
+    <view class="coverage">仅汇总已加入本群、开启排名的成员当前统计设备。群榜中的隐藏成员不参与汇总。<view>本周期 {{report.summary.reported_users}} 人有同步记录 / {{report.group.members}} 人加入</view></view>
+    <view wx:if="{{public}}" class="cta"><button class="btn btn-primary" bindtap="goMine">去看我的用量</button></view>
+  </block>
+</view>
+<canvas type="2d" id="groupCanvas" class="export-canvas"></canvas>
+<privacy-notice />

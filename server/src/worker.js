@@ -1,3 +1,4 @@
+import { loadGroupInsights } from './group-insights.js';
 import {
   hexToken, groupId, beijingDay, beijingDaysAgo as daysAgo, sanitizeName, sanitizeGroupName,
   jsonError, bearerToken,
@@ -5,7 +6,7 @@ import {
 import { storeTotalReport } from './report.js';
 import { usageWindow, buildUsage, buildActivity } from './usage.js';
 import { shareCode } from './wx-code.js';
-import { readShare, createShare, groupShareStanding } from './shares.js';
+import { readShare, createShare, groupShareStanding, saveShare } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
 import { deleteAccount } from './account.js';
 import { heartbeat, syncHealth } from './sync-health.js';
@@ -229,6 +230,7 @@ async function route(request, env, url, path) {
     if (!source) return withCors(jsonError(404, '分享记录已失效或已被取消'));
     const owner = await env.DB.prepare('SELECT user_id FROM usage_shares WHERE id=?1').bind(source.id).first();
     if (owner?.user_id === user.id) return withCors(Response.json({ error: '这是你自己的用量记录', code: 'SELF_COMPARISON' }, { status: 409 }));
+    if (!source.usage) return withCors(jsonError(400,'群数据不能用于个人 PK'));
     if (source.usage.token_basis !== 'upstream_total' || source.usage.timezone !== 'Asia/Shanghai')
       return withCors(Response.json({ error: '这份记录的统计口径较早，请使用新分享卡对比', code: 'INCOMPATIBLE_USAGE' }, { status: 409 }));
     if (!['day', 'week', 'month', 'all'].includes(source.usage.period) ||
@@ -284,6 +286,18 @@ async function route(request, env, url, path) {
   if (method === 'POST' && /^\/api\/groups\/[a-z0-9]+\/rename$/.test(path)) return withCors(await renameGroup(request, env, path));
   if (method === 'POST' && /^\/api\/groups\/[a-z0-9]+\/visibility$/.test(path)) return withCors(await setGroupVisibility(request, env, path));
   if (method === 'GET' && path === '/api/groups/mine') return withCors(await myGroups(request, env));
+  if (['GET','POST'].includes(method) && /^\/api\/groups\/[a-z0-9]+\/insights(?:\/share)?$/.test(path)) {
+    const user=await sessionUser(request,env);
+    if (!user) return withCors(jsonError(401,'请先登录'));
+    const sharing=path.endsWith('/share');
+    if ((sharing && method!=='POST') || (!sharing && method!=='GET')) return withCors(jsonError(405,'method not allowed'));
+    const body=sharing ? await readJson(request) : null;
+    const loaded=await loadGroupInsights(env,user.id,path.split('/')[3],sharing ? body?.period : url.searchParams.get('period') || 'day');
+    if (loaded instanceof Response) return withCors(loaded);
+    if (!sharing) return withCors(Response.json(loaded.report));
+    if (!body?.snapshot || body.snapshot !== loaded.report.snapshot) return withCors(jsonError(409,'群数据已更新，请刷新后再分享'));
+    return withCors(await saveShare(env,user.id,{style:'group-insights',report:loaded.report,_group:loaded.guard}));
+  }
   if (method === 'GET' && path.startsWith('/api/groups/')) return withCors(await groupInfo(request, env, path));
 
   // ---- 榜单 ----
