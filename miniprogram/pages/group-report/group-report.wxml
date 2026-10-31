@@ -11,7 +11,7 @@
       <view class="sub cost-note">API 等值估算 · 非实际账单<text wx:if="{{report.costNote}}">\n{{report.costNote}}</text></view>
     </view>
     <view class="share-actions"><button class="btn btn-primary" open-type="share" disabled="{{!record}}">{{sharePreparing ? '准备中…' : '转发群数据'}}</button><button class="btn btn-ghost" bindtap="shareImage" disabled="{{!posterPath}}">{{imagePreparing ? '生成图片中…' : '分享数据图片'}}</button></view>
-    <button wx:if="{{shareError}}" class="retry" bindtap="retry">{{shareError}} · 重试</button><button wx:if="{{imageError}}" class="retry" bindtap="buildImages">{{imageError}}</button>
+    <button wx:if="{{shareError}}" class="retry" bindtap="retry">{{shareError}} · 重试</button><button wx:if="{{imageError}}" class="retry" bindtap="retryImages">{{imageError}}</button>
     <view class="section">
       <view class="section-title">用量构成</view>
       <view class="composition"><view class="composition-row"><text class="composition-label">输入</text><text class="composition-amount">{{report.inputText}}</text></view><view class="composition-row"><text class="composition-label">输出</text><text class="composition-amount">{{report.outputText}}</text></view><view class="composition-row"><text class="composition-label">缓存读取</text><text class="composition-amount">{{report.cacheRead}}</text></view><view class="composition-row"><text class="composition-label">缓存写入</text><text class="composition-amount">{{report.cacheWrite}}</text></view></view>

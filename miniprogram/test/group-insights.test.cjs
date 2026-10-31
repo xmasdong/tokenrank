@@ -10,10 +10,10 @@ function raw(period='day',tokens=258000000){
  const a={scope:'group',period,dimension:'models',summary:{tokens,breakdown_tokens:tokens,users:2,detail_users:2},items:[{key:'named:M',name:'M',tokens,users:2,preferred_users:2,percent:100,preferred_percent:100}],daily:[{day:'2026-10-30',reported:false,tokens:null,parts:[],reported_users:0},{day:'2026-10-31',reported:true,tokens,parts:[{name:'M',tokens}],reported_users:2}],trend_days:7};
  return{group:{name:'真实群名',members:8},period,from:'2026-10-31',to:'2026-10-31',summary:{tokens,active_users:2,reported_users:2,cache_read:tokens,input_tokens:0,output_tokens:0,cache_write:0},tools:{...a,dimension:'tools'},models:a,cost:{status:'unavailable',usd_micros:null,models:[],missing_days:1,missing_user_days:2},snapshot:'s-'+period};
 }
-function page(overrides={}){
+function page(overrides={},wxOverrides={}){
  let definition,epoch=0,logins=0,reads=0,shares=0,shows=0;const nav=[];
  const api={accountEpoch:()=>epoch,ensureSession:async()=>{logins++;},groupInsights:async(g,p)=>{reads++;return raw(p);},createGroupInsightsShare:async(g,p)=>{shares++;return{id:'a'.repeat(24),style:'group-insights',report:raw(p),expires_at:Date.now()+10000};},sharedRecord:async()=>{reads++;return{id:'b'.repeat(24),style:'group-insights',report:raw(),expires_at:Date.now()+10000};},...overrides};
- const wx={hideShareMenu(){},showShareMenu(){shows++;},stopPullDownRefresh(){},switchTab:o=>nav.push(o.url),navigateBack(){}};
+ const wx={hideShareMenu(){},showShareMenu(){shows++;},stopPullDownRefresh(){},switchTab:o=>nav.push(o.url),navigateBack(){},...wxOverrides};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/group-report/group-report.js'),'utf8'),{Page:x=>definition=x,wx,require:id=>id.endsWith('/api')?api:require(path.join(__dirname,'../utils',path.basename(id)))});
  const p={...definition,data:structuredClone(definition.data),setData(patch){Object.assign(this.data,patch);}};
  return{p,api,wx,nav,epoch:()=>epoch++,counts:()=>({logins,reads,shares,shows})};
@@ -65,4 +65,23 @@ test('群榜刚刷新时，不用比榜单更旧的群汇总缓存；普通重�
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/group/group.js'),'utf8'),{Page:x=>definition=x,wx:{},require:id=>id.endsWith('/api')?api:id.endsWith('/flow')?{PERIODS:[]}:id.endsWith('/share-avatar')?{loadAvatarImage:async()=>null}:id.endsWith('/quick-share')?{quickShare:()=>({})}:id.endsWith('/profile-editor')?{profileEditor:()=>({})}:require(path.join(__dirname,'../utils',path.basename(id)))});
  const p={...definition,data:{id:'g1',period:'day'},_visible:true,_requestId:1,_boardSnapshot:{updated_at:2},setData(patch){Object.assign(this.data,patch);}};
  await p.loadInsights();assert.equal(calls,1);assert.equal(forced,true);p._boardSnapshot.updated_at=1;await p.loadInsights();assert.equal(calls,1);
+});
+
+test('群图片在模拟器直接预览真实导出字节，失败后可重新生成；手机保留原生图片分享',async()=>{
+ const bytes=Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=','base64');
+ let native=0,preview=0;const f=page({}, {getDeviceInfo:()=>({platform:'devtools'}),arrayBufferToBase64:b=>Buffer.from(b).toString('base64'),getFileSystemManager:()=>({readFile:o=>o.success({data:bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength)})}),showShareImageMenu:()=>native++,previewImage:o=>{preview++;assert.match(o.urls[0],/^data:image\/png;base64,/);o.success({});}});
+ f.p.onLoad({g:'g1'});await f.p.onShow();f.p.data.posterPath='wxfile://real-export.png';await f.p.shareImage();assert.equal(native,0);assert.equal(preview,1);
+ f.wx.getFileSystemManager=()=>({readFile:o=>o.fail({errMsg:'file missing'})});await f.p.shareImage();assert.equal(f.p.data.posterPath,'');assert.match(f.p.data.imageError,/重新生成/);let rebuilt=0;f.p.buildImages=()=>rebuilt++;f.p.retryImages();assert.equal(rebuilt,1);
+ const phone=page({}, {getDeviceInfo:()=>({platform:'ios'}),showShareImageMenu:o=>{assert.equal(o.path,'wxfile://real-export.png');native++;},getFileSystemManager:()=>{throw Error('手机分享不额外读取文件');}});phone.p.onLoad({g:'g1'});await phone.p.onShow();phone.p.data.posterPath='wxfile://real-export.png';phone.p.shareImage();assert.equal(native,1);
+});
+
+test('打开图片期间切维度、离页或切账号，迟到的本地图片读取不再弹预览',async()=>{
+ for(const invalidate of [f=>f.p.onHide(),f=>f.epoch(),f=>f.p.switchDimension({currentTarget:{dataset:{key:'tools'}}})]){
+  let finish,previews=0;const f=page({}, {getDeviceInfo:()=>({platform:'devtools'}),getFileSystemManager:()=>({readFile:o=>finish=o.success}),previewImage:()=>previews++});f.p.onLoad({g:'g1'});await f.p.onShow();f.p.data.posterPath='real.png';const pending=f.p.shareImage();invalidate(f);finish({data:new ArrayBuffer(24)});await pending;assert.equal(previews,0);assert.equal(f.p.data.imageError,'');
+ }
+});
+
+test('损坏导出不会进入预览；手机原生菜单失败回退文件预览，取消不报错',async()=>{
+ let previews=0;const broken=page({}, {getDeviceInfo:()=>({platform:'devtools'}),getFileSystemManager:()=>({readFile:o=>o.success({data:new ArrayBuffer(24)})}),previewImage:()=>previews++});broken.p.onLoad({g:'g1'});await broken.p.onShow();broken.p.data.posterPath='broken.png';await broken.p.shareImage();assert.equal(previews,0);assert.equal(broken.p.data.posterPath,'');assert.match(broken.p.data.imageError,/重新生成/);
+ let menu;const f=page({}, {getDeviceInfo:()=>({platform:'ios'}),showShareImageMenu:o=>menu=o,previewImage:o=>{previews++;assert.deepEqual(o.urls,['real.png']);o.success({});}});f.p.onLoad({g:'g1'});await f.p.onShow();f.p.data.posterPath='real.png';f.p.shareImage();menu.fail({errMsg:'showShareImageMenu:fail cancel'});await new Promise(resolve=>setImmediate(resolve));assert.equal(previews,0);assert.equal(f.p.data.imageError,'');menu.fail({errMsg:'showShareImageMenu:fail unsupported'});await new Promise(resolve=>setImmediate(resolve));assert.equal(previews,1);assert.equal(f.p.data.posterPath,'real.png');
 });

@@ -1,4 +1,5 @@
 const api=require('../../utils/api');
+const {isDevtools,previewExportedImage}=require('../../utils/share-image-preview');
 const {presentGroupInsights,groupReportTitle}=require('../../utils/group-insights');
 const {loadCodeImage}=require('../../utils/share-code');
 const {drawGroupInsightsPoster,GROUP_POSTER_HEIGHT}=require('../../utils/group-insights-poster');
@@ -51,17 +52,29 @@ Page({
       for(const cover of [true,false]){
         canvas.width=1000;canvas.height=cover?800:GROUP_POSTER_HEIGHT;
         drawGroupInsightsPoster(canvas.getContext('2d'),{report,dimension,cover,codeImage});
-        const path=await new Promise((resolve,reject)=>wx.canvasToTempFilePath({canvas,destWidth:canvas.width,destHeight:canvas.height,fileType:'png',success:r=>resolve(r.tempFilePath),fail:reject}));
+        const path=await new Promise((resolve,reject)=>wx.canvasToTempFilePath({canvas,destWidth:canvas.width,destHeight:canvas.height,fileType:'png',success:r=>typeof r.tempFilePath==='string' && r.tempFilePath ? resolve(r.tempFilePath) : reject(new Error('图片导出失败')),fail:reject}));
         if(!current())return;this.setData(cover?{coverPath:path}:{posterPath:path});
       }
     }catch(error){if(current())this.setData({imageError:'图片生成失败，点此重试'});}
     finally{this._drawing=false;if(current())this.setData({imagePreparing:false});if(this._imagePending){this._imagePending=false;this.buildImages();}}
   },
+  retryImages(){
+    this._imageVersion=(this._imageVersion||0)+1;
+    this.setData({posterPath:'',coverPath:'',imageError:''});
+    return this.buildImages();
+  },
   shareImage(){
-    const path=this.data.posterPath,record=this.data.record,epoch=api.accountEpoch();if(!path||!record||epoch!==this._recordEpoch)return;
-    const preview=()=>{if(this._visible&&epoch===api.accountEpoch())wx.previewImage({urls:[path]});};
-    if(!wx.showShareImageMenu){preview();return;}
-    wx.showShareImageMenu({path,needShowEntrance:true,entrancePath:`/pages/group-report/group-report?id=${record.id}&dimension=${this.data.dimension}`,fail:error=>{if(!/cancel/i.test(error.errMsg||''))preview();}});
+    const path=this.data.posterPath,record=this.data.record,epoch=api.accountEpoch(),version=this._imageVersion;
+    if(!path||!record||epoch!==this._recordEpoch||this._previewing)return;
+    const current=()=>this._visible&&epoch===api.accountEpoch()&&version===this._imageVersion&&path===this.data.posterPath&&record===this.data.record;
+    const preview=async()=>{
+      this._previewing=true;
+      try{await previewExportedImage(wx,path,current);}
+      catch(error){if(current()&&!/cancel/i.test(error.errMsg||''))this.setData({posterPath:'',coverPath:'',imageError:'图片预览失败，请重新生成'});}
+      finally{this._previewing=false;}
+    };
+    if(isDevtools(wx)||!wx.showShareImageMenu)return preview();
+    wx.showShareImageMenu({path,needShowEntrance:true,entrancePath:`/pages/group-report/group-report?id=${record.id}&dimension=${this.data.dimension}`,fail:error=>{if(!/cancel/i.test(error.errMsg||'')&&current())preview();}});
   },
   onShareAppMessage(){
     const record=this.data.record;if(!record||this._recordEpoch!==api.accountEpoch()||record.expires_at<=Date.now())return{title:'Token 群排名',path:'/pages/index/index'};
