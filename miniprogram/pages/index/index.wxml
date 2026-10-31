@@ -1,25 +1,8 @@
 <view class="page">
   <view class="home-toolbar"><text>每个群一张榜</text><button class="mast-about" bindtap="goAbout">使用说明</button></view>
   <view class="tabs"><view wx:for="{{periods}}" wx:key="key" class="tab {{period === item.key ? 'tab-active' : ''}}" data-key="{{item.key}}" bindtap="switchPeriod">{{item.label}}</view></view>
-  <view class="own-usage">
-    <view class="own-head"><text class="display">我的用量</text><button wx:if="{{!hasReported && (usageLoading || usageError || (usage && usage.has_history))}}" class="own-link own-entry" bindtap="goConnect">接入电脑</button><text wx:elif="{{hasReported}}" class="own-link" bindtap="goProfile">详情</text></view>
-    <view wx:if="{{usageLoading}}" class="own-note">正在读取用量…</view>
-    <view wx:elif="{{usageError}}" class="own-note">用量加载失败：{{usageError}}<text class="own-link" bindtap="load"> 重试</text></view>
-    <block wx:elif="{{usage && !usage.has_history && !hasReported}}">
-      <view class="own-note">在电脑上运行接入命令后显示用量。不想上榜也行，接入后可以关掉排名。</view>
-      <button class="btn btn-primary quick-start" bindtap="goConnect">接入电脑</button>
-    </block>
-    <block wx:elif="{{usage}}">
-      <view class="own-number num-font" bindtap="goProfile">{{usage.value}}<text class="own-unit">{{usage.unit}}</text><text class="own-tokens"> tokens</text></view>
-      <view class="own-meta"><text>{{usage.periodLabel}} · {{usage.requestsText}} 次调用</text><button class="own-share" wx:if="{{usage.has_history}}" open-type="share" data-kind="personal" disabled="{{!quickShareReady}}">{{quickSharePreparing ? '准备中' : '转发'}}</button></view>
-      <view wx:if="{{usage.has_history}}" class="own-note"><text class="own-link" bindtap="goShare">分享图片</text><text wx:if="{{quickShareError}}" class="own-link" bindtap="retryQuickShare"> 转发重试</text></view>
-    </block>
-  </view>
-  <view class="conn-strip status-line status-{{connState}}" wx:if="{{user && hasReported}}" bindtap="goConnect">
-    <text class="status-dot"></text><text>{{connText}}</text><text class="strip-arr">查看</text>
-  </view>
-  <view class="profile-tip" wx:if="{{user && hasReported && !user.nickname}}" bindtap="goProfile">
-    <text>还没设置昵称</text><text class="arr">设置</text>
+  <view class="conn-strip status-line status-{{connState}}" wx:if="{{user}}" aria-role="button" bindtap="goConnect" aria-label="{{hasReported ? '查看电脑同步状态' : '接入电脑'}}">
+    <view class="status-dot"></view><text>{{connText}}</text><text class="strip-arr">{{hasReported ? '同步设置' : '接入电脑'}}</text>
   </view>
   <view wx:if="{{loading}}" class="hint">正在加载我的群榜…</view>
   <view wx:elif="{{error}}" class="hint"><view class="hint-sub">{{error}}</view><button class="btn btn-ghost retry" bindtap="load">重新加载</button></view>
@@ -41,5 +24,4 @@
   </block>
   <view class="legal">数据由用户电脑上报，仅供参考</view>
 </view>
-<canvas type="2d" id="quickShareCanvas" class="export-canvas"></canvas>
 <privacy-notice />

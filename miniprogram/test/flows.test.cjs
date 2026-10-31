@@ -356,7 +356,7 @@ test('已有历史同步的用户即使今日零用量或没有群，也不回�
   });
   await p.load();
   assert.equal(p.data.hasReported, true); assert.equal(p.data.connState, 'unknown');
-  assert.equal(p.data.usage.summary.tokens, 0); assert.equal(p.data.myGroups.length, 0);
+  assert.equal(p.data.usage, undefined); assert.equal(p.data.myGroups.length, 0);
 });
 
 test('无来源群的接入成功入口打开本人用量', () => {
@@ -691,18 +691,28 @@ test('普通网络故障不会被误判成需要重新登录', async () => {
   assert.equal(logins, 0);
 });
 
-test('没有群或群列表失败时仍能查看自己的用量，并分享所选周期', async () => {
-  const { p, navigation } = page('index', { myRankings: async () => { throw new Error('群列表暂不可用'); } });
-  await p.load();
-  assert.equal(p.data.usage.exact, '12,000'); assert.match(p.data.error, /群列表/);
+test('群榜列表失败保留同步状态与重试，切周期也不请求个人用量或分享', async () => {
+  let usageCalls = 0, shareCalls = 0;
+  const { p, navigation } = page('index', {
+    ensureLogin: async () => ({ user_id: 1, last_report_at: 1 }),
+    myRankings: async () => { throw new Error('群列表暂不可用'); },
+    myUsage: async () => { usageCalls++; return usageData(); }, createShare: async () => { shareCalls++; },
+  });
+  await p.load(); assert.match(p.data.error, /群列表/); assert.equal(p.data.hasReported, true);
   await p.switchPeriod({ currentTarget: { dataset: { key: 'week' } } });
-  assert.equal(p.data.usage.periodLabel, '近7天');
-  p.goShare(); assert.equal(navigation[0][1], '/pages/share/share?period=week');
+  assert.equal(p.data.period, 'week'); assert.equal(usageCalls, 0); assert.equal(shareCalls, 0);
+  assert.equal(p.onShareAppMessage().path, '/pages/group/group?enter=1');
+  p.goConnect(); assert.equal(navigation[0][1], '/pages/connect/connect');
 });
 
-test('用量加载失败不伪装为零，群列表仍能正常显示', async () => {
-  const { p } = page('index', { myUsage: async () => { throw new Error('用量网络失败'); } });
-  await p.load(); assert.equal(p.data.usage, null); assert.match(p.data.usageError, /用量网络失败/);
+test('群榜不依赖个人用量读取，直接展示列表与未接入状态', async () => {
+  let usageCalls = 0;
+  const { p } = page('index', {
+    myUsage: async () => { usageCalls++; throw new Error('用量网络失败'); },
+    myRankings: async () => ({ groups: [{ id: 'g1', name: '本群', members: 2, my_tokens: 100 }] }),
+  });
+  await p.load(); assert.equal(usageCalls, 0); assert.equal(p.data.usage, undefined);
+  assert.equal(p.data.myGroups[0].name, '本群'); assert.equal(p.data.hasReported, false);
   assert.equal(p.data.error, ''); assert.equal(p.data.loading, false);
 });
 
@@ -1309,8 +1319,8 @@ test('电脑端同步程序版本低于服务端发布版本时自动提示，�
   queue._reset(); prompt._reset();
 });
 
-test('首页与我的原生按钮直接打开本人的公开记录，不经过模板选择页', async () => {
-  for (const name of ['index', 'profile']) {
+test('我的原生按钮直接打开本人的公开记录，不经过模板选择页', async () => {
+  for (const name of ['profile']) {
     const { p, navigation } = page(name);
     await p.load(); await flush();
     assert.equal(p.data.quickShareReady, true, name);
