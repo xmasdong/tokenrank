@@ -2,7 +2,7 @@ const api = require('../../utils/api');
 const { trendsView } = require('../../utils/history');
 Page({
   data: { period: 'week', dimension: 'tools', metric: 'users', end: '', loading: true, error: '', report: null, loadingMore: false, moreError: '' },
-  onLoad(options) { this.setData({ period: options.period === 'month' ? 'month' : 'week', dimension: options.dimension === 'models' ? 'models' : 'tools',
+  onLoad(options) { this.setData({ period: ['month','last_month'].includes(options.period) ? options.period : 'week', dimension: options.dimension === 'models' ? 'models' : 'tools',
     metric: options.metric === 'tokens' ? 'tokens' : 'users', end: options.end || '' }); wx.showShareMenu({ menus: ['shareAppMessage'], withShareTicket: true }); },
   onShow() { this._visible = true; return this.load(); },
   onHide() { this._visible = false; this._requestId = (this._requestId || 0) + 1; this.setData({ loadingMore: false }); },
@@ -27,9 +27,9 @@ Page({
   },
   switchOption(e) {
     const { field, value } = e.currentTarget.dataset;
-    const allowed = { period: ['week','month'], dimension: ['tools','models'], metric: ['users','tokens'] };
+    const allowed = { period: ['week','month','last_month'], dimension: ['tools','models'], metric: ['users','tokens'] };
     if (!allowed[field]?.includes(value) || this.data[field] === value) return;
-    this.setData({ [field]: value }); return this.load();
+    this.setData({ [field]: value, ...(field === 'period' ? { end: '' } : {}) }); return this.load();
   },
   onReachBottom() { if (!this.data.moreError) return this.loadMore(); },
   async loadMore() {

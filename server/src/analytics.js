@@ -1,4 +1,4 @@
-import { usageWindow } from './usage.js';
+import { USAGE_PERIODS, usageWindow } from './usage.js';
 import { beijingDaysAgo, jsonError } from './lib.js';
 import { insightPolicy } from './insight-access.js';
 import { toolModelRows } from './tool-models.js';
@@ -22,8 +22,8 @@ export async function analyticsRows(env, { scope, userId = null, period, dimensi
     AND json_type(${pair},'$[1]') IN ('integer','real') AND json_extract(${pair},'$[1]')>0`;
   const detailSource = `${view} ds, json_each(CASE WHEN json_valid(ds.${column}) THEN
     CASE WHEN json_type(ds.${column})='array' THEN ds.${column} ELSE '[]' END ELSE '[]' END) je`;
-  const trendDays = period === 'day' || period === 'week' ? 7 : 30;
-  const trendFrom = beijingDaysAgo(trendDays - 1, now);
+  const trendDays = range.trendDays;
+  const trendFrom = beijingDaysAgo(trendDays - 1, Date.parse(range.to + 'T12:00:00+08:00'));
   const statements = [
     env.DB.prepare(`SELECT ds.user_id AS uid, ${totals},
       COUNT(CASE WHEN tokens>0 OR requests>0 THEN 1 END) AS active_days,
@@ -95,7 +95,7 @@ export function aggregateAnalytics(rows) {
     if (missing) day.parts.set(unknownName, (day.parts.get(unknownName) || 0) + missing);
   }
   const daily = Array.from({ length: trendDays }, (_, i) => {
-    const day = beijingDaysAgo(trendDays - 1 - i, now), value = dayMap.get(day);
+    const day = beijingDaysAgo(trendDays - 1 - i, Date.parse(range.to + 'T12:00:00+08:00')), value = dayMap.get(day);
     return value ? { day, tokens: value.tokens, requests: value.requests, reported: true, reported_users: value.reported_users,
       ...(rows.tool ? { details_complete: !rows.incompleteDays.has(day) } : {}),
       parts: [...value.parts].map(([name, tokens]) => ({ name, tokens })) }
@@ -138,6 +138,6 @@ export async function communityAudience(env, query, origin) {
 export function analyticsQuery(url) {
   const period = url.searchParams.get('period') || 'day', dimension = url.searchParams.get('dimension') || 'tools';
   const tool = url.searchParams.get('tool') || '';
-  return ['day','week','month','all'].includes(period) && ['tools','models'].includes(dimension) &&
+  return USAGE_PERIODS.includes(period) && ['tools','models'].includes(dimension) &&
     (!tool || (dimension === 'models' && tool.trim() && tool.length <= 60)) ? { period, dimension, ...(tool ? { tool } : {}) } : null;
 }

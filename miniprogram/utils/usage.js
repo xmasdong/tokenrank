@@ -1,7 +1,7 @@
 const { presentCost } = require('./cost');
 const PERIODS = [
   { key: 'day', label: '今日' }, { key: 'week', label: '近7天' },
-  { key: 'month', label: '近30天' }, { key: 'all', label: '累计' },
+  { key: 'month', label: '近30天' }, { key: 'last_month', label: '上个月' }, { key: 'all', label: '累计' },
 ];
 const integer = n => String(Math.max(0, Math.round(Number(n) || 0))).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 function compact(n) {

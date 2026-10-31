@@ -8,8 +8,8 @@ const count = value => Number.isSafeInteger(value) && value >= 0;
 // Only explicit event-level associations are used; old reports stay unlinked.
 export async function toolModelRows(env, { scope, userId, period, tool, trend = true, now = Date.now() }) {
   const range = usageWindow(period, now), view = scope === 'mine' ? 'ranked_usage' : 'public_usage';
-  const trendDays = period === 'day' || period === 'week' ? 7 : 30;
-  const trendFrom = beijingDaysAgo(trendDays - 1, now);
+  const trendDays = range.trendDays;
+  const trendFrom = beijingDaysAgo(trendDays - 1, Date.parse(range.to + 'T12:00:00+08:00'));
   const select = from => env.DB.prepare(`SELECT user_id AS uid,day,tokens,tools_json,tool_models_json,updated_at
     FROM ${view} WHERE day>=?1 AND day<=?2 AND (?3 IS NULL OR user_id=?3) ORDER BY day,user_id`)
     .bind(from, range.to, scope === 'mine' ? userId : null);

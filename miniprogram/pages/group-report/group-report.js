@@ -4,10 +4,10 @@ const {presentGroupInsights,groupReportTitle}=require('../../utils/group-insight
 const {loadCodeImage}=require('../../utils/share-code');
 const {drawGroupInsightsPoster,GROUP_POSTER_HEIGHT}=require('../../utils/group-insights-poster');
 Page({
-  data:{id:'',g:'',period:'day',periods:[{key:'day',label:'今日'},{key:'week',label:'近7天'},{key:'month',label:'近30天'}],
+  data:{id:'',g:'',period:'day',periods:[{key:'day',label:'今日'},{key:'week',label:'近7天'},{key:'month',label:'近30天'},{key:'last_month',label:'上个月'}],
     public:false,report:null,analysis:null,dimension:'models',expanded:false,selectedDay:null,selectedCategory:null,
     loading:true,error:'',record:null,sharePreparing:false,shareError:'',posterPath:'',coverPath:'',imageError:'',imagePreparing:false},
-  onLoad(options){this.setData({id:options.id||'',g:options.g||'',public:!!options.id,period:['day','week','month'].includes(options.period)?options.period:'day',dimension:options.dimension==='tools'?'tools':'models'});wx.hideShareMenu();},
+  onLoad(options){this.setData({id:options.id||'',g:options.g||'',public:!!options.id,period:['day','week','month','last_month'].includes(options.period)?options.period:'day',dimension:options.dimension==='tools'?'tools':'models'});wx.hideShareMenu();},
   onShow(){this._visible=true;const epoch=api.accountEpoch();if(!this.data.public && this._epoch!==undefined && this._epoch!==epoch)this.setData({report:null,analysis:null});this._epoch=epoch;return this.load();},
   onReady(){this._canvasReady=true;this.buildImages();},
   onHide(){this._visible=false;this._request=(this._request||0)+1;this._imageVersion=(this._imageVersion||0)+1;this.setData({sharePreparing:false,imagePreparing:false});},
@@ -32,7 +32,7 @@ Page({
     }catch(error){if(current())this.setData({loading:false,error:error.message||'群数据暂不可用'});}
   },
   setRecord(record){if(record.style!=='group-insights'||!/^[0-9a-f]{24}$/.test(record.id))throw new Error('分享记录无效');this._recordEpoch=api.accountEpoch();this.setData({record});wx.showShareMenu({menus:['shareAppMessage'],withShareTicket:true});this.buildImages();},
-  switchPeriod(e){const period=e.currentTarget.dataset.key;if(this.data.public||period===this.data.period||!['day','week','month'].includes(period))return;this.setData({period,report:null,analysis:null,expanded:false});return this.load();},
+  switchPeriod(e){const period=e.currentTarget.dataset.key;if(this.data.public||period===this.data.period||!['day','week','month','last_month'].includes(period))return;this.setData({period,report:null,analysis:null,expanded:false});return this.load();},
   switchDimension(e){const dimension=e.currentTarget.dataset.key;if(!['tools','models'].includes(dimension)||dimension===this.data.dimension)return;this._imageVersion=(this._imageVersion||0)+1;this.setData({dimension,analysis:this.data.report[dimension],expanded:false,selectedCategory:null,posterPath:'',coverPath:'',imageError:''});this.buildImages();},
   selectCategory(e){const row=this.data.analysis.items.find(item=>item.key===(e.detail?.key||e.currentTarget?.dataset.key));this.setData({selectedCategory:row||null});},
   selectDay(e){this.setData({selectedDay:this.data.analysis.daily[e.detail.index]||null});},

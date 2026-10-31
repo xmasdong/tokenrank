@@ -1,8 +1,15 @@
 import { beijingDay, beijingDaysAgo as daysAgo } from './lib.js';
 import { buildCosts } from './costs.js';
 
+export const USAGE_PERIODS = ['day', 'week', 'month', 'last_month', 'all'];
+
 export function usageWindow(value, now = Date.now()) {
-  const period = ['day', 'week', 'month', 'all'].includes(value) ? value : 'day';
+  const period = USAGE_PERIODS.includes(value) ? value : 'day';
+  if (period === 'last_month') {
+    const first = beijingDay(now).slice(0, 7) + '-01';
+    const to = new Date(Date.parse(first + 'T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+    return { period, from: to.slice(0, 7) + '-01', to, trendDays: Number(to.slice(8)) };
+  }
   const days = period === 'day' ? 1 : period === 'week' ? 7 : 30;
   return { period, from: period === 'all' ? '0000-01-01' : daysAgo(days - 1, now),
     to: beijingDay(now), trendDays: period === 'day' ? 7 : days };
@@ -47,8 +54,13 @@ function breakdown(map, total) {
 }
 
 /** 仅处理已按登录用户过滤的日聚合；不依赖用户是否入群或是否上榜。 */
-export function buildUsage(rows, period, now = Date.now()) {
+export function buildUsage(rows, period, now = Date.now(), fixedRange = null) {
   const window = usageWindow(period, now);
+  if (fixedRange) {
+    // An old shared month keeps its original dates when opened or compared later.
+    window.from = fixedRange.from; window.to = fixedRange.to;
+    if (window.period === 'last_month') window.trendDays = Math.round((Date.parse(window.to) - Date.parse(window.from)) / 86400000) + 1;
+  }
   const selected = rows.filter(r => r.day >= window.from && r.day <= window.to);
   const summary = { tokens: 0, input_tokens: 0, output_tokens: 0, requests: 0, cache_read: 0, cache_write: 0, active_days: 0 };
   const models = new Map(), tools = new Map();
@@ -60,7 +72,7 @@ export function buildUsage(rows, period, now = Date.now()) {
   }
   const byDay = new Map(rows.map(row => [row.day, row]));
   const daily = Array.from({ length: window.trendDays }, (_, i) => {
-    const day = daysAgo(window.trendDays - 1 - i, now);
+    const day = daysAgo(window.trendDays - 1 - i, Date.parse(window.to + 'T12:00:00+08:00'));
     const row = byDay.get(day);
     return { day, tokens: count(row?.tokens), requests: count(row?.requests) };
   });

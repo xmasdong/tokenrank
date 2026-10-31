@@ -9,6 +9,10 @@ const rankingPosterHeight = data => RANKING_HEIGHT - (5 - Math.max(1, Math.min(5
 
 function rankingRange(period, day) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(day || '')) return '';
+  if (period === 'last_month') {
+    const to = new Date(Date.parse(day.slice(0, 7) + '-01T00:00:00Z') - 86400000).toISOString().slice(0, 10);
+    return `${to.slice(0, 7)}-01 — ${to}`;
+  }
   const days = { day: 0, week: 6, month: 29 }[period];
   if (days == null) return '';
   const from = new Date(Date.parse(day + 'T00:00:00Z') - days * 86400000).toISOString().slice(0, 10);
@@ -125,4 +129,4 @@ function drawRankingPoster(ctx, { data, cover = false, codeImage, avatarImages =
   text(data.shortNote || '含缓存 · 北京时间', L, H - 26, cover ? 20 : 24, C.soft, cover ? 720 : 620);
 }
 
-module.exports = { RANKING_WIDTH, RANKING_HEIGHT, RANKING_COVER_HEIGHT, rankingPosterHeight, personalRanking, rankingAvatarUrls, drawRankingPoster };
+module.exports = { RANKING_WIDTH, RANKING_HEIGHT, RANKING_COVER_HEIGHT, rankingPosterHeight, personalRanking, rankingAvatarUrls, rankingRange, drawRankingPoster };

@@ -1,5 +1,5 @@
 import { beijingDay, jsonError } from './lib.js';
-import { usageWindow, buildUsage } from './usage.js';
+import { USAGE_PERIODS, usageWindow, buildUsage } from './usage.js';
 
 export async function rankSnapshot(group, period, today, rows) {
   const value = group ? [group.id, group.name, group.members, period, today, rows] : ['global', period, today, rows];
@@ -11,7 +11,7 @@ export async function rankSnapshot(group, period, today, rows) {
 // the selected member, nor exposes an account ID or their daily history.
 export async function groupPk(env, user, groupId, body, origin, now = Date.now()) {
   const { period, rank, snapshot } = body || {};
-  if (!['day', 'week', 'month', 'all'].includes(period) || !Number.isSafeInteger(rank) || rank < 1 || rank > 1e9 ||
+  if (!USAGE_PERIODS.includes(period) || !Number.isSafeInteger(rank) || rank < 1 || rank > 1e9 ||
     typeof snapshot !== 'string' || !/^[a-f0-9]{64}$/.test(snapshot)) return jsonError(400, 'PK 参数无效，请重新从群榜选择');
   const range = usageWindow(period, now), to = period === 'all' ? '9999-12-31' : range.to;
   const ranked = `SELECT u.id AS uid, u.nickname, u.avatar_path,

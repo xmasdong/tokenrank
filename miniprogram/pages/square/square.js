@@ -86,7 +86,7 @@ Page({
       this.setData({ insights: presentAnalysis(result), loading: false, updated_fmt: api.fmtRelTime(result.updated_at) });
     } catch (err) { if (requestId === this._requestId) this.setData({ loading: false, error: err.message }); }
   },
-  goTrends() { wx.navigateTo({ url: '/pages/trends/trends?period=' + (this.data.period === 'month' ? 'month' : 'week') + '&dimension=' + (this.data.mode === 'models' ? 'models' : 'tools') }); },
+  goTrends() { wx.navigateTo({ url: '/pages/trends/trends?period=' + (['month','last_month'].includes(this.data.period) ? this.data.period : 'week') + '&dimension=' + (this.data.mode === 'models' ? 'models' : 'tools') }); },
   goAnalysis(e) {
     const name = e.currentTarget?.dataset?.name;
     wx.navigateTo({ url: '/pages/analysis/analysis?scope=public&period=' + this.data.period +

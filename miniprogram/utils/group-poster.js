@@ -1,5 +1,6 @@
 /** Group codes open the app; joining a real WeChat group still requires its in-chat card. */
 const { drawCodeBadge } = require('./share-code');
+const { rankingRange } = require('./ranking-poster');
 function drawGroupPoster(ctx, { data, cover = false, codeImage, avatarImages = {}, previewOnly = false }) {
   // Chat covers already open the app when tapped; only saved posters carry the mini program code.
   if (!cover && !codeImage && !previewOnly) throw new Error('小程序码尚未就绪，请重试');
@@ -14,7 +15,8 @@ function drawGroupPoster(ctx, { data, cover = false, codeImage, avatarImages = {
     ctx.fillText(chars.join(''),x,y);
   };
   const rule=y=>{ctx.fillStyle=C.rule;ctx.fillRect(L,y,R-L,1);};
-  const period={day:'今日',week:'近7天',month:'近30天'}[data.period]||'今日';
+  const period={day:'今日',week:'近7天',month:'近30天',last_month:'上个月'}[data.period]||'今日';
+  const basis=data.period==='last_month' ? rankingRange(data.period,data.day) + ' · 北京时间' : '含缓存总用量 · 北京时间自然日';
   ctx.fillStyle=C.paper;ctx.fillRect(0,0,W,H);
   text('Token 群排名',L,cover?40:52,20);text(`${data.members} 人已加入 · ${period}`,R,cover?40:52,20,C.soft,420,'right');
   text(data.name||'本群 Token 排名',L,cover?88:120,cover?35:42,C.ink,658,'left',serif);
@@ -44,7 +46,7 @@ function drawGroupPoster(ctx, { data, cover = false, codeImage, avatarImages = {
     rule(428);
     text(data.me?`我的群内排名 #${data.me.rank}`:'我的群内排名 —',L,494,28,C.ink,400,'left',serif);
     if(data.me)text(`${data.me.tokens_fmt} Tokens`,R,494,28,C.accent,240,'right');
-    text('含缓存总用量 · 北京时间自然日',L,H-22,16,C.soft,330);
+    text(basis,L,H-22,16,C.soft,330);
     text(countNote,R,H-22,16,C.soft,320,'right');
     return;
   }
@@ -56,6 +58,6 @@ function drawGroupPoster(ctx, { data, cover = false, codeImage, avatarImages = {
   text('入群请点击群内卡片',L,footer+(cover?156:185),cover?20:21,C.soft,cover?450:390);
   drawCodeBadge(ctx,codeImage,qx,qy,size);
   if(!codeImage) {text('小程序码区域',qx+size/2,qy+size/2-5,18,C.soft,size-20,'center');text('预览不含真实码',qx+size/2,qy+size/2+24,17,C.soft,size-16,'center');}
-  text('含缓存总用量 · 北京时间自然日',L,H-16,16,C.soft);
+  text(basis,L,H-16,16,C.soft);
 }
 module.exports={drawGroupPoster};

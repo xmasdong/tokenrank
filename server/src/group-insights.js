@@ -3,7 +3,7 @@ import { beijingDaysAgo, jsonError } from './lib.js';
 import { aggregateAnalytics } from './analytics.js';
 import { buildCosts } from './costs.js';
 
-export const groupPeriod = value => ['day', 'week', 'month'].includes(value);
+export const groupPeriod = value => ['day', 'week', 'month', 'last_month'].includes(value);
 const digest = async value => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify(value))))]
   .map(n => n.toString(16).padStart(2, '0')).join('');
 function pairs(value) {
@@ -24,7 +24,7 @@ function dimension(rows, range, now, name) {
   const combined = new Map();
   for (const row of details) { const key = JSON.stringify([row.uid,row.name]); if (!combined.has(key)) combined.set(key,{...row,tokens:0}); combined.get(key).tokens += row.tokens; }
   for (const row of rows) for (const [label,tokens] of pairs(row[name + '_json'])) dayDetails.push({ uid:row.user_id,day:row.day,name:label,tokens });
-  return aggregateAnalytics({ scope:'group', dimension:name, range, now, trendDays:range.period === 'month' ? 30 : 7,
+  return aggregateAnalytics({ scope:'group', dimension:name, range, now, trendDays:range.trendDays,
     users:[...users.values()], details:[...combined.values()], days:rows.map(row=>({...row,uid:row.user_id})), dayDetails }).data;
 }
 export async function loadGroupInsights(env, userId, groupId, period = 'day', now = Date.now()) {
@@ -32,7 +32,7 @@ export async function loadGroupInsights(env, userId, groupId, period = 'day', no
   const member = await env.DB.prepare(`SELECT g.name FROM rank_groups g JOIN rank_group_members m ON m.group_id=g.id
     JOIN users u ON u.id=m.user_id WHERE g.id=?1 AND m.user_id=?2 AND u.disabled_at IS NULL`).bind(groupId,userId).first();
   if (!member) return jsonError(403,'请先加入这个群榜');
-  const range=usageWindow(period,now), from=beijingDaysAgo(period === 'month' ? 29 : 6,now);
+  const range=usageWindow(period,now), from=beijingDaysAgo(range.trendDays - 1,Date.parse(range.to + 'T12:00:00+08:00'));
   // Both dimensions and the cost use this one read transaction and the exact same public cohort as the ranking.
   const [groups,source] = await env.DB.batch([
     env.DB.prepare(`SELECT name,(SELECT COUNT(*) FROM rank_group_members WHERE group_id=g.id) AS members FROM rank_groups g WHERE id=?1`).bind(groupId),

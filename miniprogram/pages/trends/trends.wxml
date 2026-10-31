@@ -1,6 +1,6 @@
 <view class="page">
   <view class="tabs"><view class="tab {{dimension === 'tools' ? 'tab-active' : ''}}" data-field="dimension" data-value="tools" bindtap="switchOption">工具</view><view class="tab {{dimension === 'models' ? 'tab-active' : ''}}" data-field="dimension" data-value="models" bindtap="switchOption">模型</view></view>
-  <view class="tabs"><view class="tab {{period === 'week' ? 'tab-active' : ''}}" data-field="period" data-value="week" bindtap="switchOption">近 7 天</view><view class="tab {{period === 'month' ? 'tab-active' : ''}}" data-field="period" data-value="month" bindtap="switchOption">近 30 天</view></view>
+  <view class="tabs"><view class="tab {{period === 'week' ? 'tab-active' : ''}}" data-field="period" data-value="week" bindtap="switchOption">近 7 天</view><view class="tab {{period === 'month' ? 'tab-active' : ''}}" data-field="period" data-value="month" bindtap="switchOption">近 30 天</view><view class="tab {{period === 'last_month' ? 'tab-active' : ''}}" data-field="period" data-value="last_month" bindtap="switchOption">上个月</view></view>
   <view class="metric-tabs"><button class="{{metric === 'users' ? 'selected' : ''}}" data-field="metric" data-value="users" bindtap="switchOption">使用人数</button><button class="{{metric === 'tokens' ? 'selected' : ''}}" data-field="metric" data-value="tokens" bindtap="switchOption">Token 用量</button></view>
   <view wx:if="{{loading}}" class="state">正在读取趋势榜…</view>
   <view wx:elif="{{error}}" class="state">{{error}}<button class="btn btn-ghost" bindtap="load">重试</button></view>

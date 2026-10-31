@@ -30,7 +30,7 @@ function drawGroupInsightsPoster(ctx,{report,dimension='models',cover=false,code
   });
   if(!analysis.items.length)text('暂无明细',492,640,26,'#888888');
   text(`覆盖 ${analysis.summary.detail_users} 人 · ${analysis.categoryCount} 个${dimension==='models'?'模型':'工具'}${analysis.has_overlap?' · 按明细占比':''}`,48,980,23,'#888888');
-  rule(1012);text(`近 ${analysis.trend_days} 天群用量`,48,1068,32);
+  rule(1012);text(report.period === 'last_month' ? '上个月每日群用量' : `近 ${analysis.trend_days} 天群用量`,48,1068,32);
   ctx.save();ctx.translate(20,1100);ctx.scale(2,2);drawTrend(ctx,470,132,analysis.daily.map(day=>({...day,value:day.tokens})));ctx.restore();
   rule(1382);text(report.costNote || 'API 等值估算 · 非实际账单',48,1432,23,'#888888',670);
   text('Token 群排名',48,1508,32);text('长按识别小程序码',48,1554,25,'#888888');

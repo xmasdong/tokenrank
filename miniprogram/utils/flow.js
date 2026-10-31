@@ -4,6 +4,7 @@ const PERIODS = [
   { key: 'day', label: '今日' },
   { key: 'week', label: '近7天' },
   { key: 'month', label: '近30天' },
+  { key: 'last_month', label: '上个月' },
 ];
 
 function connection(user, now = Date.now()) {

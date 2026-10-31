@@ -1,14 +1,20 @@
 import { aggregateAnalytics } from './analytics.js';
+import { usageWindow } from './usage.js';
 import { beijingDay, jsonError } from './lib.js';
 import { addDays, validDay, digest } from './history.js';
 
 export function trendQuery(url, now = Date.now()) {
   const period = url.searchParams.get('period') || 'week', dimension = url.searchParams.get('dimension') || 'tools';
   const metric = url.searchParams.get('metric') || 'users', yesterday = addDays(beijingDay(now), -1);
-  const end = url.searchParams.get('end') || yesterday, offsetText = url.searchParams.get('offset') || '0';
+  const end = url.searchParams.get('end') || (period === 'last_month' ? usageWindow(period, now).to : yesterday), offsetText = url.searchParams.get('offset') || '0';
   const snapshot = url.searchParams.get('snapshot') || '', offset = Number(offsetText);
-  if (!['week', 'month'].includes(period) || !['tools', 'models'].includes(dimension) || !['users', 'tokens'].includes(metric) ||
+  if (!['week', 'month', 'last_month'].includes(period) || !['tools', 'models'].includes(dimension) || !['users', 'tokens'].includes(metric) ||
     !validDay(end) || end > yesterday || !/^\d{1,8}$/.test(offsetText) || (offset > 0 && !/^[a-f0-9]{64}$/.test(snapshot))) return null;
+  if (period === 'last_month') {
+    if (!addDays(end, 1).endsWith('-01')) return null;
+    const from = end.slice(0, 7) + '-01', previous_to = addDays(from, -1);
+    return { period, dimension, metric, end, from, previous_from: previous_to.slice(0, 7) + '-01', previous_to, offset, snapshot };
+  }
   const days = period === 'week' ? 7 : 30;
   return { period, dimension, metric, end, from: addDays(end, 1 - days),
     previous_from: addDays(end, 1 - days * 2), previous_to: addDays(end, -days), offset, snapshot };

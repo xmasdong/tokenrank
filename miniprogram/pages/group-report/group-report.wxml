@@ -28,7 +28,7 @@
       <view class="sub">主用人数：该成员同期用量最多的{{dimension === 'models' ? '模型' : '工具'}}。未分类部分更多时，不推断其偏好。</view>
     </view>
     <view class="section">
-      <view class="section-title">近 {{analysis.trend_days}} 天群用量</view><view class="sub">全体可统计成员按日汇总 · 点折线查看当天</view>
+      <view class="section-title">{{period === 'last_month' ? '上个月每日群用量' : '近 ' + analysis.trend_days + ' 天群用量'}}</view><view class="sub">全体可统计成员按日汇总 · 点折线查看当天</view>
       <usage-chart mode="trend" daily="{{analysis.daily}}" bindpoint="selectDay" />
       <view wx:if="{{selectedDay}}" class="selected-day"><text>{{selectedDay.day}}</text><text class="selected-day-amount">{{selectedDay.reported ? selectedDay.amount.value + selectedDay.amount.unit + ' Tokens · ' + selectedDay.reported_users + ' 人同步' : '未同步'}}</text></view>
       <view class="sub">断点表示没有同步记录，已同步的零用量保留为 0。</view>

@@ -4,7 +4,7 @@ import {
   jsonError, bearerToken,
 } from './lib.js';
 import { storeTotalReport } from './report.js';
-import { usageWindow, buildUsage, buildActivity } from './usage.js';
+import { USAGE_PERIODS, usageWindow, buildUsage, buildActivity } from './usage.js';
 import { shareCode } from './wx-code.js';
 import { readShare, createShare, groupShareStanding, saveShare } from './shares.js';
 import { profileBody, parseAvatar, avatarResponse } from './avatar.js';
@@ -250,7 +250,7 @@ async function route(request, env, url, path) {
     if (!source.usage) return withCors(jsonError(400,'群数据不能用于个人 PK'));
     if (source.usage.token_basis !== 'upstream_total' || source.usage.timezone !== 'Asia/Shanghai')
       return withCors(Response.json({ error: '这份记录的统计口径较早，请使用新分享卡对比', code: 'INCOMPATIBLE_USAGE' }, { status: 409 }));
-    if (!['day', 'week', 'month', 'all'].includes(source.usage.period) ||
+    if (!USAGE_PERIODS.includes(source.usage.period) ||
       !/^\d{4}-\d{2}-\d{2}$/.test(source.usage.from) || !/^\d{4}-\d{2}-\d{2}$/.test(source.usage.to) ||
       source.usage.from > source.usage.to || source.usage.to > beijingDay())
       return withCors(jsonError(400, '这份记录的日期范围无效'));
@@ -707,7 +707,7 @@ async function groupInfo(request, env, path) {
 async function leaderboard(request, env, url) {
   const scope = url.searchParams.get('scope') === 'group' ? 'group' : 'global';
   const groupIdParam = String(url.searchParams.get('id') ?? '').trim();
-  const period = ['day', 'week', 'month', 'all'].includes(url.searchParams.get('period')) ? url.searchParams.get('period') : 'day';
+  const period = usageWindow(url.searchParams.get('period')).period;
   const offsetText = url.searchParams.get('offset') || '0';
   const offset = Number(offsetText);
   const previousSnapshot = url.searchParams.get('snapshot') || '';
@@ -730,10 +730,8 @@ async function leaderboard(request, env, url) {
   }
 
   const today = beijingDay();
-  const [from, to] = period === 'day' ? [today, today]
-    : period === 'week' ? [daysAgo(6, Date.now()), today]
-    : period === 'month' ? [daysAgo(29, Date.now()), today]
-    : ['0000-01-01', '9999-12-31'];
+  const range = usageWindow(period);
+  const from = range.from, to = period === 'all' ? '9999-12-31' : range.to;
 
   const memberFilter = scope === 'group' ? ` AND ds.user_id IN (${groupMembers('?3')})` : '';
   // me 查询的占位符不同（?1/?2/?3 已被占用），群过滤落在 ?4
@@ -842,7 +840,7 @@ async function myUsage(request, env, url, sharedRange = null) {
   const activityTask = env.DB.prepare('SELECT day, tokens, requests FROM ranked_usage WHERE user_id = ?1 AND day <= ?2 ORDER BY day')
     .bind(user.id, range.to).all();
   const [rows, history, activityRows] = await Promise.all([rowsTask, historyTask, activityTask]);
-  const usage = buildUsage(rows.results, range.period, now);
+  const usage = buildUsage(rows.results, range.period, now, sharedRange);
   if (sharedRange) { usage.from = range.from; usage.to = range.to; }
   const ranking = await env.DB.prepare(`SELECT COUNT(*) AS participants,
     SUM(CASE WHEN total > ?3 OR (total = ?3 AND user_id < ?4) THEN 1 ELSE 0 END) AS ahead
@@ -862,13 +860,11 @@ async function myUsage(request, env, url, sharedRange = null) {
 async function myRankings(request, env, url) {
   const user = await sessionUser(request, env);
   if (!user) return jsonError(401, '请先登录');
-  const period = ['day', 'week', 'month', 'all'].includes(url.searchParams.get('period')) ? url.searchParams.get('period') : 'day';
+  const period = usageWindow(url.searchParams.get('period')).period;
 
   const today = beijingDay();
-  const [from, to] = period === 'day' ? [today, today]
-    : period === 'week' ? [daysAgo(6, Date.now()), today]
-    : period === 'month' ? [daysAgo(29, Date.now()), today]
-    : ['0000-01-01', '9999-12-31'];
+  const range = usageWindow(period);
+  const from = range.from, to = period === 'all' ? '9999-12-31' : range.to;
 
   const groupsTask = env.DB.prepare(`
     SELECT g.id, g.name, mm.hidden AS my_hidden,
