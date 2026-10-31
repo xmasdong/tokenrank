@@ -39,19 +39,20 @@ Page({
     this.setData({ month }); return this.load();
   },
   selectDay(e) {
-    return this.chooseDate(e.currentTarget.dataset.day);
+    return this.chooseDate(e.currentTarget.dataset.day,{scroll:true});
   },
   async chooseDate(day,options={}) {
     const report=this.data.report,days=report?.heatmap.days||[],selected=days.find(item=>item.day===day&&!item.future&&!item.outside);
     if(!selected)return;
     const request=this._dayRequestId=(this._dayRequestId||0)+1,epoch=api.accountEpoch();
+    const current=()=>this._visible&&request===this._dayRequestId&&report===this.data.report&&this.data.selected?.day===day&&epoch===api.accountEpoch()&&!api.accountState();
     this.setData({selected,dayView:dayView(selected),dayCostBusy:false,dayCostError:'',
-      canPrevious:days.some(item=>item.day<day&&!item.outside&&!item.future),canNext:days.some(item=>item.day>day&&!item.outside&&!item.future)});
+      canPrevious:days.some(item=>item.day<day&&!item.outside&&!item.future),canNext:days.some(item=>item.day>day&&!item.outside&&!item.future)},
+      ()=>{if(options.scroll&&current())wx.pageScrollTo?.({selector:'#calendarDayDetail',duration:160});});
     if(!selected.reported || selected.detailView?.supported)return;
     const today=day===new Date(Date.now()+8*3600000).toISOString().slice(0,10);
     const fetch=today?api.myUsage:api.daily,peek=today?api.peekUsage:api.peekDaily,key=today?'day':day;
     if(typeof fetch!=='function')return;
-    const current=()=>this._visible&&request===this._dayRequestId&&report===this.data.report&&this.data.selected?.day===day&&epoch===api.accountEpoch()&&!api.accountState();
     if(!current())return;
     const apply=value=>{const row=dailyRow(value,day,selected);if(current())this.setData({selected:row,dayView:dayView(row)});};
     try{

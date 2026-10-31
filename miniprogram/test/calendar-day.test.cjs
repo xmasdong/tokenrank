@@ -5,13 +5,13 @@ const flush=()=>new Promise(resolve=>setImmediate(resolve));
 const report=(day,tokens=258000000,cost={status:'complete',usd_micros:98765400})=>({day,from:day,to:day,has_history:true,summary:{tokens},cost,top_model:{name:'Model-A',tokens}});
 const calendar=(daily)=>({month:'2026-10',today:'2026-10-31',daily,summary:{tokens:daily.reduce((n,d)=>n+(d.tokens||0),0),reported_days:daily.filter(d=>d.reported).length,active_days:1}});
 const row=(day,tokens=10,details)=>({day,tokens,requests:98765,reported:true,...(details?{details}:{})});
-function fixture(raw,overrides={}){
+function fixture(raw,overrides={},wxOverrides={}){
  let definition,epoch=0,now=Date.parse('2026-10-31T12:00:00+08:00');const storage=new Map();
  class Clock extends Date{static now(){return now;}}
  const api={accountEpoch:()=>epoch,accountState:()=>'',ensureLogin:async()=>{},calendar:async()=>raw,...overrides};
- const wx={showShareMenu(){},getStorageSync:k=>storage.get(k),setStorageSync:(k,v)=>storage.set(k,v)};
+ const wx={showShareMenu(){},getStorageSync:k=>storage.get(k),setStorageSync:(k,v)=>storage.set(k,v),...wxOverrides};
  vm.runInNewContext(fs.readFileSync(path.join(__dirname,'../pages/calendar/calendar.js'),'utf8'),{Page:v=>definition=v,wx,Date:Clock,require:id=>id.endsWith('/api')?api:require(path.join(__dirname,'../utils',path.basename(id)))});
- const p={...definition,data:JSON.parse(JSON.stringify(definition.data)),setData(v){Object.assign(this.data,v);}};p.onLoad({});
+ const p={...definition,data:JSON.parse(JSON.stringify(definition.data)),setData(v,callback){Object.assign(this.data,v);callback?.();}};p.onLoad({});
  return {p,api,changeAccount:()=>epoch++,setNow:value=>now=Date.parse(value)};
 }
 test('日期详情突出含缓存总量和USD估算，零费用、缺价、缺记录分别呈现',()=>{
@@ -72,4 +72,11 @@ test('估算失败只影响金额，可单独重试；日期不匹配不显示�
 test('未同步或未来日期不补成零估算，不发多余日报请求',async()=>{
  let reads=0;const {p}=fixture(calendar([{day:'2026-10-01',reported:false,tokens:null},{day:'2026-10-31',reported:false,tokens:null},{day:'2026-11-01',future:true,reported:false,tokens:null}]),{daily:async()=>reads++,myUsage:async()=>reads++});
  await p.onShow();await p.chooseDate('2026-11-01');assert.equal(p.data.dayView.cost,'—');assert.equal(p.data.dayView.reported,false);assert.equal(reads,0);
+});
+test('点热力格直接带到当日数量与金额；首次打开、前后切日和无效日期不抢滚动位置',async()=>{
+ const scrolls=[],cost={cost:{status:'complete',usd_micros:0}};
+ const {p}=fixture(calendar([row('2026-10-01',10,cost),row('2026-10-02',0,cost)]),{}, {pageScrollTo:o=>scrolls.push(o)});
+ await p.onShow();assert.equal(scrolls.length,0);await p.selectDay({currentTarget:{dataset:{day:'2026-10-01'}}});
+ assert.equal(scrolls.length,1);assert.equal(scrolls[0].selector,'#calendarDayDetail');assert.equal(p.data.dayView.cost,'$0.0000');
+ await p.stepDay({currentTarget:{dataset:{delta:1}}});await p.selectDay({currentTarget:{dataset:{day:'2026-11-01'}}});assert.equal(scrolls.length,1);
 });
