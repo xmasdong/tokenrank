@@ -15,6 +15,6 @@ function detailsView(details){
  return {supported,costAvailable:c.available,device:details?.device?.label||'暂无设备记录',model:details?.top_model?.name||'暂无模型记录',
    cost:c.available?'$'+c.amount:c.unpricedCount?'暂无可用价格':'暂无费用记录',
    costBasis:c.available&&details.cost.status==='partial'?'已计价部分 · API 等值估算 · USD':'API 等值估算 · USD',costCoverage:c.note,
-   costNote:supported?[c.available?(details.cost.status==='partial'?'已计价部分 · USD':'API 等值估算 · USD'):'API 等值估算 · USD',c.note,'非实际账单'].filter(Boolean).join(' · '):''};
+   costNote:supported?[c.available&&details.cost.status==='partial'?'已计价部分 · API 等值估算 · USD':'API 等值估算 · USD',c.note,'非实际账单'].filter(Boolean).join(' · '):''};
 }
 module.exports={KEY,DEFAULTS,OPTIONS,normalizeDisplay,readDisplay,saveDisplay,displayOptions,detailsView};

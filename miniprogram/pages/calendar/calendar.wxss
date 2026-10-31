@@ -45,10 +45,17 @@
 .legend > view, .scale { display: flex; align-items: center; gap: 5px; }
 .key { display: inline-block; width: 11px; height: 11px; border-radius: 2px; box-sizing: border-box; }
 .day-detail { padding: 20px 16px; border-top: 1rpx solid var(--separator); border-bottom: 1rpx solid var(--separator); }
-.day-heading { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; }
-.day-heading text + text { font-size: 12px; color: var(--text-secondary); }
-.day-amount { font-size: 30px; margin: 8px 0; color: var(--amount); }
+.day-status { color: var(--text-secondary); font-size: 12px; margin: 4px 0 16px; }
+.day-metrics { display: flex; flex-wrap: wrap; gap: 20px 24px; }
+.day-metric { flex: 1 1 140px; min-width: 0; }
+.day-metric-wide { flex-basis: 100%; }
+.day-metric-label { font-size: 13px; color: var(--text-secondary); }
+.day-amount { font-size: 30px; margin: 8px 0 4px; color: var(--amount); line-height: 1.4; }
 .day-amount text { font-size: 18px; margin-left: 4px; }
+.day-cost { font-size: 26px; line-height: 42px; margin: 8px 0 4px; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; }
+.day-cost-state { color: var(--text-secondary); font-size: 12px; line-height: 1.8; }
+.day-retry { display: inline-flex; width: auto; min-height: 44px; margin: -10px 0 -10px 8px; padding: 8px 0; font-size: 12px; line-height: 28px; font-weight: 400; color: var(--link); background: transparent; }
+.day-retry::after { border: none; }
 .day-detail .text-button { width: auto; min-height: 44px; margin: 8px 0 0; padding: 8px 0; background: transparent; color: var(--link); font-size: 14px; font-weight: 400; line-height: 28px; text-align: left; }
 .footnote { margin: 20px 16px 0; }
 .connect { margin: 16px; }
