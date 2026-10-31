@@ -1,5 +1,6 @@
 import { beijingDay, jsonError } from './lib.js';
 import { buildUsage } from './usage.js';
+import {buildCosts} from './costs.js';
 export const addDays = (day, n) => new Date(Date.parse(day + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
 export const validDay = day => typeof day === 'string' && /^20\d{2}-\d{2}-\d{2}$/.test(day) &&
   Number.isFinite(Date.parse(day + 'T00:00:00Z')) && new Date(day + 'T00:00:00Z').toISOString().slice(0, 10) === day;
@@ -9,19 +10,35 @@ export async function digest(value) {
   return [...new Uint8Array(hash)].map(n => n.toString(16).padStart(2, '0')).join('');
 }
 
-async function ownRows(env, userId, from, to, groups = false) {
+async function ownRows(env, userId, from, to, groups = false, compact = false) {
   const result = await env.DB.batch([
-    env.DB.prepare(`SELECT day,tokens,input_tokens,output_tokens,requests,cache_read,cache_write,
-      models_json,tools_json,updated_at,cost_json FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3 ORDER BY day`).bind(userId, from, to),
+    env.DB.prepare(`SELECT ${compact ? 'day,tokens,requests,updated_at,models_json,cost_json' : 'day,tokens,input_tokens,output_tokens,requests,cache_read,cache_write,models_json,tools_json,updated_at,cost_json'}
+      FROM ranked_usage WHERE user_id=?1 AND day>=?2 AND day<=?3 ORDER BY day`).bind(userId, from, to),
     env.DB.prepare(`SELECT MIN(day) AS first_day,MAX(updated_at) AS updated_at FROM ranked_usage WHERE user_id=?1`).bind(userId),
     env.DB.prepare(`SELECT EXISTS(SELECT 1 FROM usage_sync_state WHERE user_id=?1) AS ready,
-      EXISTS(SELECT 1 FROM daily_stats WHERE user_id=?1) AS legacy`).bind(userId),
+      EXISTS(SELECT 1 FROM daily_stats WHERE user_id=?1) AS legacy,
+      (SELECT a.platform FROM usage_sync_state s JOIN sync_agents a ON a.user_id=s.user_id AND a.device_id=s.device_id WHERE s.user_id=?1) AS device_platform`).bind(userId),
     ...(groups ? [env.DB.prepare(`SELECT g.id,g.name FROM rank_groups g JOIN rank_group_members m ON m.group_id=g.id
       WHERE m.user_id=?1 ORDER BY g.created_at,g.id`).bind(userId)] : []),
   ]);
   const state = result[2].results[0];
   if (!state.ready && state.legacy) return jsonError(409, '请先更新电脑同步器，以查看含缓存的总用量');
-  return { rows: result[0].results, history: result[1].results[0], groups: result[3]?.results || [] };
+  return { rows: result[0].results, history: result[1].results[0], groups: result[3]?.results || [],device_platform:state.device_platform||null };
+}
+
+/** Only display-safe metadata. Device keys, host names and file paths never leave this report. */
+export function calendarDetails(rows,platform){
+  const models=new Map();
+  for(const row of rows){let pairs;try{pairs=JSON.parse(row.models_json||'[]');}catch{continue;}if(!Array.isArray(pairs))continue;
+    for(const pair of pairs){if(!Array.isArray(pair)||typeof pair[0]!=='string'||!pair[0].trim()||!Number.isSafeInteger(pair[1])||pair[1]<=0||/^(其他|未分类|unknown|other|unclassified|其他\s*\/\s*未分类)$/i.test(pair[0].trim()))continue;
+      const name=pair[0].trim();models.set(name,(models.get(name)||0)+pair[1]);}
+  }
+  const top=[...models].sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]))[0];
+  const cost=buildCosts(rows),labels={darwin:'macOS',win32:'Windows',linux:'Linux'};
+  return {device:labels[platform]?{platform,label:labels[platform],basis:'current_selected_device'}:null,
+    top_model:top?{name:top[0],tokens:top[1],basis:'reported_model_tokens'}:null,
+    cost:{basis:cost.basis,currency:cost.currency,status:cost.status,usd_micros:cost.usd_micros,
+      missing_days:cost.missing_days,unpriced_count:cost.unpriced_models.length}};
 }
 
 export function calendarMonth(value, now = Date.now()) {
@@ -33,7 +50,11 @@ export function calendarMonth(value, now = Date.now()) {
 export async function calendarReport(env, userId, month, now = Date.now()) {
   const range = calendarMonth(month, now);
   if (!range) return jsonError(400, '月份无效，请选择当前或过去的月份');
-  const source = await ownRows(env, userId, range.from, range.to);
+  // Thirteen weeks fit on a phone without horizontal scrolling. Keep the original
+  // month fields for older clients, using the same three read-only DB statements.
+  const heatmapFrom = addDays(mondayOf(range.to), -12 * 7);
+  const heatmapEnd = addDays(mondayOf(range.to), 6);
+  const source = await ownRows(env, userId, heatmapFrom, range.to, false, true);
   if (source instanceof Response) return source;
   const map = new Map(source.rows.map(row => [row.day, row]));
   const count = Number(range.end.slice(-2));
@@ -42,11 +63,19 @@ export async function calendarReport(env, userId, month, now = Date.now()) {
     return { day, reported: !!row, future, tokens: row?.tokens ?? null, requests: row?.requests ?? null };
   });
   const previous = addDays(range.from, -1).slice(0, 7), next = addDays(range.end, 1).slice(0, 7);
+  const summary = rows => ({tokens: rows.length ? rows.reduce((sum,row)=>sum+row.tokens,0) : null,
+    reported_days: rows.length, active_days: rows.filter(row=>row.tokens>0||row.requests>0).length});
+  const monthRows = source.rows.filter(row=>row.day>=range.from);
+  const heatmap = {from:heatmapFrom,to:range.to,end:heatmapEnd,summary:summary(source.rows),details:calendarDetails(source.rows,source.device_platform),
+    daily:Array.from({length:91},(_,i)=>{
+      const day=addDays(heatmapFrom,i),row=map.get(day),outside=day>range.to;
+      return {day,outside,future:day>range.today,reported:!outside&&!!row,tokens:!outside&&row ? row.tokens:null,requests:!outside&&row ? row.requests:null,
+        details:!outside&&row?calendarDetails([row],source.device_platform):null};
+    })};
   return Response.json({ month: range.month, today: range.today, timezone: 'Asia/Shanghai', token_basis: 'upstream_total',
-    daily, first_day: source.history.first_day, previous_month: previous >= '2000-01' ? previous : null,
+    daily, heatmap, first_day: source.history.first_day, previous_month: previous >= '2000-01' ? previous : null,
     next_month: next <= range.today.slice(0, 7) ? next : null,
-    summary: { tokens: source.rows.length ? source.rows.reduce((sum, row) => sum + row.tokens, 0) : null,
-      reported_days: source.rows.length, active_days: source.rows.filter(row => row.tokens > 0 || row.requests > 0).length,
+    summary: { ...summary(monthRows),
       elapsed_days: daily.filter(row => !row.future).length }, updated_at: Math.max(0, ...source.rows.map(row => row.updated_at)) || null });
 }
 

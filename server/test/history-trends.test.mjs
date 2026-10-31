@@ -57,6 +57,42 @@ test('日历只读本账号选中设备，零上报、缺记录、未来日期�
   assert.equal((await f.request('/api/my/calendar?month=bad',1)).status,400);
   const own = await f.request('/api/my/calendar?month=2026-10&user_id=2',1); assert.equal(own.data.summary.tokens >= 258000000,true);
 });
+test('近13周热力图复用同次只读查询，跨月真实汇总不混入原月统计，范围外不补零',async t=>{
+ const f=fixture(t);f.seed(1,'2026-07-20',999);f.seed(1,'2026-07-21',10);f.seed(1,'2026-09-30',0);f.seed(1,'2026-10-15',20);f.seed(1,'2026-10-17',999);
+ f.seed(2,'2026-09-30',999);f.seed(1,'2026-10-15',999,{device:'old'});
+ const changes=f.db.prepare('SELECT total_changes() n').get().n;
+ let batches=0,queries=0;const batch=f.env.DB.batch;f.env.DB.batch=stmts=>{batches++;queries+=stmts.length;return batch(stmts);};
+ const result=await(await calendarReport(f.env,1,'2026-10',fixed)).json();
+ assert.equal(result.heatmap.from,'2026-07-20');assert.equal(result.heatmap.to,'2026-10-16');assert.equal(result.heatmap.end,'2026-10-18');assert.equal(result.heatmap.daily.length,91);
+ assert.equal(result.summary.tokens,20);assert.equal(result.summary.reported_days,1);
+ assert.equal(result.heatmap.summary.tokens,1029);assert.equal(result.heatmap.summary.reported_days,4);assert.equal(result.heatmap.summary.active_days,3);
+ assert.equal(result.heatmap.daily.find(d=>d.day==='2026-09-30').tokens,0);assert.equal(result.heatmap.daily.find(d=>d.day==='2026-09-29').tokens,null);
+ assert.equal(result.heatmap.daily.find(d=>d.day==='2026-10-17').outside,true);assert.equal(result.heatmap.daily.find(d=>d.day==='2026-10-17').reported,false);
+ assert.equal(batches,1);assert.equal(queries,3);assert.equal(f.db.prepare('SELECT total_changes() n').get().n,changes);
+ const historical=await(await calendarReport(f.env,1,'2026-09',fixed)).json();assert.equal(historical.heatmap.daily.find(d=>d.day==='2026-10-01').outside,true);
+});
+test('近13周按周一跨年对齐，当前日及其后的占位不混淆',async t=>{
+ const f=fixture(t);f.seed(1,'2025-12-31',123);
+ const r=await(await calendarReport(f.env,1,'2026-01',Date.parse('2026-01-01T00:01:00+08:00'))).json();
+ assert.equal(r.heatmap.from,'2025-10-06');assert.equal(r.heatmap.to,'2026-01-01');assert.equal(r.heatmap.summary.tokens,123);
+ assert.equal(r.summary.tokens,null);assert.equal(r.heatmap.daily.find(d=>d.day==='2026-01-02').future,true);
+});
+test('日历设备、模型与估算费用只取本人当前设备，区间与当日各算各的，缺价不补零',async t=>{
+ const f=fixture(t);f.seed(1,'2026-09-30',200,{models:[['A',200]]});f.seed(1,'2026-10-14',20,{models:[['A',20]]});f.seed(1,'2026-10-15',100,{models:[['B',100]]});
+ f.seed(1,'2026-10-17',999,{models:[['future-model',999]]});f.seed(1,'2026-10-15',999,{device:'old',models:[['old-model',999]]});f.seed(2,'2026-10-15',999,{models:[['peer-model',999]]});
+ f.db.exec("INSERT INTO sync_agents(user_id,device_id,client_version,platform,state,event_at,last_seen_at) VALUES(1,'selected','0.2.20','darwin','ok',1,1),(1,'old','0.2.20','win32','ok',1,1),(2,'selected','0.2.20','linux','ok',1,1)");
+ const price=(usd,unpriced=[])=>({basis:'token_watcher_api_estimate',currency:'USD',usd_micros:usd,models:[['B',usd]],unpriced_models:unpriced,unpriced_tokens:unpriced.length?1:0});
+ f.db.prepare("UPDATE daily_totals SET cost_json=? WHERE user_id=1 AND device_id='selected' AND day='2026-10-15'").run(JSON.stringify(price(2580000,['NoPrice'])));
+ f.db.prepare("UPDATE daily_totals SET cost_json=? WHERE user_id=1 AND device_id='selected' AND day='2026-10-14'").run(JSON.stringify(price(0)));
+ const before=f.db.prepare('SELECT total_changes() n').get().n,r=await(await calendarReport(f.env,1,'2026-10',fixed)).json();
+ assert.equal(r.heatmap.details.device.label,'macOS');assert.equal(r.heatmap.details.top_model.name,'A');assert.equal(r.heatmap.details.top_model.tokens,220);
+ assert.equal(r.heatmap.details.cost.usd_micros,2580000);assert.equal(r.heatmap.details.cost.status,'partial');assert.equal(r.heatmap.details.cost.missing_days,1);assert.equal(r.heatmap.details.cost.unpriced_count,1);
+ const day=r.heatmap.daily.find(d=>d.day==='2026-10-15');assert.equal(day.details.top_model.name,'B');assert.equal(day.details.cost.usd_micros,2580000);
+ assert.equal(r.heatmap.daily.find(d=>d.day==='2026-10-14').details.cost.usd_micros,0);assert.equal(r.heatmap.daily.find(d=>d.day==='2026-09-30').details.cost.usd_micros,null);
+ assert.equal(r.heatmap.daily.find(d=>d.day==='2026-10-16').details,null);assert.equal(r.heatmap.daily.find(d=>d.day==='2026-10-17').details,null);
+ assert.doesNotMatch(JSON.stringify(r),/device_id|openid|hostname|old-model|peer-model|future-model|client_version/);assert.equal(f.db.prepare('SELECT total_changes() n').get().n,before);
+ f.db.exec("DELETE FROM sync_agents WHERE user_id=1 AND device_id='selected'");const missing=await(await calendarReport(f.env,1,'2026-10',fixed)).json();assert.equal(missing.heatmap.details.device,null);
+});
 test('周报精确聚合完整自然周，真实零日参与覆盖，环比只在双方七天记录齐全时计算', () => {
   const range=weeklyRange('2026-10-05',fixed), rows=[];
   for(let i=0;i<14;i++) rows.push({day:addDays('2026-09-28',i),tokens:i<7?100:i===7?0:200,requests:i===7?0:2,tools_json:'[["A",100]]',models_json:'[["M",100]]',updated_at:1});

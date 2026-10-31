@@ -1,4 +1,5 @@
 const { compact, integer } = require('./usage');
+const {heatmapView}=require('./calendar-heatmap');
 function calendarView(result) {
   const max = Math.max(0, ...result.daily.filter(day => day.reported).map(day => day.tokens));
   const days = result.daily.map(day => ({ ...day, number: Number(day.day.slice(-2)), amount: day.reported ? compact(day.tokens) : null,
@@ -9,7 +10,7 @@ function calendarView(result) {
   const start = (new Date(result.month + '-01T00:00:00Z').getUTCDay() + 6) % 7;
   const cells = [...Array.from({ length: start }, (_, i) => ({ key: 'pad-' + i, padding: true })), ...days.map(day => ({ ...day, key: day.day }))];
   const empty = result.summary.reported_days === 0;
-  return { ...result, days, cells, title: result.month.slice(0, 4) + ' 年 ' + Number(result.month.slice(5)) + ' 月',
+  return { ...result, days, cells, heatmap:heatmapView(result), title: result.month.slice(0, 4) + ' 年 ' + Number(result.month.slice(5)) + ' 月',
     amount: empty ? null : compact(result.summary.tokens), exact: empty ? '' : integer(result.summary.tokens) };
 }
 function weeklyView(usage) {

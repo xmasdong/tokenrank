@@ -1573,6 +1573,21 @@ test('日历日期进入对应自然周，切换月份的旧响应与离开后�
   p.goWeekly();assert.match(navigation.at(-1)[1],/week=2026-08-31/);
   const third=p.load();await flush();p.onHide();pending[2](data('2026-08'));await third;assert.equal(p.data.report,null);
 });
+test('热力格跨月点选、原生日期选择和前后日切换只更新详情，不额外调用接口',async()=>{
+ const from='2026-08-03',daily=Array.from({length:91},(_,i)=>({day:new Date(Date.parse(from+'T00:00:00Z')+i*86400000).toISOString().slice(0,10),reported:i<90,tokens:10,requests:1,outside:i===90,future:i===90}));
+ let reads=0;const {p}=page('calendar',{calendar:async()=>{reads++;return {month:'2026-10',today:'2026-10-31',daily:[],summary:{tokens:0,reported_days:0},heatmap:{from,to:'2026-10-31',end:'2026-11-01',daily,summary:{tokens:900,reported_days:90,active_days:90}}};}});
+ p.onLoad({});await p.onShow();assert.equal(p.data.selected.day,'2026-10-31');assert.equal(p.data.canNext,false);
+ p.selectDay({currentTarget:{dataset:{day:'2026-09-30'}}});assert.equal(p.data.selected.day,'2026-09-30');
+ p.stepDay({currentTarget:{dataset:{delta:'1'}}});assert.equal(p.data.selected.day,'2026-10-01');p.pickDate({detail:{value:from}});assert.equal(p.data.canPrevious,false);
+ p.stepDay({currentTarget:{dataset:{delta:'-1'}}});p.pickDate({detail:{value:'2026-11-01'}});assert.equal(p.data.selected.day,from);assert.equal(reads,1);
+});
+test('日历显示内容即时应用并记住；勾选和重新打开不额外请求数据',async()=>{
+ let reads=0;const raw={month:'2026-10',today:'2026-10-31',daily:[{day:'2026-10-01',reported:true,tokens:10,requests:1}],summary:{tokens:10,reported_days:1,active_days:1}};
+ const {p}=page('calendar',{peekCalendar:()=>raw,calendar:async()=>{reads++;return raw;}});p.onLoad({});await p.onShow();const report=p.data.report;
+ p.changeDisplay({detail:{value:['device','model','cost']}});assert.equal(p.data.display.tokens,false);assert.equal(p.data.display.cost,true);assert.equal(p.data.report,report);assert.equal(p.insightImageOptions().display.cost,true);
+ p.onLoad({});assert.equal(p.data.display.cost,true);p.onHide();await p.onShow();assert.equal(reads,0);
+ p.changeDisplay({detail:{value:[]}});assert.ok(Object.values(p.data.display).every(v=>v===false));
+});
 test('周报先准备真实记录，切换群复用周报不重取数据，快照变更仅强制刷新一次',async()=>{
   let loads=0,shares=0,stale=false;const payloads=[];
   const {p}=page('weekly',{weekly:async()=>{loads++;return historyWeek();},createWeeklyShare:async data=>{payloads.push(data);shares++;if(stale){const e=new Error('changed');e.statusCode=409;throw e;}return {id:'a'.repeat(24),style:'weekly',user:{nickname:'原作者'},usage:{...historyWeek(),...(data.group_id?{group_standing:{name:'本群',rank:2,participants:3}}:{})}};}});

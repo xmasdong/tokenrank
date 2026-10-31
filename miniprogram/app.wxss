@@ -51,3 +51,8 @@ page {
 .sk { background: #EDEDED; border-radius: 4px; animation: sk-breathe 1.4s ease-in-out infinite; }
 @keyframes sk-breathe { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
 .export-canvas { position: fixed; left: -2000px; top: 0; width: 1000px; height: 800px; pointer-events: none; }
+.data-share-actions { display:flex; flex-wrap:wrap; align-items:center; justify-content:flex-end; gap:4px 16px; padding:4px 16px; border-bottom:1rpx solid var(--separator); }
+.data-share-actions button { width:auto;min-width:0;flex:none;display:flex; align-items:center; justify-content:center; min-height:44px; margin:0; padding:6px 0; background:transparent; color:var(--link); font-size:14px; font-weight:400; line-height:1.5; }
+.data-share-actions button::after { border:0; }
+.data-share-actions button[disabled] { color:var(--text-muted); }
+.data-share-actions>text { margin-right:auto; color:var(--text-muted); font-size:12px; }

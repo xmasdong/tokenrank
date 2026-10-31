@@ -151,4 +151,4 @@ function drawDailyPoster(ctx, {user,usage,cover=false,codeImage,avatarImage}) {
   }
   p.text(v.day+' · 北京时间 · 含缓存 · 分享时的记录',60,H-20,20,p.soft);
 }
-module.exports = { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster, drawDailyPoster };
+module.exports = { painter, SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster, drawDailyPoster };
