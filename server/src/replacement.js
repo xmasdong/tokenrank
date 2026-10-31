@@ -1,4 +1,5 @@
 import { jsonError } from './lib.js';
+import { uploadDayStatement } from './achievements.js';
 export const MIN_REBUILD_CLIENT = '0.2.6', MIN_REBUILD_COLLECTOR = '1.8.2';
 export function versionAtLeast(value, minimum) {
   if (!/^\d+\.\d+\.\d+$/.test(value || '')) return false;
@@ -80,6 +81,7 @@ export async function storeReplacement(env, conn, body, now) {
     prepare(`INSERT INTO usage_rebuild_guard(user_id,client_version,collector_version,source_at) SELECT ?1,?3,?4,?5 WHERE ${committing}
       ON CONFLICT(user_id) DO UPDATE SET client_version=excluded.client_version,collector_version=excluded.collector_version,source_at=excluded.source_at`,
     uid,id,body.client_version,body.collector_version,body.source_at),
+    uploadDayStatement(env,uid,body.device_id,body.source_at,now,body.source_at),
     prepare(`UPDATE connect_tokens SET last_report_at=?3,device_id=?4 WHERE user_id=?1 AND token=?5 AND ${committing}`,uid,id,now,body.device_id,conn.token),
     prepare(`UPDATE usage_replacements SET status='complete' WHERE user_id=?1 AND id=?2 AND status='committing'`,uid,id),
   ]);

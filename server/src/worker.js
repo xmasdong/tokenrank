@@ -19,6 +19,7 @@ import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeRemind
 import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
 import { listSubscriptions, createSubscription, updateSubscription, deleteSubscription, getRates } from './subscriptions.js';
 import { createTopup, updateTopup, deleteTopup } from './topups.js';
+import { loadAchievements, claimAchievements, achievementShare } from './achievements.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -87,6 +88,15 @@ async function route(request, env, url, path) {
   if (method === 'GET' && path === '/healthz') {
     await env.DB.prepare('SELECT 1 FROM users LIMIT 1').first();
     return withCors(Response.json({ ok: true, day: beijingDay() }));
+  }
+
+  if (path === '/api/my/achievements' || path === '/api/my/achievements/claim') {
+    const user = await sessionUser(request, env);
+    if (!user) return withCors(jsonError(401, '请先登录'));
+    if (user.disabled_at) return withCors(jsonError(403, '账号已停用'));
+    if (path.endsWith('/claim') && method === 'POST') return withCors(await claimAchievements(env,user.id));
+    if (!path.endsWith('/claim') && method === 'GET') return withCors(Response.json((await loadAchievements(env,user.id)).data));
+    return withCors(jsonError(405,'method not allowed'));
   }
 
   const subscriptionPath = path.match(/^\/api\/subscriptions(?:\/([a-f0-9]{32}))?$/);
@@ -201,7 +211,13 @@ async function route(request, env, url, path) {
     const user = await sessionUser(request, env);
     if (!user) return withCors(jsonError(401, '请先登录'));
     const body = await readJson(request);
-    const usageUrl = new URL(request.url); usageUrl.searchParams.set('period', body?.period || 'day');
+    let milestone = null;
+    if (body?.style === 'milestone') {
+      if (user.disabled_at) return withCors(jsonError(403,'账号已停用'));
+      milestone = await achievementShare(env,user.id,body);
+      if (milestone instanceof Response) return withCors(milestone);
+    }
+    const usageUrl = new URL(request.url); usageUrl.searchParams.set('period', milestone ? 'all' : body?.period || 'day');
     if (body?.style === 'daily' && !validDay(body.day)) return withCors(jsonError(400,'日报分享日期无效'));
     const result = body?.style === 'daily' ? await dailyReport(env,user.id,body.day)
       : body?.style === 'weekly' ? await weeklyReport(env, user.id, body.week) : await myUsage(request, env, usageUrl);
@@ -211,7 +227,8 @@ async function route(request, env, url, path) {
       return withCors(Response.json({ error: '周报数据已有更新，请刷新后重新分享', code: 'WEEK_CHANGED' }, { status: 409 }));
     if (body?.style === 'daily' && body.day_snapshot !== usage.snapshot)
       return withCors(Response.json({ error: '日报数据已有更新，请刷新后重新分享', code: 'DAY_CHANGED' }, { status: 409 }));
-    if (!usage.has_history) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
+    if (!usage.has_history && !milestone) return withCors(jsonError(400, '先同步一份用量，再生成分享记录'));
+    if (milestone) usage.milestone = milestone;
     if (body?.group_id !== undefined) {
       if (typeof body.group_id !== 'string' || !body.group_id || body.group_id.length > 128)
         return withCors(jsonError(400, '群榜参数无效'));
@@ -220,7 +237,7 @@ async function route(request, env, url, path) {
       usage.group_standing = group;
     }
     return withCors(await createShare(env, await publicUser(env, user.id, userOrigin(env, request)), usage,
-      ['receipt', 'tools', 'weekly', 'daily'].includes(body?.style) ? body.style : 'usage'));
+      ['receipt', 'tools', 'weekly', 'daily', 'milestone'].includes(body?.style) ? body.style : 'usage'));
   }
   if (method === 'POST' && /^\/api\/shares\/[0-9a-f]{24}\/compare$/.test(path)) {
     const user = await sessionUser(request, env);

@@ -1,6 +1,7 @@
 import { jsonError } from './lib.js';
 import { storeReplacement, versionAtLeast } from './replacement.js';
 import { validateCost } from './costs.js';
+import { uploadDayStatement } from './achievements.js';
 
 const fields = ['tokens', 'input_tokens', 'output_tokens', 'cache_read', 'cache_write', 'requests'];
 export function validateTotalReport(body, now = Date.now()) {
@@ -70,6 +71,7 @@ export async function storeTotalReport(env, conn, body, now = Date.now()) {
       AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?1 AND status='collecting' AND expires_at>?4)
     ON CONFLICT(user_id) DO UPDATE SET device_id=excluded.device_id,source_at=excluded.source_at,updated_at=excluded.updated_at
     WHERE excluded.source_at >= usage_sync_state.source_at`).bind(conn.user_id,body.device_id,body.source_at,now,guard?.source_at || 0));
+  if (body.complete) stmts.push(uploadDayStatement(env,conn.user_id,body.device_id,body.source_at,now,guard?.source_at || 0));
   stmts.push(env.DB.prepare(`UPDATE connect_tokens SET last_report_at=?1,device_id=?2 WHERE token=?3
     AND COALESCE((SELECT source_at FROM usage_rebuild_guard WHERE user_id=?4),0)=?5
     AND NOT EXISTS(SELECT 1 FROM usage_replacements WHERE user_id=?4 AND status='collecting' AND expires_at>?1)`)

@@ -1,5 +1,6 @@
 import { jsonError } from './lib.js';
 import { groupShareValid } from './group-insights.js';
+import { loadAchievements } from './achievements.js';
 export const SHARE_ID = /^[0-9a-f]{24}$/;
 const TTL = 90 * 86400000;
 export async function readShare(env, id, allowComparison = true) {
@@ -11,6 +12,10 @@ export async function readShare(env, id, allowComparison = true) {
   if (record.style === 'group-insights') {
     if (!await groupShareValid(env,row.user_id,record._group)) return null;
     delete record._group;
+  }
+  if (record.style === 'milestone') {
+    const {data} = await loadAchievements(env,row.user_id);
+    if (!data.families.some(f=>f.badges.some(b=>b.id===record.usage.milestone?.id && b.earned))) return null;
   }
   if (record.style === 'comparison') {
     if (!allowComparison) return null;
@@ -64,6 +69,14 @@ export async function createShare(env, user, usage, style = 'usage', source = nu
       tools: style === 'tools' ? shareTools(usage) : usage.tools.filter(t => !t.unclassified).slice(0, 1), activity: usage.activity, standing: usage.standing },
   };
   if (style === 'tools') snapshot.style = 'tools';
+  if (style === 'milestone') {
+    snapshot.style = 'milestone';
+    delete snapshot.usage.tools;
+    delete snapshot.usage.activity;
+    delete snapshot.usage.standing;
+    snapshot.usage.milestone = Object.fromEntries(['id','family','label','art','threshold','unit','metric_label','current','tier','achieved_day','rule_version']
+      .map(key=>[key,usage.milestone[key]]));
+  }
   if (style === 'daily') {
     snapshot.style = 'daily';
     snapshot.usage.report_day = usage.day;
