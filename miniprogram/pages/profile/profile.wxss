@@ -13,7 +13,12 @@
 .hero-unit { font-size: 26px; font-weight: 400; margin-left: 6px; }
 .exact { font-size: 13px; color: var(--text-secondary); margin-top: 8px; overflow-wrap: anywhere; }
 .range { font-size: 12px; color: var(--text-muted); line-height: 1.7; margin-top: 8px; }
-.usage-hero .share-button { width: 100%; margin: 20px 0 0; }
+.usage-share { margin-top: 20px; }
+.share-actions { display: flex; gap: 12px; }
+.share-actions .btn { flex: 1; width: 0; min-width: 0; margin: 0; font-size: 15px; font-weight: 500; }
+.share-feedback { display: flex; align-items: center; gap: 12px; margin-top: 4px; color: var(--danger); font-size: 12px; line-height: 1.7; }
+.share-feedback text { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.share-feedback .text-button { flex: none; margin: 0; padding: 0 4px; min-width: 44px; }
 .metrics { display: flex; margin: 20px 0 0; padding: 16px 0 0; border-top: 1rpx solid var(--separator); }
 .metric { flex: 1; min-width: 0; }
 .metric-secondary { padding-left: 20px; border-left: 1rpx solid var(--separator); }
@@ -54,8 +59,6 @@
 .menu-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; box-sizing: border-box; border-top: 1rpx solid var(--separator); font-size: 15px; }
 .menu-arrow { color: var(--text-muted); font-size: 22px; }
 .account-delete { color: var(--danger); }
-.share-options { display: flex; gap: 16px; }
-.share-options .text-button { margin: 0; padding: 4px 0; }
 .tools-share { float: right; margin: 0; padding: 0 0 0 12px; min-height: 32px; font-size: 13px; }
 
 .history-entries { display: flex; flex-wrap: wrap; gap: 0 16px; border-top: 1rpx solid var(--separator); }
