@@ -1,6 +1,7 @@
-<view wx:if="{{visible}}" class="pn-mask" catchtouchmove="noop">
-  <view class="pn-card">
-    <view class="pn-title">关于隐私和开源</view>
+<view wx:if="{{visible}}" class="pn-mask" bindtap="dismissOnce" catchtouchmove="noop">
+  <view class="pn-card" catchtap="noop" role="dialog" aria-label="关于隐私和开源">
+    <view class="pn-heading"><view class="pn-title">关于隐私和开源</view><button class="pn-close" aria-label="关闭隐私与开源说明" catchtap="dismissOnce">×</button></view>
+    <scroll-view class="pn-body" scroll-y="{{true}}">
     <view class="pn-p">上传每天的用量数字、工具、模型和估算金额，以及同步程序的运行状态与版本。</view>
     <view class="pn-p">代码、对话、项目名和文件路径都不会收集上传。</view>
     <view class="pn-p">邮箱由你主动填写，仅用于用量日报登记，不公开展示，可随时撤销。</view>
@@ -11,9 +12,10 @@
       <text class="pn-copy">复制</text>
     </view>
     <view class="pn-p pn-soft">不想上榜，可以在「我的」里关掉排名。</view>
+    </scroll-view>
     <view class="pn-actions">
-      <button class="btn btn-ghost pn-btn" data-never="1" bindtap="close">不再提示</button>
-      <button class="btn btn-primary pn-btn" data-never="0" bindtap="close">知道了</button>
+      <button class="btn btn-ghost pn-btn" catchtap="dismissForever">不再提示</button>
+      <button class="btn btn-primary pn-btn" catchtap="dismissOnce">知道了</button>
     </view>
   </view>
 </view>

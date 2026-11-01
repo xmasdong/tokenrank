@@ -1201,7 +1201,7 @@ test('打开小程序就弹自定义隐私与开源说明，可复制仓库地�
     setClipboardData: o => { clips.push(o.data); o.success && o.success(); }, showToast: o => toasts.push(o.title) };
   let def; vm.runInNewContext(fs.readFileSync(path.join(root, 'components/privacy-notice/index.js'), 'utf8'),
     { Component: d => def = d, wx, require: id => require(path.join(root, 'components/privacy-notice', id)) });
-  const c = { ...def, ...def.methods, data: { ...def.data }, setData(p) { Object.assign(this.data, p); } };
+  const c = { ...def, ...def.methods, data: { ...def.data }, setData(p, done) { Object.assign(this.data, p); done?.(); } };
   const wxml = fs.readFileSync(path.join(root, 'components/privacy-notice/index.wxml'), 'utf8');
   assert.match(wxml, /不会收集上传/); assert.match(wxml, /不再提示/); assert.equal(c.data.repo, 'github.com/xmasdong/tokenrank');
   notice.arm(); def.pageLifetimes.show.call(c); assert.equal(c.data.visible, true);
