@@ -29,7 +29,7 @@ test('展示页面的本地交接仅当前账号有效，结束幂等，不调�
  f.remove();assert.equal(prompt.validTicket(ticket,f.api),false);prompt.finish(ticket);prompt.finish(ticket);assert.equal(modal,1);
 });
 test('成就数字上亿统一两位小数；图片路径白名单，后续设计不伪造达成',()=>{
- const b=badgeView(milestone());assert.equal(b.metricText,'2.58 亿');assert.equal(b.targetText,'1.00 亿');assert.equal(b.artPath,'/assets/badges/tiers/usage-orbit-1.webp');assert.equal(badgeView({...milestone(),art:'../secret'}),null);
+ const b=badgeView(milestone());assert.equal(b.metricText,'2.58 亿');assert.equal(b.targetText,'1.00 亿');assert.equal(b.artPath,'/assets/badges/tiers/usage-orbit-1.png');assert.equal(badgeView({...milestone(),art:'../secret'}),null);
  const view=catalogueView({families:[{id:'total',enabled:true,art:'usage-orbit',badges:[milestone()]},{id:'build',enabled:false,art:'build-modules',badges:[]}]});assert.equal(view.rows[1].future,true);assert.equal(view.families[1].statusText,'暂未开放');assert.equal(view.families[1].hasEarned,false);
 });
 function page(apiOverrides={},wxOverrides={}){

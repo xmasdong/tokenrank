@@ -10,5 +10,5 @@ const STAGES={
  total:{art:'usage-orbit',thresholds:[1e8,1e9,1e10,1e11],original:3},
 };
 function stageIndex(badge){const family=STAGES[badge?.family];return family?.art===badge?.art?family.thresholds.indexOf(badge.threshold)+1:0;}
-function stageArt(badge){const family=STAGES[badge?.family],index=stageIndex(badge);return index&&index!==family.original?'/assets/badges/tiers/'+family.art+'-'+index+'.webp':'';}
+function stageArt(badge){const family=STAGES[badge?.family],index=stageIndex(badge);return index&&index!==family.original?'/assets/badges/tiers/'+family.art+'-'+index+'.png':'';}
 module.exports={STAGES,stageIndex,stageArt};

@@ -48,7 +48,12 @@
         "value": "README.md"
       }
     ],
-    "include": []
+    "include": [
+      {
+        "type": "folder",
+        "value": "assets/badges"
+      }
+    ]
   },
   "editorSetting": {}
 }
