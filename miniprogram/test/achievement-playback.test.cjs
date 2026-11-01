@@ -8,12 +8,12 @@ function fixture(){
  const badge={id:'total:100000000',earned:true};
  const p={...module.exports.achievementPlayback(wx,api),_visible:true,data:{motion:true,selected:{badge}},setData(v,done){Object.assign(this.data,v);done?.();},_achievementClaim:{id:'claim',badgeId:badge.id,epoch:0,expiresAt:61000,confirmed:false,ackPending:false}};
  function advance(ms){now+=ms;for(const [id,t] of [...timers])if(t.at<=now){timers.delete(id);t.fn();}}
- return{p,api,confirmed,released,finished,toasts,frames,advance,render:()=>{while(frames.length)frames.shift()();},art:()=>p.onBadgeArtReady({detail:{id:badge.id}}),hide:()=>{p._visible=false;p.cancelAchievementDisplay();},changeAccount:()=>epoch++};
+ return{p,api,confirmed,released,finished,toasts,frames,advance,render:()=>{while(frames.length)frames.shift()();},art:()=>p.onBadgeArtReady({detail:{id:badge.id}}),end:()=>p.onAchievementMotionEnd({detail:{id:badge.id,playId:p.data.achievementPlayId}}),hide:()=>{p._visible=false;p.cancelAchievementDisplay();},changeAccount:()=>epoch++};
 }
 test('图片未就绪及首帧前不确认；可见动画完成后才提交一次确认',async()=>{
  const f=fixture();f.p.requestAchievementPlayback();f.advance(1000);assert.equal(f.confirmed.length,0);
  f.art();assert.equal(f.confirmed.length,0);f.render();assert.equal(f.p.data.achievementPlaying,true);
- f.advance(699);assert.equal(f.confirmed.length,0);f.advance(1);await flush();assert.deepEqual(f.confirmed,['claim']);assert.equal(f.p._achievementClaim.confirmed,true);
+ f.advance(700);assert.equal(f.confirmed.length,0);f.end();await flush();assert.deepEqual(f.confirmed,['claim']);assert.equal(f.p._achievementClaim.confirmed,true);
  f.hide();assert.equal(f.released.length,0);
 });
 test('图片加载前离页、动画中离页及切换账号均不确认，离页释放未展示资格',async()=>{
@@ -23,7 +23,7 @@ test('图片加载前离页、动画中离页及切换账号均不确认，离�
 });
 test('手动重播只播放当前已达成奖章，不准备、确认或修改任何历史展示记录',async()=>{
  const f=fixture();f.p._achievementClaim=null;f.art();
- for(let i=0;i<2;i++){f.p.replayMotion();f.render();assert.equal(f.p.data.achievementPlaying,true);f.advance(700);await flush();assert.equal(f.p.data.achievementPlaying,false);}
+ for(let i=0;i<2;i++){f.p.replayMotion();f.render();assert.equal(f.p.data.achievementPlaying,true);f.end();await flush();assert.equal(f.p.data.achievementPlaying,false);}
  assert.equal(f.confirmed.length,0);assert.equal(f.released.length,0);
  f.p.data.selected.badge.earned=false;f.p.replayMotion();f.render();assert.equal(f.p.data.achievementPlaying,false);
 });
@@ -34,8 +34,24 @@ test('关闭动效时自动展示静态奖章，仍等渲染完成；手动重�
 test('图片失败不确认，确认失败如实保留补播机会；409重试有上限',async()=>{
  const f=fixture();f.p.requestAchievementPlayback();f.p.onBadgeArtError({detail:{id:'total:100000000'}});f.advance(1000);assert.equal(f.confirmed.length,0);assert.match(f.p.data.motionError,/图片加载失败/);
  let attempts=0;f.api.confirmAchievements=async()=>{attempts++;const e=Error('changed');e.statusCode=409;throw e;};
- f.p.requestAchievementPlayback();f.art();f.render();f.advance(700);await flush();assert.equal(attempts,2);assert.equal(f.p._achievementClaim.confirmed,false);assert.match(f.p.data.motionError,/确认失败/);f.hide();assert.equal(f.released.length,1);
+ f.p.requestAchievementPlayback();f.art();f.render();f.end();await flush();assert.equal(attempts,2);assert.equal(f.p._achievementClaim.confirmed,false);assert.match(f.p.data.motionError,/确认失败/);f.hide();assert.equal(f.released.length,1);
 });
 test('账号失效的页面交接释放旧提示队列，但不取得展示资格',()=>{
  const f=fixture();f.changeAccount();f.p.initAchievementUnlock({unlock:'1',ticket:'valid'});assert.equal(f.p._unlocking,false);assert.deepEqual(f.finished,['valid']);
+});
+
+test('丢失图片回调时主动读取组件就绪状态；始终未加载时提示重试并恢复按钮',()=>{
+ const f=fixture();let checks=0;f.p.selectComponent=selector=>{assert.equal(selector,'#achievementCard');return{ensureArtReady(){checks++;f.art();}};};
+ f.p.replayMotion();assert.equal(f.p.data.motionWaiting,true);f.render();assert.equal(checks,1);assert.equal(f.p.data.achievementPlaying,true);assert.equal(f.p.data.motionWaiting,false);
+ const g=fixture();g.p.replayMotion();g.render();g.advance(8000);assert.match(g.p.data.motionError,/图片未就绪/);assert.equal(g.p.data.motionWaiting,false);assert.equal(g.confirmed.length,0);
+});
+test('原生动画无完成回调不会靠计时器确认，过期回调也不能确认新的播放',async()=>{
+ const f=fixture();f.p.replayMotion();f.art();f.render();const old=f.p.data.achievementPlayId;
+ f.advance(3000);await flush();assert.equal(f.confirmed.length,0);assert.equal(f.p.data.achievementPlaying,false);assert.match(f.p.data.motionError,/动效未能播放/);
+ f.p.replayMotion();f.render();f.p.onAchievementMotionEnd({detail:{id:f.p.data.selected.badge.id,playId:old}});assert.equal(f.confirmed.length,0);assert.equal(f.p.data.achievementPlaying,true);
+ f.end();await flush();assert.equal(f.confirmed.length,1);
+});
+test('不支持或执行失败的原生动画恢复交互，不写展示记录',()=>{
+ const f=fixture();f.p.replayMotion();f.art();f.render();f.p.onAchievementMotionError({detail:{id:f.p.data.selected.badge.id,playId:f.p.data.achievementPlayId}});
+ assert.match(f.p.data.motionError,/未能播放/);assert.equal(f.p.data.achievementPlaying,false);assert.equal(f.confirmed.length,0);
 });

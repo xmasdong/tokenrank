@@ -7,7 +7,7 @@ Page({
  ...socialImages(wx,api),
  ...milestoneSaving(wx,api),
  ...achievementPlayback(wx,api),
- data:{unlocking:false,newBadgeCount:0,achievementPlaying:false,motionError:'',loading:true,error:'',catalogue:null,rows:[],selected:null,selectedRow:-1,isDetail:false,cardUser:null,showFuture:false,shareReady:false,sharePreparing:false,shareError:'',saving:false,motion:true},
+ data:{unlocking:false,newBadgeCount:0,achievementPlaying:false,achievementPlayId:0,motionWaiting:false,motionError:'',loading:true,error:'',catalogue:null,rows:[],selected:null,selectedRow:-1,isDetail:false,cardUser:null,showFuture:false,shareReady:false,sharePreparing:false,shareError:'',saving:false,motion:true},
  onLoad(options={}){this._manualReplay=options.replay==='1';this.initAchievementUnlock(options);let badge=typeof options.badge==='string'&&options.badge.length<240?options.badge:'';try{badge=decodeURIComponent(badge);}catch{}this._requestedBadge=badge.length<80?badge:'';this._requestedFamily=typeof options.family==='string'&&options.family.length<40?options.family:'';const isDetail=this._unlocking||!!(this._requestedBadge||this._requestedFamily);this.setData({isDetail,motion:!wx.getStorageSync(MOTION_KEY)});if(isDetail)wx.setNavigationBarTitle?.({title:this._unlocking?'新成就':'成就卡'});wx.showShareMenu?.({menus:['shareAppMessage'],withShareTicket:true});},
  onShow(){this._visible=true;this._socialVisible=true;this.setData({motion:!wx.getStorageSync(MOTION_KEY)});if(!this._unlocking&&this.data.unlocking)this.setData({unlocking:false});return this.load();},
  onReady(){this._socialCanvasReady=true;return this.buildSocialImages();},
@@ -42,7 +42,7 @@ Page({
    else if(this.data.isDetail)this.setData({error:'奖章不存在，请返回收藏页重新选择'});
   }catch(err){if(this._visible&&version===this._loadVersion)this.setData({loading:false,error:err.message||'成就加载失败'});}
  },
- replayEarned(){const badges=(this.data.catalogue?.families||[]).flatMap(f=>f.badges).filter(b=>b.earned).sort((a,b)=>(b.priority||0)-(a.priority||0));if(badges[0]&&this.data.motion)wx.navigateTo({url:'/pages/achievements/achievements?badge='+encodeURIComponent(badges[0].id)+'&replay=1'});},
+ replayEarned(){const badges=(this.data.catalogue?.families||[]).flatMap(f=>f.badges).filter(b=>b.earned).sort((a,b)=>(b.priority||0)-(a.priority||0));if(badges[0]&&this.data.motion)wx.navigateTo({url:'/pages/achievements/achievements?badge='+encodeURIComponent(badges[0].id)+'&replay=1',fail:()=>wx.showToast({title:'页面未打开，请返回后重试',icon:'none'})});},
  selectFamily(e){const id=e.currentTarget.dataset.id;if(this.data.catalogue?.families.some(f=>f.id===id))wx.navigateTo({url:'/pages/achievements/achievements?family='+encodeURIComponent(id)});},
  select(id,badgeId=''){
   const family=this.data.catalogue?.families.find(f=>f.id===id);if(!family)return;

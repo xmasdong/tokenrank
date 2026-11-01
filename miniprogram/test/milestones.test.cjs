@@ -50,6 +50,9 @@ test('失效的卡片链接不替换成别的奖章，账号版本改变后不�
  const f=page();f.p.onLoad({badge:'not-a-real-badge'});await f.p.onShow();assert.equal(f.p.data.selected,null);assert.match(f.p.data.error,/奖章不存在/);
  let epoch=0;const g=page({accountEpoch:()=>epoch});await g.p.onShow();await g.p.select('total');epoch++;assert.equal(g.p.onShareAppMessage().path,'/pages/index/index');
 });
+test('收藏页重播导航失败会提示用户，不再无声失败',async()=>{
+ const notices=[];const f=page({}, {navigateTo:o=>o.fail({errMsg:'page limit'}),showToast:o=>notices.push(o.title)});await f.p.onShow();f.p.replayEarned();assert.deepEqual(notices,['页面未打开，请返回后重试']);
+});
 test('解锁弹层传入编码后的徽章编号仍打开原档位，分享记录保持对应徽章',async()=>{
  const f=page();f.p.onLoad({badge:encodeURIComponent('total:100000000'),share:'1'});await f.p.onShow();await flush();
  assert.equal(f.p.data.error,'');assert.equal(f.p.data.isDetail,true);assert.equal(f.p.data.selected.badge.id,'total:100000000');assert.equal(f.p.data.shareReady,true);

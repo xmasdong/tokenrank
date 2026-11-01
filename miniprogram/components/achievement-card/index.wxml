@@ -1,6 +1,6 @@
-<view class="medal-card {{badge.earned ? '' : 'medal-card-locked'}} {{playing ? 'medal-card-playing' : ''}}">
+<view class="medal-card {{badge.earned ? '' : 'medal-card-locked'}}">
  <view class="card-top"><text>Token 群排名</text><text class="card-status">{{badge.earned ? '已达成' : badge ? '未达成' : '暂未开放'}}</text></view>
- <view class="medal-stage"><image class="medal-art" src="{{badge.artPath || family.artPath}}" mode="aspectFit" bindload="artReady" binderror="artError" /></view>
+ <view class="medal-stage"><view class="medal-motion"><image wx:for="{{artNodes}}" wx:key="key" class="medal-art" src="{{item.src}}" data-art-key="{{item.key}}" data-art-src="{{item.src}}" mode="aspectFit" bindload="artReady" binderror="artError" /></view><view class="medal-sweep"></view></view>
  <view class="card-category">{{badge.family === 'connect' ? '电脑接入' : family.label || badge.label}}</view>
  <view class="card-target">{{badge ? (badge.family === 'connect' ? '首次同步' : badge.targetText) : '暂未开放'}}</view>
  <view class="card-date">{{badge.earned ? '达成于 ' + badge.dateText : badge ? '还差 ' + badge.gapText : family.metric_label}}</view>
