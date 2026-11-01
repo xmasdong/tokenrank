@@ -13,3 +13,8 @@
 .pn-copy { flex: none; display: flex; align-items: center; min-height: 44px; color: var(--link, #576B95); font-size: 13px; font-weight: 400; }
 .pn-actions { flex: none; display: flex; gap: 12px; margin-top: 20px; }
 .pn-actions .pn-btn { flex: 1; width: auto; margin: 0; min-height: 44px; font-size: 14px; }
+
+/* root-portal is outside page, so page-level CSS variables may be absent. */
+.pn-actions .btn-primary { background: var(--primary, #07C160); color: #FFFFFF; }
+.pn-actions .btn-primary:active { background: var(--primary-active, #06AD56); }
+.pn-actions .btn-ghost { color: var(--text, #191919); }
