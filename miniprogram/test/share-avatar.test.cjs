@@ -13,3 +13,9 @@ test('注销/切账号后的迟到头像不进入画布；非图片及解码失�
  const f=fixture();const late=f.load(f.canvas,'https://rank.test/avatars/a.jpg');f.changeAccount();f.requests[0].success({statusCode:200,data:bytes});assert.equal(await late,null);assert.equal(f.images.length,0);
  for(const valid of [true,false]){const g=fixture();g.canvas.createImage=()=>({set src(p){queueMicrotask(()=>this.onerror());}});const pending=g.load(g.canvas,'https://rank.test/avatars/a.jpg');g.requests[0].success({statusCode:200,data:valid?bytes:new ArrayBuffer(4)});assert.equal(await pending,null);}
 });
+test('分享封面和海报并发或反复打开共用头像字节，换账号重新读取，失败不污染缓存',async()=>{
+ const f=fixture(),url='https://rank.test/avatars/a.jpg';const a=f.load(f.canvas,url),b=f.load(f.canvas,url);assert.equal(f.requests.length,1);f.requests[0].success({statusCode:200,data:bytes});assert.ok(await a);assert.ok(await b);assert.equal(f.images.length,2);
+ for(let i=0;i<10;i++)assert.ok(await f.load(f.canvas,url));assert.equal(f.requests.length,1);
+ f.changeAccount();const fresh=f.load(f.canvas,url);assert.equal(f.requests.length,2);f.requests[1].fail({errMsg:'offline'});assert.equal(await fresh,null);
+ const retry=f.load(f.canvas,url);assert.equal(f.requests.length,3);f.requests[2].success({statusCode:200,data:bytes});assert.ok(await retry);
+});

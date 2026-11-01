@@ -922,13 +922,15 @@ test('个人卡片指向作者记录，小程序码加载不携带作者或主�
 });
 
 test('没有历史不创建公开记录；重载失败也不能复用上次的分享链接', async () => {
-  let created=0,fail=false;
-  const {p,api}=page('share',{createShare:async()=>{created++;return {id:'a'.repeat(24),user:{},usage:usageData()};},
-    myUsage:async()=>{if(fail)throw new Error('断网');return {...usageData(),has_history:false};}});
-  p.onLoad({});await p.onShow();await p.onReady();assert.equal(created,0);assert.equal(p.data.shareId,'');
-  api.myUsage=async()=>usageData();p._canvasReady=false;await p.load();assert.ok(p.data.shareId);
-  api.myUsage=async()=>{throw new Error('断网');};await p.load();
-  assert.equal(p.data.shareId,'');assert.equal(p._snapshot,null);assert.equal(p.onShareAppMessage().path,'/pages/index/index');
+  let created=0,mode='empty';
+  const {p}=page('share',{createShare:async()=>{
+    if(mode==='empty'){const error=Error('没有历史');error.code='NO_USAGE';throw error;}
+    if(mode==='fail')throw Error('断网');
+    created++;return{id:'a'.repeat(24),user:{},usage:usageData()};
+  },myUsage:async()=>{throw Error('分享不应再预读用量');}});
+  p.onLoad({});await p.onShow();await p.onReady();assert.equal(created,0);assert.equal(p.data.shareId,'');assert.equal(p.data.error,'');
+  mode='ready';p._canvasReady=false;await p.load();assert.ok(p.data.shareId);
+  mode='fail';await p.load();assert.equal(p.data.shareId,'');assert.equal(p._snapshot,null);assert.equal(p.onShareAppMessage().path,'/pages/index/index');
 });
 
 test('取消公开后返回页面不会重新开放记录，用户明确重新生成后才恢复', async () => {
@@ -1242,7 +1244,7 @@ test('新增排行榜类型生成真码海报和封面，点开仍是作者的�
   exports[0].options.success({ tempFilePath: 'ranking.png' }); await flush();
   assert.equal(exports[1].height, 800);
   exports[1].options.success({ tempFilePath: 'ranking-cover.png' }); await drawing;
-  assert.deepEqual(calls, [['week', 'usage']]);
+  assert.deepEqual(calls, [['week', 'ranking']]);
   const card = p.onShareAppMessage();
   assert.equal(card.path, '/pages/record/record?id=' + 'd'.repeat(24));
   assert.equal(card.imageUrl, 'ranking-cover.png'); assert.match(card.title, /作者.*2.58 亿.*52/);

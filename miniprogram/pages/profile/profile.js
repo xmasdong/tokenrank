@@ -52,6 +52,13 @@ Page({
     try {
       await api.ensureSession();
       if (requestId !== this._requestId) return;
+      if (api.myOverview) {
+        const result=await api.myOverview(period,options);if(requestId!==this._requestId)return;
+        this.showUser(result.user,profileRevision);
+        if(result.usage){this.setData({usage:usage.present(result.usage),usageLoading:false});this.prepareUsageShare(result.usage);}
+        else this.setData({usageLoading:false,usageError:result.usage_error?.error || '用量暂不可用'});
+        return;
+      }
       await Promise.all([
         api.ensureLogin(options).then(user => { if (requestId === this._requestId) this.showUser(user, profileRevision); }),
         api.myUsage(period, options).then(result => {

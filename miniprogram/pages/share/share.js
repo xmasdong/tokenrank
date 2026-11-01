@@ -22,6 +22,10 @@ Page({
   },
   onShow() {
     this._visible = true;
+    if(this._snapshotEpoch!==undefined && this._snapshotEpoch!==api.accountEpoch()){
+      this._snapshot=null;this._ranking=null;this._revoked=false;
+      this.setData({shareId:'',posterPath:'',coverPath:'',cost:null});
+    }
     if (this._revoked) return;
     if (!this._snapshot) return this.load();
     if (!this.data.posterPath) return this.buildImages();
@@ -35,31 +39,32 @@ Page({
     this._imageVersion = (this._imageVersion || 0) + 1;
     this._snapshot = null;
     this._ranking = null;
-    const period = this.data.period, style = this.data.style;
+    const period = this.data.period, style = this.data.style, epoch=api.accountEpoch();
     wx.hideShareMenu();
     this.setData({ loading: true, error: '', shareId: '', hasHistory: false, posterPath: '', coverPath: '', imageError: '' });
     try {
-      await api.ensureLogin();
-      const result = await api.myUsage(period);
-      if (requestId !== this._requestId) return;
-      if (!result.has_history) { this.setData({ loading: false, hasHistory: false }); return; }
+      await api.ensureSession();
+      if (requestId !== this._requestId || epoch!==api.accountEpoch()) return;
       let record, ranking;
       if (style === 'ranking') {
         for (let attempt = 0; attempt < 2; attempt++) {
-          const pair = await Promise.all([api.createShare(period, 'usage', '', { force: attempt > 0 }), api.fetchLeaderboard({ scope: 'global', period }, { force: attempt > 0 })]);
-          if (requestId !== this._requestId) return;
-          record = pair[0];
-          try { ranking = personalRanking(record, pair[1]); break; }
-          catch (err) { if (attempt === 1) throw err; }
+          try {
+            record=await api.createShare(period,'ranking','',{force:attempt>0});
+            if(requestId!==this._requestId || epoch!==api.accountEpoch())return;
+            const board=record.ranking || await api.fetchLeaderboard({scope:'global',period},{force:attempt>0});
+            if(requestId!==this._requestId || epoch!==api.accountEpoch())return;
+            ranking=personalRanking(record,board);break;
+          } catch(err) { if(requestId!==this._requestId || epoch!==api.accountEpoch())return; if(err.code==='NO_USAGE' || attempt===1 || (err.statusCode && err.statusCode!==409))throw err; }
         }
       } else record = await api.createShare(period, style);
-      if (requestId !== this._requestId) return;
+      if (requestId !== this._requestId || epoch!==api.accountEpoch()) return;
       this._ranking = ranking || null;
+      this._snapshotEpoch=epoch;
       this._snapshot = { user: record.user, usage: record.usage, created_at: record.created_at };
       this.setData({ loading: false, hasHistory: true, shareId: record.id, cost: presentCost(record.usage.cost), basisLabel: usage.usageBasis(record.usage).basisLabel });
       return this.buildImages();
     } catch (err) {
-      if (requestId === this._requestId) this.setData({ loading: false, error: err.message });
+      if (requestId === this._requestId) this.setData({ loading: false, hasHistory:false, error:err.code==='NO_USAGE'?'':err.message });
     }
   },
   switchStyle(e) {

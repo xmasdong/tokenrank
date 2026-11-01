@@ -27,20 +27,24 @@ function dimension(rows, range, now, name) {
   return aggregateAnalytics({ scope:'group', dimension:name, range, now, trendDays:range.trendDays,
     users:[...users.values()], details:[...combined.values()], days:rows.map(row=>({...row,uid:row.user_id})), dayDetails }).data;
 }
-export async function loadGroupInsights(env, userId, groupId, period = 'day', now = Date.now()) {
+export async function loadGroupInsights(env, userId, groupId, period = 'day', now = Date.now(), knownGroup = null) {
   if (!groupPeriod(period)) return jsonError(400, '群数据周期无效');
-  const member = await env.DB.prepare(`SELECT g.name FROM rank_groups g JOIN rank_group_members m ON m.group_id=g.id
+  const member = knownGroup || await env.DB.prepare(`SELECT g.name FROM rank_groups g JOIN rank_group_members m ON m.group_id=g.id
     JOIN users u ON u.id=m.user_id WHERE g.id=?1 AND m.user_id=?2 AND u.disabled_at IS NULL`).bind(groupId,userId).first();
   if (!member) return jsonError(403,'请先加入这个群榜');
   const range=usageWindow(period,now), from=beijingDaysAgo(range.trendDays - 1,Date.parse(range.to + 'T12:00:00+08:00'));
   // Both dimensions and the cost use this one read transaction and the exact same public cohort as the ranking.
-  const [groups,source] = await env.DB.batch([
-    env.DB.prepare(`SELECT name,(SELECT COUNT(*) FROM rank_group_members WHERE group_id=g.id) AS members FROM rank_groups g WHERE id=?1`).bind(groupId),
-    env.DB.prepare(`SELECT d.user_id,d.day,d.tokens,d.requests,d.input_tokens,d.output_tokens,d.cache_read,d.cache_write,
+  const sourceStatement=env.DB.prepare(`SELECT d.user_id,d.day,d.tokens,d.requests,d.input_tokens,d.output_tokens,d.cache_read,d.cache_write,
       d.models_json,d.tools_json,d.cost_json,d.updated_at FROM public_usage d JOIN rank_group_members m ON m.user_id=d.user_id
-      WHERE m.group_id=?1 AND m.hidden=0 AND d.day>=?2 AND d.day<=?3 ORDER BY d.day,d.user_id`).bind(groupId,from,range.to)
-  ]);
-  const group=groups.results[0]; if (!group) return jsonError(404,'群不存在或已解散');
+      WHERE m.group_id=?1 AND m.hidden=0 AND d.day>=?2 AND d.day<=?3 ORDER BY d.day,d.user_id`).bind(groupId,from,range.to);
+  let group,source;
+  if(knownGroup){group={name:knownGroup.name,members:knownGroup.members};source=await sourceStatement.all();}
+  else {
+    const [groups,rows]=await env.DB.batch([
+      env.DB.prepare(`SELECT name,(SELECT COUNT(*) FROM rank_group_members WHERE group_id=g.id) AS members FROM rank_groups g WHERE id=?1`).bind(groupId),sourceStatement]);
+    group=groups.results[0];source=rows;
+  }
+  if(!group)return jsonError(404,'群不存在或已解散');
   const rows=source.results, selected=rows.filter(row=>row.day>=range.from), tools=dimension(rows,range,now,'tools'), models=dimension(rows,range,now,'models');
   const cost=buildCosts(selected), missing=selected.filter(row=>buildCosts([row]).missing_days>0);
   for (const data of [tools,models]) data.summary.active_days=new Set(selected.filter(row=>row.tokens>0).map(row=>row.day)).size;

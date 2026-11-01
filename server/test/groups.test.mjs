@@ -286,7 +286,7 @@ test('同分时列表、个人、群内和全站排名保持一致', async t => 
   assert.equal(mine.global.rank, 2);
 });
 
-test('多个群并行查询仍按创建时间排序，保留各群不同排名且不包含未加入群', async t => {
+test('多个群批量查询按参与人数及最近更新排序，保留各群不同排名且不包含未加入群', async t => {
   const f = fixture(t);
   seedDay(f, 1, beijingDay(), { tokens: 200, requests: 1 });
   seedDay(f, 2, beijingDay(), { tokens: 100, requests: 1 });
@@ -297,7 +297,7 @@ test('多个群并行查询仍按创建时间排序，保留各群不同排名�
   }
   const result = await f.request('/api/my/rankings?period=day', null, 2);
   assert.equal(result.status, 200);
-  assert.deepEqual(result.data.groups.map(g => g.id), [6, 5, 4, 3, 2, 1, 0].map(i => `many-${i}`));
+  assert.deepEqual(result.data.groups.map(g => g.id), [0, 2, 4, 6, 1, 3, 5].map(i => `many-${i}`));
   for (const g of result.data.groups) {
     assert.equal(g.my_rank, Number(g.id.slice(-1)) % 2 === 0 ? 2 : 1);
     assert.equal(g.global_rank, 2); assert.equal(g.my_tokens, 100);

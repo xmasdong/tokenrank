@@ -10,7 +10,8 @@ const byTokens = (a, b) => b.tokens - a.tokens || a.name.localeCompare(b.name);
 export async function analyticsRows(env, { scope, userId = null, period, dimension, tool = '', trend = true, now = Date.now() }) {
   if (tool) return toolModelRows(env, { scope, userId, period, tool, trend, now });
   const range = usageWindow(period, now), view = scope === 'mine' ? 'ranked_usage' : 'public_usage';
-  const column = dimension === 'models' ? 'models_json' : 'tools_json';
+  const both=dimension==='both';
+  const column=both ? "(CASE WHEN dim.dimension='models' THEN ds.models_json ELSE ds.tools_json END)" : 'ds.'+(dimension==='models'?'models_json':'tools_json');
   const where = `ds.day>=?1 AND ds.day<=?2 AND (?3 IS NULL OR ds.user_id=?3)
     AND (?3 IS NOT NULL OR ds.user_id IN (SELECT user_id FROM ${view} WHERE day>=?4 AND day<=?2 GROUP BY user_id HAVING SUM(tokens)>0))`;
   const values = (from, cohortFrom = range.from) => [from, range.to, scope === 'mine' ? userId : null, cohortFrom];
@@ -20,8 +21,8 @@ export async function analyticsRows(env, { scope, userId = null, period, dimensi
   const pair = `CASE WHEN je.type='array' THEN je.value ELSE '[]' END`;
   const detailWhere = `json_type(${pair},'$[0]')='text' AND LENGTH(json_extract(${pair},'$[0]'))>0
     AND json_type(${pair},'$[1]') IN ('integer','real') AND json_extract(${pair},'$[1]')>0`;
-  const detailSource = `${view} ds, json_each(CASE WHEN json_valid(ds.${column}) THEN
-    CASE WHEN json_type(ds.${column})='array' THEN ds.${column} ELSE '[]' END ELSE '[]' END) je`;
+  const detailSource = `${view} ds${both ? ",(SELECT 'tools' AS dimension UNION ALL SELECT 'models') dim" : ''}, json_each(CASE WHEN json_valid(${column}) THEN
+    CASE WHEN json_type(${column})='array' THEN ${column} ELSE '[]' END ELSE '[]' END) je`;
   const trendDays = range.trendDays;
   const trendFrom = beijingDaysAgo(trendDays - 1, Date.parse(range.to + 'T12:00:00+08:00'));
   const statements = [
@@ -29,14 +30,14 @@ export async function analyticsRows(env, { scope, userId = null, period, dimensi
       COUNT(CASE WHEN tokens>0 OR requests>0 THEN 1 END) AS active_days,
       MIN(CASE WHEN tokens>0 OR requests>0 THEN day END) AS first_day
       FROM ${view} ds WHERE ${where} GROUP BY ds.user_id`).bind(...values(range.from)),
-    env.DB.prepare(`SELECT ds.user_id AS uid, json_extract(${pair},'$[0]') AS name,
+    env.DB.prepare(`SELECT ds.user_id AS uid${both ? ',dim.dimension AS dimension' : ''}, json_extract(${pair},'$[0]') AS name,
       SUM(json_extract(${pair},'$[1]')) AS tokens FROM ${detailSource}
-      WHERE ${where} AND ${detailWhere} GROUP BY ds.user_id,name`).bind(...values(range.from)),
+      WHERE ${where} AND ${detailWhere} GROUP BY ds.user_id,name${both ? ',dim.dimension' : ''}`).bind(...values(range.from)),
     ...(trend ? [env.DB.prepare(`SELECT ds.user_id AS uid, ds.day, SUM(tokens) AS tokens, SUM(requests) AS requests
       FROM ${view} ds WHERE ${where} GROUP BY ds.user_id,ds.day`).bind(...values(trendFrom, trendFrom)),
-      env.DB.prepare(`SELECT ds.user_id AS uid,ds.day,json_extract(${pair},'$[0]') AS name,
+      env.DB.prepare(`SELECT ds.user_id AS uid,ds.day${both ? ',dim.dimension AS dimension' : ''},json_extract(${pair},'$[0]') AS name,
         SUM(json_extract(${pair},'$[1]')) AS tokens FROM ${detailSource}
-        WHERE ${where} AND ${detailWhere} GROUP BY ds.user_id,ds.day,name`).bind(...values(trendFrom, trendFrom))] : []),
+        WHERE ${where} AND ${detailWhere} GROUP BY ds.user_id,ds.day,name${both ? ',dim.dimension' : ''}`).bind(...values(trendFrom, trendFrom))] : []),
   ];
   // D1 batch is one transaction: a concurrent five-minute report cannot split
   // the headline, breakdown and trend into different source versions.

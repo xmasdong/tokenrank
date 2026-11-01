@@ -26,6 +26,10 @@ Page({
     try {
       await api.ensureSession();
       if (requestId !== this._requestId) return;
+      if (api.groupsOverview) {
+        const result=await api.groupsOverview(period,options);if(requestId!==this._requestId)return;
+        this.setData({user:result.user,...flow.connection(result.user)});this.showGroups(result.rankings);this.promptConnect();return;
+      }
       await Promise.all([
         api.ensureLogin(options).then(user => { if (requestId === this._requestId) this.setData({ user, ...flow.connection(user) }); }),
         this.loadGroups(period, requestId, options),

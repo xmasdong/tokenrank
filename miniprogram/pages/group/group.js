@@ -222,6 +222,16 @@ Page({
     try {
       await api.ensureSession();
       if (requestId !== this._requestId) return;
+      if (api.groupPage) {
+        const result=await api.groupPage(this.data.id,period,options);if(requestId!==this._requestId)return;
+        this.showInfo(result.user,result.group);
+        if(!result.group.joined){this.setData({loading:false,entries:[]});return;}
+        if(!flow.hasProfile(result.user)){this.beginProfile(result.user,'member');return;}
+        this.showBoard(result.board);
+        if(result.insights)this.setData({insights:presentGroupInsights(result.insights),insightsLoading:false,insightsError:''});
+        else this.setData({insights:null,insightsLoading:false,insightsError:result.insights_error || '群数据暂不可用，请重试'});
+        return;
+      }
       // Membership already confirmed by the card entry: load the board alongside user and group info.
       const board = options.joined === true ? api.fetchLeaderboard({ scope: 'group', id: this.data.id, period }, options) : null;
       board?.catch(() => {});

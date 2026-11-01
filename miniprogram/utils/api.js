@@ -6,7 +6,7 @@
  * 「详情 → 本地设置 → 不校验合法域名」。
  */
 const BASE_URL = 'https://tokenrank.xmasdong.cn';
-const { formatTokens: fmtTokens } = require('./usage');
+const { formatTokens: fmtTokens, PERIODS } = require('./usage');
 
 const KEY = 'session_token';
 const ACCOUNT_STATE_KEY = 'account_state';
@@ -23,11 +23,13 @@ const pendingReads = new Map();
 let readEpoch = 0;
 let readDay = '';
 let readRevision = 0;
+let readOrder = 0;
+const latestReads = new Map();
 let reminderVersion = 0;
 let emailVersion = 0;
 let subscriptionVersion = 0;
 
-function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); }
+function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); latestReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
 function assertActive(epoch = authEpoch) { if (accountState || epoch !== authEpoch) throw authError(); }
 function clearAvatarFiles() {
@@ -60,27 +62,35 @@ function cacheKey(path) {
 }
 function peek(path) {
   const item = readCache.get(cacheKey(path));
-  return item && Date.now() - item.at < READ_TTL && (!item.value.expires_at || item.value.expires_at > Date.now()) ? item.value : null;
+  return item && Date.now() - item.at < READ_TTL && (!item.value?.expires_at || item.value.expires_at > Date.now()) ? item.value : null;
 }
-function read(path, options = {}, requestOptions = {}, cachePath = path) {
+function remember(path, value, at = Date.now(), order = 0) {
+  if (value === undefined) return;
+  const key=cacheKey(path), old=readCache.get(key);
+  if (old && (old.order || 0) > order) return;
+  const same=old && (old.value===value || JSON.stringify(old.value)===JSON.stringify(value));
+  if (readCache.size>=100 && !old) readCache.delete(readCache.keys().next().value);
+  readCache.set(key,{value,at,order,revision:same?old.revision:++readRevision});
+}
+function read(path, options = {}, requestOptions = {}, cachePath = path, hydrate = null) {
   const key = cacheKey(cachePath);
   if (options.force !== true) {
     const value = peek(cachePath);
-    if (value) return Promise.resolve(value);
-  } else readCache.delete(key);
+    if (value) { if(hydrate)hydrate(value,readCache.get(key).at,readCache.get(key).order); return Promise.resolve(value); }
+  } else {readCache.delete(key);pendingReads.delete(key);}
   if (pendingReads.has(key)) return pendingReads.get(key);
+  const order=++readOrder;latestReads.set(key,order);
   const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion, subscriptionReadVersion = subscriptionVersion;
   const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(cachePath);
-    if (epoch === readEpoch && key === currentKey && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion) &&
+    if (epoch === readEpoch && key === currentKey && latestReads.get(key)===order && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion) &&
       (cachePath !== '/api/email-registration' || emailReadVersion === emailVersion) &&
       (cachePath !== '/api/subscriptions' || subscriptionReadVersion === subscriptionVersion)) {
-      // Bound memory when a user opens many groups in one session.
-      if (readCache.size >= 100) readCache.delete(readCache.keys().next().value);
-      readCache.set(key, { value, at: Date.now(), revision: ++readRevision });
+      const at=Date.now();remember(cachePath,value,at,order);
+      if(hydrate)hydrate(value,at,order);
     }
     return value;
-  }).finally(() => { if (pendingReads.get(key) === task) pendingReads.delete(key); });
+  }).finally(() => { if (pendingReads.get(key) === task) {pendingReads.delete(key);latestReads.delete(key);} });
   pendingReads.set(key, task);
   return task;
 }
@@ -155,9 +165,51 @@ function derived(path, data, options = {}, sources = []) {
   return read(path, options, { method: 'POST', data }, 'derived:' + path + ':' + JSON.stringify([data, revision]));
 }
 function usageShare(period, style = 'usage', groupId = '', options = {}) {
-  return derived('/api/shares', { period, style, ...(groupId ? { group_id: groupId } : {}) }, options,
-    ['/api/me', usagePath(period), rankingsPath(period), boardPath({ period }),
+  return derived('/api/shares', { period, style:style==='ranking'?'usage':style, ...(style==='ranking'?{include_ranking:true}:{}), ...(groupId ? { group_id: groupId } : {}) }, options,
+    ['/api/me', usagePath(period), ...(style==='ranking' ? [boardPath({period})] : []),
       ...(groupId ? [groupPath(groupId), boardPath({ scope: 'group', id: groupId, period })] : [])]);
+}
+async function myOverview(period='day', options={}) {
+  await ensureSession();
+  const user=options.force?null:peek('/api/me'), usage=options.force?null:peek(usagePath(period));
+  if(user&&usage)return {user,usage};
+  if(user){
+    try{return {user,usage:await read(usagePath(period),options)};}
+    catch(error){if(accountState || error.code==='ACCOUNT_INACTIVE')throw error;return {user,usage:null,usage_error:{error:error.message,statusCode:error.statusCode,code:error.code}};}
+  }
+  if(usage)return {user:await ensureLogin(options),usage};
+  const path='/api/my/overview?period='+encodeURIComponent(period);
+  return read(path,options,{},path,(r,at,order)=>{remember('/api/me',r.user,at,order);remember(usagePath(period),r.usage,at,order);});
+}
+async function groupsOverview(period='day', options={}) {
+  await ensureSession();
+  const user=options.force?null:peek('/api/me'), rankings=options.force?null:peek(rankingsPath(period));
+  if(user&&rankings)return {user,rankings};
+  if(user)return {user,rankings:await read(rankingsPath(period),options)};
+  if(rankings)return {user:await ensureLogin(options),rankings};
+  const path='/api/my/groups-overview?period='+encodeURIComponent(period);
+  return read(path,options,{},path,(r,at,order)=>{remember('/api/me',r.user,at,order);remember(rankingsPath(period),r.rankings,at,order);});
+}
+function groupPage(id,period='day',options={}) {
+  const path='/api/groups/'+encodeURIComponent(id)+'/page?period='+encodeURIComponent(period);
+  return read(path,options,{},path,(r,at,order)=>{
+    remember('/api/me',r.user,at,order);remember(groupPath(id),r.group,at,order);
+    remember(boardPath({scope:'group',id,period}),r.board,at,order);
+    remember('/api/groups/'+encodeURIComponent(id)+'/insights?period='+encodeURIComponent(period),r.insights,at,order);
+  });
+}
+const legacyAnalysis=new Set();
+async function analysis(query,options) {
+  const path=analysisPath(query),cached=options?.force?null:peek(path);
+  if(cached)return cached;
+  if(query.tool || legacyAnalysis.has(query.scope))return read(path,options,{auth:query.scope!=='public'});
+  const base=analysisPath({...query,dimension:'tools'}),bundlePath=base+'&bundle=1';
+  const value=await read(bundlePath,options,{auth:query.scope!=='public'},bundlePath,(r,at,order)=>{
+    if(r.tools&&r.models)for(const dimension of ['tools','models'])remember(analysisPath({...query,dimension}),r[dimension],at,order);
+    else {legacyAnalysis.add(query.scope);remember(base,r,at,order);}
+  });
+  if(value.tools&&value.models)return value[query.dimension||'tools'];
+  return value.dimension && value.dimension!==(query.dimension||'tools') ? read(path,options,{auth:query.scope!=='public'}) : value;
 }
 function rawRequest(path, { method = 'GET', data = null, auth = true, header = {}, timeout = 15000, deleting = false } = {}) {
   const epoch = authEpoch;
@@ -391,6 +443,9 @@ module.exports = {
   initialOf,
   ensureLogin,
   ensureSession,
+  myOverview,
+  groupsOverview,
+  groupPage,
   relogin,
   sessionFresh,
   accountState: () => accountState,
@@ -404,12 +459,12 @@ module.exports = {
   peekGroup: id => peek(groupPath(id)),
   peekLeaderboard: query => peek(boardPath(query)),
   peekAnalysis: query => peek(analysisPath(query)),
-  analysis: (query, options) => read(analysisPath(query), options, { auth: query.scope !== 'public' }),
+  analysis,
   insightUsers: (query, options = {}) => read(audiencePath(query), options, { auth: false,
     ...(options.grant ? { header: { 'x-insight-grant': options.grant } } : {}) }),
   createShare: usageShare,
   sharedRecord: id => request('/api/shares/' + encodeURIComponent(id), { auth: false }),
-  compareShare: (id, options) => derived('/api/shares/' + encodeURIComponent(id) + '/compare', null, options, ['/api/me', ...['day','week','month','all'].map(usagePath)]),
+  compareShare: (id, options) => derived('/api/shares/' + encodeURIComponent(id) + '/compare', null, options, ['/api/me', ...PERIODS.map(p=>usagePath(p.key))]),
   groupComparison: (id, data, options) => derived('/api/groups/' + encodeURIComponent(id) + '/compare', data, options, ['/api/me', groupPath(id)]),
   peekCalendar: month => peek(calendarPath(month)),
   peekWeekly: week => peek(weeklyPath(week)),
