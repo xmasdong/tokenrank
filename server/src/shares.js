@@ -3,6 +3,10 @@ import { groupShareValid } from './group-insights.js';
 import { loadAchievements } from './achievements.js';
 export const SHARE_ID = /^[0-9a-f]{24}$/;
 const TTL = 90 * 86400000;
+const SHARE_WINDOW_MS = 60_000;
+const SHARE_WINDOW_LIMIT = 60;
+const shareRateLimited = () => Response.json({error:'分享准备较频繁，请稍后再试'},
+  {status:429,headers:{'Retry-After':String(SHARE_WINDOW_MS / 1000)}});
 export async function readShare(env, id, allowComparison = true) {
   if (!SHARE_ID.test(id || '')) return null;
   const row = await env.DB.prepare('SELECT id, user_id, snapshot_json, created_at, expires_at FROM usage_shares WHERE id = ?1 AND expires_at > ?2 AND revoked_at IS NULL')
@@ -121,17 +125,20 @@ export async function saveShare(env, ownerId, snapshot, source = null) {
     const record = await readShare(env, previous.id);
     return record ? Response.json(record) : jsonError(404, '分享记录已失效，请重新打开卡片');
   }
-  const count = await env.DB.prepare('SELECT COUNT(*) AS n FROM usage_shares WHERE user_id = ?1 AND created_at > ?2')
-    .bind(ownerId, Date.now() - 86400000).first();
-  if (count.n >= 50) return jsonError(429, '今天生成的分享记录较多，请明天再试');
   const id = crypto.randomUUID().replaceAll('-','').slice(0,24), now = Date.now();
   const expiresAt = source ? Math.min(now + TTL, source.expires_at) : now + TTL;
+  // Cards are prepared before WeChat opens its share menu. Limit bursts of new
+  // snapshots, not a whole day's normal browsing. Keep the guard in the write
+  // statement so concurrent requests cannot race past it; exact reuse stays free.
   await env.DB.prepare(`INSERT INTO usage_shares (id,user_id,fingerprint,snapshot_json,created_at,expires_at)
-    VALUES (?1,?2,?3,?4,?5,?6) ON CONFLICT(user_id,fingerprint) DO UPDATE SET
+    SELECT ?1,?2,?3,?4,?5,?6 WHERE
+    (SELECT COUNT(*) FROM usage_shares WHERE user_id=?2 AND created_at>?7) < ${SHARE_WINDOW_LIMIT}
+    ON CONFLICT(user_id,fingerprint) DO UPDATE SET
     id=excluded.id,snapshot_json=excluded.snapshot_json,created_at=excluded.created_at,expires_at=excluded.expires_at,revoked_at=NULL
     WHERE usage_shares.expires_at <= excluded.created_at OR usage_shares.revoked_at IS NOT NULL`)
-    .bind(id, ownerId, fingerprint, json, now, expiresAt).run();
-  const saved = await env.DB.prepare('SELECT id FROM usage_shares WHERE user_id=?1 AND fingerprint=?2').bind(ownerId, fingerprint).first();
+    .bind(id, ownerId, fingerprint, json, now, expiresAt, now - SHARE_WINDOW_MS).run();
+  const saved = await env.DB.prepare('SELECT id, expires_at, revoked_at FROM usage_shares WHERE user_id=?1 AND fingerprint=?2').bind(ownerId, fingerprint).first();
+  if (!saved || saved.expires_at <= now || saved.revoked_at !== null) return shareRateLimited();
   const record = await readShare(env, saved.id);
   return record ? Response.json(record) : jsonError(404, '分享记录已失效，请重新打开卡片');
 }
