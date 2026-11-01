@@ -79,8 +79,7 @@
     <view wx:if="{{joined === true && user}}" class="visibility-row"><text>在本群显示我的排名</text><switch checked="{{!myHidden}}" disabled="{{visibilitySaving}}" color="#07C160" bindchange="toggleGroupVisibility" /></view>
     <view class="board-tools">
       <picker wx:if="{{joined === true}}" class="poster-style-picker" range="{{posterStyles}}" value="{{posterStyleIndex}}" bindchange="changePosterStyle"><view class="poster-style-label">分享图：{{posterStyles[posterStyleIndex]}}</view></picker>
-      <button wx:if="{{joined === true && (posterPath || posterGenerating)}}" class="text-action" bindtap="previewPoster" disabled="{{posterGenerating}}">{{posterGenerating ? '生成中…' : '预览图片'}}</button>
-      <button wx:elif="{{joined === true && posterError}}" class="text-action" bindtap="buildPoster">重新生成图片</button>
+      <button wx:if="{{joined === true}}" class="text-action" bindtap="previewPoster" disabled="{{loading || posterGenerating || (posterStyle === 'achievement' && !quickShareReady)}}">{{posterGenerating ? '生成中…' : posterError ? '重新生成图片' : '预览图片'}}</button>
       <button wx:if="{{joined === true && posterStyle !== 'achievement'}}" class="text-action" open-type="share" data-kind="board">转发完整榜单</button>
       <button wx:if="{{joined === true && quickShareError}}" class="text-action" bindtap="retryQuickShare">转发重试</button>
       <button class="text-action other-groups" bindtap="goHome">我的群榜</button>

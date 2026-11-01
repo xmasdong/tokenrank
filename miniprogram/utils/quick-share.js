@@ -49,9 +49,14 @@ function quickShare(api, wx) {
     },
     async buildQuickCover() {
       if (!this._quickRecord) return;
+      const epoch=api.accountEpoch?.(),record=this._quickRecord,now=Date.now();
+      if(this._quickCoverEpoch!==epoch){this._quickCovers=new Map();this._quickCoverEpoch=epoch;}
+      if(!this._quickCovers)this._quickCovers=new Map();
+      const cached=this._quickCovers.get(record.id);
+      if(cached && cached.expiresAt>now){if(this.data.quickCoverPath!==cached.path)this.setData({quickCoverPath:cached.path});return;}
       if (this._quickDrawing) { this._quickDrawPending = true; return; }
       this._quickDrawing = true;
-      const version = this._quickVersion, record = this._quickRecord;
+      const version = this._quickVersion;
       try {
         const canvas = await new Promise(resolve => wx.createSelectorQuery().in(this).select('#quickShareCanvas')
           .fields({ node: true }).exec(res => resolve(res?.[0]?.node)));
@@ -63,7 +68,12 @@ function quickShare(api, wx) {
         drawAchievementPoster(canvas.getContext('2d'), { ...record, cover: true, codeImage, avatarImage });
         const path = await new Promise((resolve, reject) => wx.canvasToTempFilePath({ canvas, destWidth: 1000, destHeight: 800,
           fileType: 'png', success: res => resolve(res.tempFilePath), fail: reject }));
-        if (version === this._quickVersion) this.setData({ quickCoverPath: path });
+        if (version === this._quickVersion && epoch===api.accountEpoch?.()) {
+          for(const [id,item] of this._quickCovers)if(item.expiresAt<=Date.now())this._quickCovers.delete(id);
+          if(this._quickCovers.size>=8)this._quickCovers.delete(this._quickCovers.keys().next().value);
+          this._quickCovers.set(record.id,{path,expiresAt:Math.min(Date.now()+300000,record.expires_at||Infinity)});
+          this.setData({ quickCoverPath: path });
+        }
       } catch { /* The public record is still shareable with the bundled cover. */ }
       finally {
         this._quickDrawing = false;

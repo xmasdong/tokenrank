@@ -49,7 +49,7 @@ Page({
     if (this._refreshAfterPk && !this._needsResolve) { this._refreshAfterPk = false; return this.init({ force: true }); }
     return this._needsResolve ? this.tryEnterGroup() : this.init();
   },
-  onReady() { this.buildQuickCover(); if (this._quickRecord) this.buildPoster(); },
+  onReady() { this.buildQuickCover(); },
   onHide() {
     this.clearQuickShare();
     this._visible = false;
@@ -174,7 +174,6 @@ Page({
     if (this.data.hasReported || lb.me) {
       this.prepareQuickShare({ groupId: this.data.id, stamp: `${lb.snapshot || lb.updated_at}:${lb.me?.tokens}:${this.data.name}` });
     } else this.clearQuickShare();
-    if (changed || !this.data.posterPath) this.buildPoster();
     this.promptConnect();
   },
   promptConnect() {
@@ -323,7 +322,6 @@ Page({
       },
     });
   },
-  onQuickShareReady() { if (this.data.posterStyle === 'achievement') this.buildPoster(); },
   async buildPoster() {
     if (this.data.posterStyle === 'achievement' && !this._quickRecord) return;
     if (this._posterBusy) { this._posterPending = true; return; }
@@ -385,8 +383,10 @@ Page({
     return this.buildPoster();
   },
 
-  previewPoster() {
-    if (this.data.posterPath && !this.data.posterGenerating) wx.previewImage({ urls: [this.data.posterPath] });
+  async previewPoster() {
+    const request=this._requestId,epoch=api.accountEpoch();
+    if(!this.data.posterPath)await this.buildPoster();
+    if(this._visible && request===this._requestId && epoch===api.accountEpoch() && this.data.posterPath)wx.previewImage({ urls: [this.data.posterPath] });
   },
   switchPeriod(e) {
     const period = e.currentTarget.dataset.key;

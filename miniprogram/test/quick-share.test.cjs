@@ -16,19 +16,33 @@ function context() {
   return { ctx, texts, images };
 }
 function fixture(createShare = async period => record(period)) {
+  let now=Date.now();class Clock extends Date{static now(){return now;}}
   const exports = [], { ctx } = context(), mod = { exports: {} };
   const canvas = { getContext: () => ctx };
   const wx = { createSelectorQuery: () => ({ in() { return this; }, select() { return this; }, fields() { return this; }, exec(fn) { fn([{ node: canvas }]); } }),
     canvasToTempFilePath: o => exports.push(o) };
-  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../utils/quick-share.js'), 'utf8'), { module: mod,
+  vm.runInNewContext(fs.readFileSync(path.join(__dirname, '../utils/quick-share.js'), 'utf8'), { module: mod, Date:Clock,
     require: name => name === './share-avatar' ? { loadAvatarImage: async () => null }
       : name === './share-code' ? { loadCodeImage: async () => ({ officialCode: true }) } : require('../utils/' + name.slice(2)),
   });
   let epoch = 0;
   const p = { ...mod.exports.quickShare({ createShare, accountEpoch: () => epoch }, wx), data: { period: 'day' },
     setData(patch) { Object.assign(this.data, patch); } };
-  return { p, exports, logout: () => epoch++ };
+  return { p, exports, logout: () => epoch++, advance:ms=>now+=ms };
 }
+
+test('返回同一用量或周期复用已导出封面；onReady 重入不再重复导出 PNG',async()=>{
+ const f=fixture();await f.p.prepareQuickShare();await flush();f.p.buildQuickCover();
+ f.exports[0].success({tempFilePath:'cached-cover.png'});await flush();assert.equal(f.exports.length,1);
+ f.p.clearQuickShare();await f.p.prepareQuickShare();await flush();assert.equal(f.exports.length,1);assert.equal(f.p.data.quickCoverPath,'cached-cover.png');
+ f.p.clearQuickShare();f.p.data.period='week';await f.p.prepareQuickShare();await flush();assert.equal(f.exports.length,2);f.exports[1].success({tempFilePath:'week.png'});await flush();
+ f.p.clearQuickShare();f.p.data.period='day';await f.p.prepareQuickShare();await flush();assert.equal(f.exports.length,2);assert.equal(f.p.data.quickCoverPath,'cached-cover.png');
+});
+test('封面过期或账号变化后重建，不能跨账号复用旧封面',async()=>{
+ const f=fixture();await f.p.prepareQuickShare();await flush();f.exports[0].success({tempFilePath:'old.png'});await flush();
+ f.advance(300001);f.p.clearQuickShare();await f.p.prepareQuickShare();await flush();assert.equal(f.exports.length,2);f.exports[1].success({tempFilePath:'fresh.png'});await flush();
+ f.logout();f.p.clearQuickShare();await f.p.prepareQuickShare();await flush();assert.equal(f.exports.length,3);assert.equal(f.p.data.quickCoverPath,'');
+});
 
 test('群成绩封面与海报突出本人，前50名以外仍显示真实名次，不包含群友列表', () => {
   for (const cover of [true, false]) {

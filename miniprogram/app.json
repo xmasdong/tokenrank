@@ -51,6 +51,7 @@
     ]
   },
   "style": "v2",
+  "lazyCodeLoading": "requiredComponents",
   "sitemapLocation": "sitemap.json",
   "usingComponents": {
     "privacy-notice": "/components/privacy-notice/index",

@@ -69,16 +69,22 @@ export default {
   async scheduled(event, env, ctx) { ctx.waitUntil(runReminders(env)); },
   async fetch(request, env) {
     if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: CORS });
+    const started = performance.now();
+    const timed = response => {
+      const headers = new Headers(response.headers);
+      headers.set('Server-Timing', `app;dur=${(performance.now()-started).toFixed(1)}`);
+      return new Response(response.body,{status:response.status,headers});
+    };
     const url = new URL(request.url);
     const path = url.pathname.replace(/\/+$/, '') || '/';
     try {
-      return await route(request, env, url, path) ?? jsonError(404, 'not found');
+      return timed(await route(request, env, url, path) ?? jsonError(404, 'not found'));
     } catch (err) {
       // Database guards also reject requests authenticated just before deletion.
-      if (err?.message?.includes('ACCOUNT_NOT_FOUND')) return Response.json({ error: '账号已注销，请重新登录', code: 'ACCOUNT_DELETED' }, { status: 410, headers: CORS });
-      if (err?.message?.includes('GROUP_NOT_FOUND')) return new Response(JSON.stringify({ error: '群榜已变化，请重新进入' }), { status: 409, headers: { ...CORS, 'content-type': 'application/json' } });
+      if (err?.message?.includes('ACCOUNT_NOT_FOUND')) return timed(Response.json({ error: '账号已注销，请重新登录', code: 'ACCOUNT_DELETED' }, { status: 410, headers: CORS }));
+      if (err?.message?.includes('GROUP_NOT_FOUND')) return timed(new Response(JSON.stringify({ error: '群榜已变化，请重新进入' }), { status: 409, headers: { ...CORS, 'content-type': 'application/json' } }));
       console.error('unhandled:', err?.message);
-      return jsonError(500, 'internal error');
+      return timed(jsonError(500, 'internal error'));
     }
   },
 };
@@ -214,9 +220,12 @@ async function route(request, env, url, path) {
     const user = await sessionUser(request, env);
     if (!user) return withCors(jsonError(401,'请先登录'));
     if (user.disabled_at) return withCors(jsonError(403,'账号已停用'));
-    const profile = await publicUser(env,user.id,userOrigin(env,request));
-    if (path.endsWith('/groups-overview')) return withCors(Response.json({user:profile,rankings:await rankingsOverview(env,user,url.searchParams.get('period'))}));
-    const response = await myUsage(request,env,url,null,user), data = await response.json();
+    const profileTask = publicUser(env,user.id,userOrigin(env,request));
+    if (path.endsWith('/groups-overview')) {
+      const [profile,rankings] = await Promise.all([profileTask,rankingsOverview(env,user,url.searchParams.get('period'))]);
+      return withCors(Response.json({user:profile,rankings}));
+    }
+    const [profile,response] = await Promise.all([profileTask,myUsage(request,env,url,null,user)]), data = await response.json();
     return withCors(Response.json({user:profile,...(response.ok ? {usage:data} : {usage:null,usage_error:{...data,statusCode:response.status}})}));
   }
   if (method === 'GET' && /^\/api\/groups\/[a-z0-9]+\/page$/.test(path)) {
@@ -225,16 +234,16 @@ async function route(request, env, url, path) {
     if (user.disabled_at) return withCors(jsonError(403,'账号已停用'));
     const id = path.split('/')[3], response = await groupInfo(request,env,'/api/groups/'+id,user);
     if (!response.ok) return withCors(response);
-    const group = await response.json(), profile = await publicUser(env,user.id,userOrigin(env,request));
-    if (!group.joined || !completeProfile(user)) return withCors(Response.json({user:profile,group,board:null,insights:null}));
+    const group = await response.json(), profileTask = publicUser(env,user.id,userOrigin(env,request));
+    if (!group.joined || !completeProfile(user)) return withCors(Response.json({user:await profileTask,group,board:null,insights:null}));
     const boardUrl = new URL(request.url);boardUrl.searchParams.set('scope','group');boardUrl.searchParams.set('id',id);
-    const boardResponse = await leaderboard(request,env,boardUrl,{user,group});
+    const [profile,boardResponse,analysis] = await Promise.all([profileTask,leaderboard(request,env,boardUrl,{user,group}), (async()=>{
+      try { const loaded=await loadGroupInsights(env,user.id,id,usageWindow(url.searchParams.get('period')).period,Date.now(),group);
+        return loaded instanceof Response ? {insights:null,insights_error:(await loaded.json()).error} : {insights:loaded.report,insights_error:''};
+      } catch { return {insights:null,insights_error:'群数据暂不可用，请重试'}; }
+    })()]);
     if (!boardResponse.ok) return withCors(boardResponse);
-    let insights=null,insights_error='';
-    try { const loaded=await loadGroupInsights(env,user.id,id,usageWindow(url.searchParams.get('period')).period,Date.now(),group);
-      if (loaded instanceof Response) insights_error=(await loaded.json()).error; else insights=loaded.report;
-    } catch { insights_error='群数据暂不可用，请重试'; }
-    return withCors(Response.json({user:profile,group,board:await boardResponse.json(),insights,insights_error}));
+    return withCors(Response.json({user:profile,group,board:await boardResponse.json(),...analysis}));
   }
 
   // ---- 小程序身份 ----
@@ -437,9 +446,9 @@ async function sessionUser(request, env) {
 }
 
 async function publicUser(env, userId, origin = '') {
-  const u = await env.DB.prepare(`SELECT u.id, u.nickname, u.avatar_path, u.rank_hidden,
+  const [u,health] = await Promise.all([env.DB.prepare(`SELECT u.id, u.nickname, u.avatar_path, u.rank_hidden,
     c.user_id AS connected_user_id, c.last_report_at,p.awaiting_first_report,p.prompt_seen_at FROM users u
-    LEFT JOIN connect_tokens c ON c.user_id=u.id LEFT JOIN reminder_preferences p ON p.user_id=u.id WHERE u.id=?1`).bind(userId).first();
+    LEFT JOIN connect_tokens c ON c.user_id=u.id LEFT JOIN reminder_preferences p ON p.user_id=u.id WHERE u.id=?1`).bind(userId).first(),syncHealth(env,userId)]);
   if (!u) throw new Error('ACCOUNT_NOT_FOUND');
   return {
     user_id: u.id,
@@ -451,7 +460,7 @@ async function publicUser(env, userId, origin = '') {
     // 接入状态三态的依据：connected=有码；last_report_at=数据确实到达过
     last_report_at: u.last_report_at ?? null,
     rank_hidden: !!u.rank_hidden,
-    sync_health: await syncHealth(env, userId),
+    sync_health: health,
   };
 }
 

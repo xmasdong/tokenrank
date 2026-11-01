@@ -445,7 +445,7 @@ test('群榜触底加载 50/50/23 人，重复点击合并，末页停止且不�
   assert.equal(calls[1].force, true); assert.equal(calls[1].snapshot, 'a'.repeat(64));
   finish(pagedBoard(50)); await more; assert.equal(p.data.entries.length, 100);
   await p.onReachBottom(); assert.equal(p.data.entries.length, 123); assert.equal(p.data.hasMore, false);
-  await p.onReachBottom(); assert.equal(calls.length, 3); assert.equal(posters, 1);
+  await p.onReachBottom(); assert.equal(calls.length, 3); assert.equal(posters, 0);
   assert.equal(p.data.me.rank, 123);
   assert.equal(p.data.entries.filter(e => e.isMe).length, 1);
   assert.equal(p.data.entries[122].isMe, true);
@@ -1659,4 +1659,15 @@ test('接入页轮询收到真实首次上报后才询问，零用量无需额�
  let reported=false;const modals=[];const {p,navigation}=page('connect',{ackReminderPrompt:async()=>({acknowledged:true}),getConnect:async()=>({user_id:101,token:'private-token',last_report_at:reported?1:null,reminder_prompt_eligible:reported,reminder_kinds:['daily']})},{showModal:o=>modals.push(o)});
  await p.onShow();assert.equal(modals.length,0);reported=true;await p.load({silent:true});assert.equal(modals.length,1);assert.equal(p.data.hasReported,true);assert.equal(modals[0].title,'电脑已接入');
  await p.load({silent:true});assert.equal(modals.length,1);modals[0].success({confirm:true});assert.equal(navigation[0][1],'/pages/reminders/reminders?from=first');p.onHide();modals[0].complete({});await p.load({silent:true});assert.equal(modals.length,1);queue._reset();prompt._reset();
+});
+
+test('群榜进入与翻页不预生成长图，首次预览才绘制并复用；离页后不弹迟到预览',async()=>{
+ const previews=[];let draws=0,finish;
+ const {p}=page('group',{}, {previewImage:o=>previews.push(o.urls[0])});
+ p.buildPoster=async()=>{draws++;p.setData({posterPath:'group-poster.png'});};
+ p.onLoad({g:'a',from:'mine'});await p.onShow();p.onReady();await flush();assert.equal(draws,0);
+ await p.previewPoster();assert.equal(draws,1);assert.deepEqual(previews,['group-poster.png']);
+ await p.previewPoster();assert.equal(draws,1);
+ p.setData({posterPath:''});p.buildPoster=()=>new Promise(resolve=>finish=()=>{p.setData({posterPath:'late.png'});resolve();});
+ const preview=p.previewPoster();p.onHide();finish();await preview;assert.equal(previews.length,2);
 });
