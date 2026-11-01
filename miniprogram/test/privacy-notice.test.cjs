@@ -50,3 +50,28 @@ test('页面隐藏会关闭并释放说明，本地存储失败也不会卡住�
   const g = fixture(), b = g.component(); g.notice.arm(); b.show(); b.hide(); assert.equal(b.c.data.visible, false); b.callbacks[0]();
   g.notice.arm(); assert.equal(g.notice.claim(g.wx), true);
 });
+
+test('可见的残留视图即使丢失实例标记也能关闭，且不能释放另一组件持有的弹窗队列', () => {
+  const f = fixture(), owner = f.component(), restored = f.component();
+  f.notice.arm(); owner.show();
+  f.queue.show(f.wx, { title: '等待真正持有者关闭' });
+  restored.c.data.visible = true;
+  restored.c.dismissOnce();
+  assert.equal(restored.c.data.visible, false);
+  restored.callbacks[0]();
+  assert.equal(restored.c._closing, false);
+  assert.equal(f.modals.length, 0);
+  owner.c.dismissOnce(); owner.callbacks[0]();
+  assert.equal(f.modals.length, 1);
+});
+
+test('真正持有者丢失实例标记后仍能关闭、保存偏好并释放排队提示', () => {
+  const f = fixture(), a = f.component(); f.notice.arm(); a.show();
+  f.queue.show(f.wx, { title: '后续提示' });
+  a.c._noticeHeld = false;
+  a.c.dismissForever(); assert.equal(a.c.data.visible, false);
+  a.callbacks[0]();
+  assert.equal(f.store.get(f.notice.KEY), 1);
+  assert.equal(f.modals.length, 1);
+  f.notice.arm(); a.show(); assert.equal(a.c.data.visible, false);
+});

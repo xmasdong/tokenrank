@@ -3,23 +3,25 @@
 const modalQueue = require('./modal-queue');
 const KEY = 'privacy_notice_hidden_v2';
 const REPO_URL = 'https://github.com/xmasdong/tokenrank';
-let due = false, active = false;
+let due = false, active = false, activeOwner = null;
 
 function arm() { due = true; }
 
 /** Consumes this launch's notice; only one page component can own its mask. */
-function claim(wx) {
+function claim(wx, owner = null) {
   if (!due || active) return false;
   due = false;
   if (wx.getStorageSync(KEY)) return false;
   active = true;
+  activeOwner = owner;
   modalQueue.hold();
   return true;
 }
 
-function dismiss(wx, never) {
-  if (!active) return;
+function dismiss(wx, never, owner = null) {
+  if (!active || activeOwner !== owner) return;
   active = false;
+  activeOwner = null;
   due = false;
   try { if (never) wx.setStorageSync(KEY, 1); }
   catch { /* A storage failure must never leave the screen or dialog queue blocked. */ }

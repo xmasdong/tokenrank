@@ -12,7 +12,7 @@ Component({
   },
   methods: {
     showNotice() {
-      if (this._noticeHeld || this._closing || !notice.claim(wx)) return;
+      if (this._noticeHeld || this._closing || !notice.claim(wx, this)) return;
       this._noticeHeld = true;
       this.setData({ visible: true });
     },
@@ -22,19 +22,20 @@ Component({
     dismissOnce() { this.close(); },
     dismissForever() { this.close(true); },
     close(e) {
-      if (!this._noticeHeld || this._closing) return;
+      // A restored view may still be visible after its instance flags were reset.
+      // Always let that view close, without releasing another component's dialog.
+      if (this._closing || (!this._noticeHeld && !this.data.visible)) return;
       this._closing = true;
       this._never = e === true || String(e?.currentTarget?.dataset?.never) === '1';
       // Release the next native dialog only after this mask has left the view.
       this.setData({ visible: false }, () => this.releaseNotice());
     },
     releaseNotice() {
-      if (!this._noticeHeld) return;
       this._noticeHeld = false;
       this._closing = false;
       const never = this._never === true;
       this._never = false;
-      notice.dismiss(wx, never);
+      notice.dismiss(wx, never, this);
     },
     noop() {},
   },

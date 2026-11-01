@@ -1,4 +1,6 @@
-<view wx:if="{{visible}}" class="pn-mask" bindtap="dismissOnce" catchtouchmove="noop">
+<root-portal wx:if="{{visible}}">
+<view class="pn-layer">
+  <view class="pn-mask" catchtap="dismissOnce" catchtouchmove="noop" aria-hidden="{{true}}"></view>
   <view class="pn-card" catchtap="noop" role="dialog" aria-label="关于隐私和开源">
     <view class="pn-heading"><view class="pn-title">关于隐私和开源</view><button class="pn-close" aria-label="关闭隐私与开源说明" catchtap="dismissOnce">×</button></view>
     <scroll-view class="pn-body" scroll-y="{{true}}">
@@ -19,3 +21,4 @@
     </view>
   </view>
 </view>
+</root-portal>
