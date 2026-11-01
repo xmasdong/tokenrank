@@ -43,3 +43,4 @@
 .tool-head text:last-child { flex: none; color: var(--amount); }
 .tool-track { height: 4px; margin-top: 10px; background: var(--surface-muted); }
 .tool-fill { height: 4px; background: var(--amount); }
+.record-milestone{background:#F3F5EF;padding-top:28rpx;padding-left:28rpx;padding-right:28rpx;min-height:100vh;box-sizing:border-box}.milestone-share-actions{display:flex;gap:16rpx;margin-top:24rpx}.milestone-share-actions .btn{flex:1;min-width:0;margin:0;font-size:28rpx;padding-left:12rpx;padding-right:12rpx}

@@ -1,1 +1,1 @@
-{ "navigationBarTitleText": "Token 用量统计" }
+{ "navigationBarTitleText": "Token 用量统计", "usingComponents":{"achievement-card":"/components/achievement-card/index"} }

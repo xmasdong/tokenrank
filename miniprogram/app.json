@@ -20,7 +20,8 @@
     "pages/subscriptions/subscriptions",
     "pages/subscription-edit/subscription-edit",
     "pages/topup-edit/topup-edit",
-    "pages/daily/daily"
+    "pages/daily/daily",
+    "pages/achievements/achievements"
   ],
   "window": {
     "navigationBarTitleText": "Token 群排名",
@@ -52,6 +53,7 @@
   "style": "v2",
   "sitemapLocation": "sitemap.json",
   "usingComponents": {
-    "privacy-notice": "/components/privacy-notice/index"
+    "privacy-notice": "/components/privacy-notice/index",
+    "achievement-unlock": "/components/achievement-unlock/index"
   }
 }

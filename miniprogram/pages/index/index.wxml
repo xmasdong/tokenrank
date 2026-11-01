@@ -25,3 +25,4 @@
   <view class="legal">数据由用户电脑上报，仅供参考</view>
 </view>
 <privacy-notice />
+<achievement-unlock user="{{user}}" />

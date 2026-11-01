@@ -1,0 +1,27 @@
+<view class="page achievement-page {{isDetail ? 'achievement-card-page' : ''}}">
+ <view wx:if="{{loading}}" class="note">加载中…</view>
+ <view wx:if="{{error}}" class="error-note">{{error}}<button class="btn btn-ghost" bindtap="retry">重新加载</button></view>
+ <block wx:if="{{isDetail && selected}}">
+  <achievement-card badge="{{selected.badge}}" family="{{selected.family}}" user="{{cardUser}}" playing="{{achievementPlaying}}" bindartready="onBadgeArtReady" bindarterror="onBadgeArtError" />
+  <view class="motion-toolbar"><text>{{unlocking ? (newBadgeCount > 1 ? '本次达成 ' + newBadgeCount + ' 枚' : '首次达成') : '解锁动效'}}</text><button class="text-button" bindtap="replayMotion" disabled="{{!selected.badge.earned || achievementPlaying || !motion}}">{{achievementPlaying ? '播放中' : !motion ? '动效已关闭' : '重播动效'}}</button></view>
+  <view wx:if="{{motionError}}" class="card-image-error">{{motionError}}</view>
+  <view wx:if="{{selected.family.badges.length > 1}}" class="card-tiers"><view class="tier-label">达成档位</view><view class="tier-options"><button wx:for="{{selected.family.badges}}" wx:key="id" class="tier-button {{selected.badge.id === item.id ? 'tier-selected' : ''}}" data-id="{{item.id}}" bindtap="selectTier" aria-label="{{item.targetText + (item.earned ? '，已达成' : '，未达成')}}"><image class="tier-pin {{item.earned ? '' : 'tier-pin-locked'}}" src="{{item.artPath}}" mode="aspectFit" /><text>{{item.targetText}}<text wx:if="{{item.earned}}"> ✓</text></text></button></view></view>
+  <view wx:if="{{selected.family.id === 'uploads'}}" class="card-note">连续上传从功能启用后的真实上传日开始记录。</view>
+  <view wx:if="{{shareError}}" class="error-note">{{shareError}}<button class="text-button" bindtap="retry">刷新重试</button></view>
+  <view wx:if="{{socialImageError}}" class="card-image-error">{{socialImageError}}<button class="text-button" bindtap="retryImage">重新生成图片</button></view>
+ </block>
+ <block wx:elif="{{!isDetail}}">
+  <view class="achievement-summary" wx:if="{{catalogue}}"><view><text class="earned-number">{{catalogue.earned_count}}</text><text class="earned-unit"> 枚已达成</text></view><view class="note">含缓存总量 · 北京时间</view></view>
+  <view wx:if="{{catalogue}}" class="data-share-actions"><text>点奖章查看成就卡</text><button bindtap="replayEarned" disabled="{{!catalogue.earned_count || !motion}}">{{motion ? '重播动效' : '动效已关闭'}}</button><button open-type="share">转发小程序</button></view>
+  <view wx:if="{{catalogue && !catalogue.has_source}}" class="connect-note"><text>接入电脑后记录用量成就</text><button class="text-button" bindtap="goConnect">接入电脑</button></view>
+  <block wx:for="{{rows}}" wx:key="index" wx:for-item="row">
+   <view wx:if="{{row.firstFuture}}" class="future-toggle" bindtap="toggleFuture" role="button" aria-label="{{showFuture ? '收起未开放造型' : '查看未开放造型'}}"><text>产出与价值 · 暂未开放</text><text class="future-action">{{showFuture ? '收起' : '查看造型'}}</text></view>
+   <view wx:if="{{!row.future || showFuture}}" class="achievement-row"><button wx:for="{{row.items}}" wx:key="id" class="achievement-tile" data-id="{{item.id}}" bindtap="selectFamily" aria-label="{{item.label + '，' + item.statusText}}"><image src="{{item.artPath}}" mode="aspectFit" class="achievement-thumb {{item.hasEarned ? '' : 'achievement-locked'}}" /><view class="achievement-label">{{item.label}}</view><view class="achievement-status">{{item.statusText}}</view></button></view>
+  </block>
+  <view class="motion-setting"><text>解锁动效</text><switch checked="{{motion}}" color="#07C160" bindchange="toggleMotion" /></view>
+  <view class="note">连续活跃按使用日期计算；连续上传按实际上传日期计算。数据修正后重新核对成就条件。</view>
+ </block>
+</view>
+<view wx:if="{{isDetail && selected}}" class="card-actions"><button class="btn btn-ghost" bindtap="saveMilestoneImage" loading="{{saving}}" disabled="{{saving || !socialPosterPath}}">{{saving ? '保存中' : !selected.badge.earned ? '达成后可保存' : socialPosterPath ? '保存图片' : socialImageError ? '图片未生成' : '生成图片中'}}</button><button wx:if="{{selected.badge.earned}}" class="btn btn-primary" open-type="share" disabled="{{!shareReady}}">{{shareReady ? '转发到群' : shareError ? '分享未就绪' : '准备分享中'}}</button><button wx:else class="btn btn-primary" open-type="share">转发小程序</button></view>
+<canvas type="2d" id="socialCanvas" class="export-canvas"></canvas>
+<privacy-notice wx:if="{{!unlocking}}" />

@@ -103,3 +103,29 @@ test('日报分享按日期和数据版本复用，刷新后更新，提醒预�
  await resolve(f,f.api.reserveReminder('daily','request_fixture_0001'),{kinds:[]});await f.api.createDailyShare(data);assert.equal(f.calls.length,3);
  await resolve(f,f.api.daily(data.day,{force:true}),{day:data.day,snapshot:'b'.repeat(64)});await resolve(f,f.api.createDailyShare({...data,day_snapshot:'b'.repeat(64)}),{id:'b'.repeat(24)});assert.equal(f.calls.length,5);
 });
+
+test('成就五分钟缓存、并发合并；首次展示只失效成就缓存，不清空已有用量',async()=>{
+ const f=fixture();await resolve(f,f.api.myUsage('day'),{summary:{tokens:258000000}});
+ const a=f.api.achievements(),b=f.api.achievements();assert.equal(f.calls.length,2);reply(f,{pending:['total:100000000'],families:[]});assert.equal(await a,await b);
+ await f.api.achievements();assert.equal(f.calls.length,2);
+ await resolve(f,f.api.claimAchievements(),{badge:{id:'total:100000000'},count:1,claimed_ids:['total:100000000']});
+ assert.equal(f.api.peekAchievements(),null);assert.equal(f.api.peekUsage('day').summary.tokens,258000000);await f.api.myUsage('day');assert.equal(f.calls.length,3);
+ await resolve(f,f.api.achievements(),{pending:[],families:[]});assert.equal(f.calls.length,4);
+});
+test('迟到的成就GET不恢复已消费的弹窗；成就分享按快照复用',async()=>{
+ const f=fixture(),reading=f.api.achievements(),old=f.calls[0];
+ await resolve(f,f.api.claimAchievements(),{count:1,claimed_ids:['connect:1']});old.success({statusCode:200,data:{pending:['connect:1']}});await reading;assert.equal(f.api.peekAchievements(),null);
+ await resolve(f,f.api.achievements(),{pending:[],snapshot:'new'});
+ const payload={badge_id:'connect:1',achievement_snapshot:'new'};
+ await resolve(f,f.api.createAchievementShare(payload),{id:'a'.repeat(24)});await f.api.createAchievementShare(payload);assert.equal(f.calls.length,4);
+ await resolve(f,f.api.achievements({force:true}),{pending:[],snapshot:'next'});
+ await resolve(f,f.api.createAchievementShare({...payload,achievement_snapshot:'next'}),{id:'b'.repeat(24)});assert.equal(f.calls.length,6);
+});
+test('展示准备回填真实成就缓存，旧读取不覆盖；确认只失效成就，不失效用量',async()=>{
+ const f=fixture();await resolve(f,f.api.myUsage('day'),{summary:{tokens:123}});
+ const oldRead=f.api.achievements(),old=f.calls.at(-1);
+ await resolve(f,f.api.prepareAchievements(),{claim_id:'a'.repeat(32),catalogue:{pending:['total:100000000'],snapshot:'prepared',families:[]}});
+ old.success({statusCode:200,data:{pending:[],snapshot:'stale'}});await oldRead;assert.equal(f.api.peekAchievements().snapshot,'prepared');
+ await resolve(f,f.api.confirmAchievements('a'.repeat(32)),{confirmed:true});assert.equal(f.api.peekAchievements(),null);assert.equal(f.api.peekUsage('day').summary.tokens,123);
+ await resolve(f,f.api.achievements(),{pending:[],snapshot:'confirmed'});await resolve(f,f.api.releaseAchievements('a'.repeat(32)),{released:true});assert.equal(f.api.peekAchievements().snapshot,'confirmed');
+});

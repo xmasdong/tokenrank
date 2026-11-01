@@ -21,7 +21,7 @@ import { connectionReminderMeta, reminderMeta, reminderStatus, acknowledgeRemind
 import { emailRegistrationStatus, saveEmailRegistration, removeEmailRegistration } from './email-registration.js';
 import { listSubscriptions, createSubscription, updateSubscription, deleteSubscription, getRates } from './subscriptions.js';
 import { createTopup, updateTopup, deleteTopup } from './topups.js';
-import { loadAchievements, claimAchievements, achievementShare } from './achievements.js';
+import { loadAchievements, claimAchievements, achievementShare, prepareAchievementDisplay, confirmAchievementDisplay, releaseAchievementDisplay } from './achievements.js';
 
 /**
  * 「Token 群排名」Cloudflare Worker。
@@ -92,12 +92,15 @@ async function route(request, env, url, path) {
     return withCors(Response.json({ ok: true, day: beijingDay() }));
   }
 
-  if (path === '/api/my/achievements' || path === '/api/my/achievements/claim') {
+  if (/^\/api\/my\/achievements(?:\/(claim|prepare|confirm|release))?$/.test(path)) {
     const user = await sessionUser(request, env);
     if (!user) return withCors(jsonError(401, '请先登录'));
     if (user.disabled_at) return withCors(jsonError(403, '账号已停用'));
+    if (method === 'POST' && path.endsWith('/prepare')) return withCors(await prepareAchievementDisplay(env,user.id));
+    if (method === 'POST' && path.endsWith('/confirm')) return withCors(await confirmAchievementDisplay(env,user.id,await readJson(request)));
+    if (method === 'POST' && path.endsWith('/release')) return withCors(await releaseAchievementDisplay(env,user.id,await readJson(request)));
     if (path.endsWith('/claim') && method === 'POST') return withCors(await claimAchievements(env,user.id));
-    if (!path.endsWith('/claim') && method === 'GET') return withCors(Response.json((await loadAchievements(env,user.id)).data));
+    if (path === '/api/my/achievements' && method === 'GET') return withCors(Response.json((await loadAchievements(env,user.id)).data));
     return withCors(jsonError(405,'method not allowed'));
   }
 

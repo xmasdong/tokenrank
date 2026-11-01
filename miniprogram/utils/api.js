@@ -28,6 +28,7 @@ const latestReads = new Map();
 let reminderVersion = 0;
 let emailVersion = 0;
 let subscriptionVersion = 0;
+let achievementVersion = 0;
 
 function invalidateReads() { readEpoch++; readCache.clear(); pendingReads.clear(); latestReads.clear(); }
 function authError() { const error = new Error('请重新登录后使用'); error.code = 'ACCOUNT_INACTIVE'; return error; }
@@ -80,12 +81,13 @@ function read(path, options = {}, requestOptions = {}, cachePath = path, hydrate
   } else {readCache.delete(key);pendingReads.delete(key);}
   if (pendingReads.has(key)) return pendingReads.get(key);
   const order=++readOrder;latestReads.set(key,order);
-  const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion, subscriptionReadVersion = subscriptionVersion;
+  const epoch = readEpoch, reminderReadVersion = reminderVersion, emailReadVersion = emailVersion, subscriptionReadVersion = subscriptionVersion, achievementReadVersion = achievementVersion;
   const task = request(path, requestOptions).then(value => {
     const currentKey = cacheKey(cachePath);
     if (epoch === readEpoch && key === currentKey && latestReads.get(key)===order && (cachePath !== '/api/reminders' || reminderReadVersion === reminderVersion) &&
       (cachePath !== '/api/email-registration' || emailReadVersion === emailVersion) &&
-      (cachePath !== '/api/subscriptions' || subscriptionReadVersion === subscriptionVersion)) {
+      (cachePath !== '/api/subscriptions' || subscriptionReadVersion === subscriptionVersion) &&
+      (cachePath !== '/api/my/achievements' || achievementReadVersion === achievementVersion)) {
       const at=Date.now();remember(cachePath,value,at,order);
       if(hydrate)hydrate(value,at,order);
     }
@@ -168,6 +170,16 @@ function usageShare(period, style = 'usage', groupId = '', options = {}) {
   return derived('/api/shares', { period, style:style==='ranking'?'usage':style, ...(style==='ranking'?{include_ranking:true}:{}), ...(groupId ? { group_id: groupId } : {}) }, options,
     ['/api/me', usagePath(period), ...(style==='ranking' ? [boardPath({period})] : []),
       ...(groupId ? [groupPath(groupId), boardPath({ scope: 'group', id: groupId, period })] : [])]);
+}
+async function achievementWrite(action,data={}) {
+  const epoch=authEpoch,result=await request('/api/my/achievements/'+action,{method:'POST',data});
+  assertActive(epoch);
+  if(action!=='release'){
+    achievementVersion++;
+    const key=cacheKey('/api/my/achievements');readCache.delete(key);pendingReads.delete(key);
+    if(result.catalogue)remember('/api/my/achievements',result.catalogue,Date.now(),++readOrder);
+  }
+  return result;
 }
 async function myOverview(period='day', options={}) {
   await ensureSession();
@@ -454,6 +466,19 @@ module.exports = {
   deleteAccount,
   startNewAccount,
   peekMe: () => peek('/api/me'),
+  peekAchievements: () => peek('/api/my/achievements'),
+  achievements: options => read('/api/my/achievements', options),
+  prepareAchievements: () => achievementWrite('prepare'),
+  confirmAchievements: claimId => achievementWrite('confirm',{claim_id:claimId}),
+  releaseAchievements: claimId => achievementWrite('release',{claim_id:claimId}),
+  claimAchievements: async () => {
+    const epoch = authEpoch, result = await request('/api/my/achievements/claim', {method:'POST',data:{}});
+    assertActive(epoch);
+    achievementVersion++;
+    const key = cacheKey('/api/my/achievements'); readCache.delete(key); pendingReads.delete(key);
+    return result;
+  },
+  createAchievementShare: (data, options) => derived('/api/shares', {...data, style:'milestone'}, options, ['/api/me','/api/my/achievements']),
   peekUsage: period => peek(usagePath(period)),
   peekRankings: period => peek(rankingsPath(period)),
   peekGroup: id => peek(groupPath(id)),

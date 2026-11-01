@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {DatabaseSync} from 'node:sqlite';
 import {readFileSync} from 'node:fs';
 import worker from '../src/worker.js';
-import {buildAchievements,loadAchievements,claimAchievements} from '../src/achievements.js';
+import {buildAchievements,loadAchievements,claimAchievements,prepareAchievementDisplay,confirmAchievementDisplay,releaseAchievementDisplay} from '../src/achievements.js';
 import {storeTotalReport} from '../src/report.js';
 import {deleteAccount} from '../src/account.js';
 import {readShare} from '../src/shares.js';
@@ -124,4 +124,52 @@ test('从尚无成就表的正式旧结构升级，仅新增成就结构，保�
  const migration=readFileSync(new URL('../migrations/0018_achievements.sql',import.meta.url),'utf8');f.db.exec(migration);f.db.exec(migration);
  assert.deepEqual(f.db.prepare('SELECT COUNT(*) n,SUM(tokens) tokens FROM daily_totals').get(),before);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM users').get().n,users);
  const response=await f.request('/api/my/achievements');assert.equal(response.status,200);const data=await response.json();assert.equal(badge(data,'total:100000000').current,2e8);assert.equal(badge(data,'uploads:3').current,0);
+});
+
+
+test('准备展示不写已展示收据，动画确认后只确认当批，重试幂等且旧协议兼容',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-01',1e11,{requests:100000});
+ const p=await(await prepareAchievementDisplay(f.env,1,now)).json();assert.ok(p.claim_id);assert.equal(p.badge.id,'total:100000000000');
+ assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,0);
+ assert.equal((await loadAchievements(f.env,1,now)).data.pending.length,p.count);
+ const result=await(await confirmAchievementDisplay(f.env,1,{claim_id:p.claim_id},now+700)).json();assert.equal(result.confirmed,true);assert.equal(result.count,p.count);
+ assert.equal((await(await confirmAchievementDisplay(f.env,1,{claim_id:p.claim_id},now+1000)).json()).count,p.count);
+ assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,p.count);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_display_leases').get().n,0);
+ assert.equal((await(await claimAchievements(f.env,1,now+1000)).json()).count,0);
+});
+test('两台手机只能持有一个短期展示；离页释放和过期都不会消耗成就',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-01',2e8);
+ const results=await Promise.all([prepareAchievementDisplay(f.env,1,now),prepareAchievementDisplay(f.env,1,now)]);
+ const prepared=await Promise.all(results.map(r=>r.json()));assert.equal(prepared.filter(r=>r.claim_id).length,1);assert.equal(prepared.filter(r=>r.busy).length,1);
+ const a=prepared.find(r=>r.claim_id);await releaseAchievementDisplay(f.env,2,{claim_id:a.claim_id});assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_display_leases').get().n,1);
+ await releaseAchievementDisplay(f.env,1,{claim_id:a.claim_id});assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,0);
+ const b=await(await prepareAchievementDisplay(f.env,1,now+1000)).json(),c=await(await prepareAchievementDisplay(f.env,1,now+61001)).json();assert.ok(c.claim_id);assert.notEqual(b.claim_id,c.claim_id);
+ await releaseAchievementDisplay(f.env,1,{claim_id:b.claim_id});assert.equal(f.db.prepare('SELECT claim_id FROM achievement_display_leases').get().claim_id,c.claim_id);
+ assert.equal((await confirmAchievementDisplay(f.env,1,{claim_id:b.claim_id},now+62000)).status,409);
+ assert.equal((await confirmAchievementDisplay(f.env,1,{claim_id:c.claim_id},now+62000)).status,200);
+});
+test('确认不能消费准备之后新增的门槛，数据修正撤回的主奖章不能确认',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-01',2e8);
+ const p=await(await prepareAchievementDisplay(f.env,1,now)).json();f.db.exec('UPDATE daily_totals SET tokens=100000000000,updated_at=2 WHERE user_id=1');
+ assert.equal((await confirmAchievementDisplay(f.env,1,{claim_id:p.claim_id},now+700)).status,200);
+ assert.ok((await loadAchievements(f.env,1,now+700)).data.pending.includes('total:100000000000'));
+ const g=fixture(t);g.seed(1,'2026-10-01',1e11);const invalid=await(await prepareAchievementDisplay(g.env,1,now)).json();g.db.exec('UPDATE daily_totals SET tokens=1 WHERE user_id=1');
+ assert.equal((await confirmAchievementDisplay(g.env,1,{claim_id:invalid.claim_id},now+700)).status,409);assert.equal(g.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,0);
+});
+test('展示新接口只操作当前账号，参数及方法无效时不写收据，注销会清理临时占用',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-01',2e8);
+ const p=await(await f.request('/api/my/achievements/prepare','POST',{})).json();assert.ok(p.claim_id);
+ assert.equal((await f.request('/api/my/achievements/prepare','POST',{},'')).status,401);
+ assert.equal((await f.request('/api/my/achievements/confirm','POST',{claim_id:p.claim_id},'session-2')).status,409);
+ assert.equal((await f.request('/api/my/achievements/confirm','POST',{claim_id:'invalid'})).status,400);
+ assert.equal((await f.request('/api/my/achievements/prepare')).status,405);
+ assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,0);
+ await deleteAccount(f.env,1);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_display_leases').get().n,0);
+ assert.throws(()=>f.db.prepare("INSERT INTO achievement_display_leases VALUES(1,'x','[]',1,2)").run(),/ACCOUNT_NOT_FOUND/);
+});
+test('展示迁移可重复执行，只新增租期表，保留全部用量和已展示收据',async t=>{
+ const f=fixture(t);f.seed(1,'2026-10-01',2e8);await claimAchievements(f.env,1,now);
+ const usage=f.db.prepare('SELECT COUNT(*) n,SUM(tokens) tokens FROM daily_totals').get(),receipts=f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n;
+ const migration=readFileSync(new URL('../migrations/0019_achievement_presentation.sql',import.meta.url),'utf8');f.db.exec(migration);f.db.exec(migration);
+ assert.deepEqual(f.db.prepare('SELECT COUNT(*) n,SUM(tokens) tokens FROM daily_totals').get(),usage);assert.equal(f.db.prepare('SELECT COUNT(*) n FROM achievement_displays').get().n,receipts);
 });

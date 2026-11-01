@@ -2,6 +2,7 @@ const connectPrompt = require('./utils/connect-prompt');
 const privacyNotice = require('./utils/privacy-notice');
 const updatePrompt = require('./utils/update-prompt');
 const api = require('./utils/api');
+const achievementPrompt = require('./utils/achievement-prompt');
 function publicEntry(options, pages) {
   const page = pages[pages.length - 1], path = options.path || page?.route;
   return path === 'pages/record/record' || path === 'pages/trends/trends' || (path === 'pages/analysis/analysis' &&
@@ -22,7 +23,7 @@ App({
     // Public records show the author's content before any onboarding notice.
     const pages = typeof getCurrentPages === 'function' ? getCurrentPages() : [];
     if (publicEntry(options, pages)) return;
-    privacyNotice.arm(); connectPrompt.arm(); updatePrompt.arm();
+    privacyNotice.arm(); connectPrompt.arm(); updatePrompt.arm(); achievementPrompt.arm();
   },
   // Old cached builds keep running until the next cold start; apply a
   // downloaded release immediately so fixes reach every user.

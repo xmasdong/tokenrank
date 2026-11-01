@@ -1,5 +1,7 @@
 const { loadCodeImage } = require('./share-code');
 const { SOCIAL_HEIGHT, drawToolsPoster, drawComparisonPoster, drawWeeklyPoster, drawDailyPoster } = require('./social-poster');
+const {drawMilestonePoster}=require('./milestone-poster');
+const {loadBadgeImage}=require('./milestones');
 function socialImages(wx, api) {
   return {
     resetSocialImages() {
@@ -20,14 +22,15 @@ function socialImages(wx, api) {
         if (!canvas || !current()) return;
         const { loadAvatarImage } = require('./share-avatar');
         const urls = [...new Set([record.user.avatar_url, record.comparison?.source.user.avatar_url].filter(Boolean))];
-        const [codeImage, images] = await Promise.all([loadCodeImage(canvas), Promise.all(urls.map(url => loadAvatarImage(canvas, url)))]);
+        const [codeImage, images, badgeImage] = await Promise.all([loadCodeImage(canvas), Promise.all(urls.map(url => loadAvatarImage(canvas, url))),
+          record.style==='milestone'?loadBadgeImage(canvas,record.usage.milestone):Promise.resolve(null)]);
         if (!current()) return;
         const avatarImages = Object.fromEntries(urls.map((url, i) => [url, images[i]]));
         for (const cover of [true, false]) {
           if (!cover && this._socialCoverOnly) break;
           canvas.width = 1000; canvas.height = cover ? 800 : SOCIAL_HEIGHT;
-          const options = { ...record, cover, codeImage, avatarImages, avatarImage: avatarImages[record.user.avatar_url] };
-          (record.style === 'daily' ? drawDailyPoster : record.style === 'comparison' ? drawComparisonPoster : record.style === 'weekly' ? drawWeeklyPoster : drawToolsPoster)(canvas.getContext('2d'), options);
+          const options = { ...record, cover, codeImage, badgeImage, avatarImages, avatarImage: avatarImages[record.user.avatar_url] };
+          (record.style === 'milestone' ? drawMilestonePoster : record.style === 'daily' ? drawDailyPoster : record.style === 'comparison' ? drawComparisonPoster : record.style === 'weekly' ? drawWeeklyPoster : drawToolsPoster)(canvas.getContext('2d'), options);
           const file = await new Promise((resolve, reject) => wx.canvasToTempFilePath({ canvas, destWidth: 1000, destHeight: canvas.height,
             fileType: 'png', success: res => resolve(res.tempFilePath), fail: reject }));
           if (!current()) return;

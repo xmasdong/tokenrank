@@ -95,11 +95,14 @@ export async function loadAchievements(env,userId,now=Date.now()) {
   return {data,revision};
 }
 /** One atomic INSERT claims every unseen, still-eligible badge. Concurrent phones cannot split/replay the popup. */
-export async function claimAchievements(env,userId,now=Date.now()) {
+export async function claimAchievements(env,userId,now=Date.now(),options={}) {
   const {data,revision:r}=await loadAchievements(env,userId,now);
-  const pending=data.families.flatMap(f=>f.badges).filter(b=>data.pending.includes(b.id));
+  const all=data.families.flatMap(f=>f.badges);
+  if(options.requiredId && !all.some(b=>b.id===options.requiredId && b.earned))
+    return jsonError(409,'成就数据已修正，请刷新后重试');
+  const pending=all.filter(b=>data.pending.includes(b.id) && (!options.badgeIds || options.badgeIds.includes(b.id)));
   if(!pending.length)return Response.json({badge:null,count:0,claimed_ids:[]});
-  const claimId=crypto.randomUUID();
+  const claimId=options.claimId || crypto.randomUUID();
   await env.DB.prepare(`INSERT INTO achievement_displays(user_id,badge_id,rule_version,shown_at,achieved_day,claim_id)
     SELECT ?1,json_extract(j.value,'$.id'),?3,?4,json_extract(j.value,'$.day'),?5 FROM json_each(?2) j
     WHERE EXISTS(SELECT 1 FROM users WHERE id=?1 AND disabled_at IS NULL)
@@ -111,12 +114,57 @@ export async function claimAchievements(env,userId,now=Date.now()) {
     AND (SELECT COALESCE(SUM(requests),0) FROM ranked_usage WHERE user_id=?1 AND day<=?10)=?13
     AND (SELECT COUNT(*) FROM achievement_upload_days WHERE user_id=?1 AND day<=?10)=?14
     AND (SELECT COALESCE(MAX(first_report_at),0) FROM achievement_upload_days WHERE user_id=?1 AND day<=?10)=?15
+    AND (?16 IS NULL OR EXISTS(SELECT 1 FROM achievement_display_leases WHERE user_id=?1 AND claim_id=?16 AND expires_at>?4))
     ON CONFLICT(user_id,badge_id,rule_version) DO NOTHING`)
     .bind(userId,JSON.stringify(pending.map(b=>({id:b.id,day:b.achieved_day}))),ACHIEVEMENT_VERSION,now,claimId,
-      r.device,r.source,r.updated,r.count,data.as_of,r.row_source,r.tokens,r.requests,r.uploads,r.upload_at).run();
+      r.device,r.source,r.updated,r.count,data.as_of,r.row_source,r.tokens,r.requests,r.uploads,r.upload_at,options.claimId || null).run();
   const claimed=await env.DB.prepare('SELECT badge_id FROM achievement_displays WHERE user_id=?1 AND claim_id=?2').bind(userId,claimId).all();
   const ids=claimed.results.map(r=>r.badge_id),badges=pending.filter(b=>ids.includes(b.id)).sort((a,b)=>b.priority-a.priority);
   return Response.json({badge:badges[0]||null,count:badges.length,claimed_ids:ids});
+}
+
+const LEASE_MS=60000;
+const validClaim=id=>/^[a-f0-9]{32}$/.test(id || '');
+/** Reserve one batch without consuming its first display. A crashed client expires after one minute. */
+export async function prepareAchievementDisplay(env,userId,now=Date.now()) {
+  const {data,revision}=await loadAchievements(env,userId,now);
+  const badges=data.pending.map(id=>data.families.flatMap(f=>f.badges).find(b=>b.id===id));
+  if(!badges.length)return Response.json({badge:null,count:0,catalogue:data});
+  const claimId=crypto.randomUUID().replaceAll('-','');
+  await env.DB.prepare(`INSERT INTO achievement_display_leases(user_id,claim_id,badge_ids_json,created_at,expires_at)
+    SELECT ?1,?2,?3,?4,?5 WHERE EXISTS(SELECT 1 FROM users WHERE id=?1 AND disabled_at IS NULL)
+    AND EXISTS(SELECT 1 FROM usage_sync_state WHERE user_id=?1 AND device_id=?6 AND source_at=?7)
+    ON CONFLICT(user_id) DO UPDATE SET claim_id=excluded.claim_id,badge_ids_json=excluded.badge_ids_json,
+      created_at=excluded.created_at,expires_at=excluded.expires_at
+    WHERE achievement_display_leases.expires_at<=?4`)
+    .bind(userId,claimId,JSON.stringify(badges.map(b=>b.id)),now,now+LEASE_MS,revision.device,revision.source).run();
+  const lease=await env.DB.prepare('SELECT claim_id,expires_at FROM achievement_display_leases WHERE user_id=?1').bind(userId).first();
+  if(lease?.claim_id!==claimId)return Response.json({badge:null,count:0,busy:true,retry_at:lease?.expires_at || now+1000,catalogue:data});
+  return Response.json({claim_id:claimId,expires_at:lease.expires_at,badge:badges[0],count:badges.length,catalogue:data});
+}
+export async function releaseAchievementDisplay(env,userId,body) {
+  if(!validClaim(body?.claim_id))return jsonError(400,'成就展示凭据无效');
+  await env.DB.prepare('DELETE FROM achievement_display_leases WHERE user_id=?1 AND claim_id=?2').bind(userId,body.claim_id).run();
+  return Response.json({released:true});
+}
+/** Called only after the visible card and its animation have completed. Idempotent across lost responses. */
+export async function confirmAchievementDisplay(env,userId,body,now=Date.now()) {
+  if(!validClaim(body?.claim_id))return jsonError(400,'成就展示凭据无效');
+  const claimId=body.claim_id;
+  const previous=await env.DB.prepare('SELECT COUNT(*) AS count FROM achievement_displays WHERE user_id=?1 AND claim_id=?2').bind(userId,claimId).first();
+  if(previous.count)return Response.json({confirmed:true,count:previous.count});
+  const lease=await env.DB.prepare('SELECT badge_ids_json,expires_at FROM achievement_display_leases WHERE user_id=?1 AND claim_id=?2').bind(userId,claimId).first();
+  if(!lease || lease.expires_at<=now)return jsonError(409,'成就展示已过期，请重新打开');
+  const ids=JSON.parse(lease.badge_ids_json);
+  const response=await claimAchievements(env,userId,now,{claimId,badgeIds:ids,requiredId:ids[0]});
+  if(!response.ok)return response;
+  const result=await response.json();
+  if(!result.count) {
+    const {data}=await loadAchievements(env,userId,now);
+    if(data.pending.some(id=>ids.includes(id)))return jsonError(409,'成就数据已有更新，请重试');
+  }
+  await releaseAchievementDisplay(env,userId,{claim_id:claimId});
+  return Response.json({confirmed:true,count:result.count});
 }
 export async function achievementShare(env,userId,body) {
   const {data}=await loadAchievements(env,userId);

@@ -1004,10 +1004,10 @@ test('启动时监听新版本，下载完成后提示并应用更新', () => {
   const manager = { onUpdateReady: fn => { ready = fn; }, applyUpdate: () => applied++ };
   vm.runInNewContext(fs.readFileSync(path.join(root, 'app.js'), 'utf8'), {
     App: v => app = v, wx: { getUpdateManager: () => manager, showModal: o => modal = o },
-    require: id => id === './utils/api' ? { accountState: () => '' } : id === './utils/connect-prompt' ? { arm: () => armed++ } : id === './utils/privacy-notice' ? { arm: () => armed++ } : id === './utils/update-prompt' ? { arm: () => armed++ } : require(id) });
+    require: id => id === './utils/api' ? { accountState: () => '' } : ['./utils/connect-prompt','./utils/privacy-notice','./utils/update-prompt','./utils/achievement-prompt'].includes(id) ? { arm: () => armed++ } : require(id) });
   app.onLaunch.call(app); ready(); assert.equal(modal.showCancel, false);
   modal.complete(); assert.equal(applied, 1);
-  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 6);
+  app.onShow.call(app); app.onShow.call(app); assert.equal(armed, 8);
 });
 
 test('未接入成员先看内容，不弹接入提示；主动点击才进入设备选择页', async () => {

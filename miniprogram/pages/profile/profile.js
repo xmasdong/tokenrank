@@ -89,6 +89,7 @@ Page({
   goShare() { wx.navigateTo({ url: usage.shareUrl(this.data.period) }); },
   goTools() { wx.navigateTo({ url: usage.shareUrl(this.data.period) + '&style=tools' }); },
   goCalendar() { wx.navigateTo({ url: '/pages/calendar/calendar' }); },
+  goAchievements() { wx.navigateTo({ url: '/pages/achievements/achievements' }); },
   goDaily() { wx.navigateTo({ url: '/pages/daily/daily' }); },
   goWeekly() { wx.navigateTo({ url: '/pages/weekly/weekly' }); },
   goAnalysis() { wx.navigateTo({ url: '/pages/analysis/analysis?scope=mine&period=' + this.data.period }); },
