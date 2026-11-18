@@ -58,6 +58,34 @@ test('任务阻塞时心跳持续，检查不重叠；失败后下一周期重�
   await watcher.stop();const count=beats.length;await sleep(50);assert.equal(beats.length,count);
 });
 
+test('结果不变时按保活周期发心跳，状态变化立即发，服务端可调周期',async t=>{
+  const f=fixture(t),beats=[];let clock=1_000_000,ack={},result={accepted:0};
+  const watcher=startWatch({dir:f.dir,intervalMs:300_000,now:()=>clock,
+    heartbeat:async({status,onAck})=>{beats.push(status.state);onAck(ack);return true;},
+    check:()=>({done:Promise.resolve({type:'result',result,source_day:'2026-11-18'}),cancel(){}})});
+  t.after(()=>watcher.stop());await watcher.first;
+  assert.deepEqual(beats,['checking','idle']);
+  clock+=300_000;await watcher.tick();assert.equal(beats.length,2);
+  clock+=299_000;await watcher.tick();assert.deepEqual(beats.slice(2),['idle']);
+  result={accepted:1};clock+=1000;await watcher.tick();assert.deepEqual(beats.slice(3),['uploaded']);
+  ack={heartbeat_ms:1_200_000};result={accepted:0};clock+=300_000;await watcher.tick();assert.equal(beats.length,5);
+  clock+=600_000;await watcher.beat();assert.equal(beats.length,5);
+  clock+=301_000;await watcher.beat();assert.equal(beats.length,6);
+});
+
+test('检查超过慢检查阈值才上报检查中',async t=>{
+  const f=fixture(t),beats=[];let resolve;
+  const watcher=startWatch({dir:f.dir,intervalMs:300_000,slowMs:20,heartbeat:async({status})=>{beats.push(status.state);return true;},
+    check:()=>({done:new Promise(r=>resolve=r),cancel(){resolve({result:{skipped:'cancelled'}});}})});
+  t.after(()=>watcher.stop());
+  await until(()=>resolve);resolve({type:'result',result:{accepted:0}});await watcher.first;
+  assert.deepEqual(beats,['checking','idle']);
+  resolve=null;const second=watcher.tick();await until(()=>resolve);resolve({type:'result',result:{accepted:0}});await second;
+  assert.deepEqual(beats,['checking','idle']);
+  resolve=null;const third=watcher.tick();await until(()=>beats.length===3);assert.equal(beats[2],'checking');
+  resolve({type:'result',result:{accepted:0}});await third;assert.deepEqual(beats.slice(3),['idle']);
+});
+
 test('超时只终止自己启动的检查子进程，并将超时与异常退出分开',async()=>{
   const child=new EventEmitter();let killed=[];
   child.send=()=>{};child.kill=signal=>{killed.push(signal);queueMicrotask(()=>child.emit('exit',null,signal));};

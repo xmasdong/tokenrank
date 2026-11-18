@@ -1,6 +1,8 @@
 import { fork } from 'node:child_process';
 import { readConfig, SYNC_DIR } from './config.js';
 import { sendHeartbeat, sameConnection, canContact, INTERVAL_MS, CHECK_TIMEOUT_MS } from './health.js';
+const SLOW_CHECK_MS = 60_000;
+const MAX_KEEP_ALIVE_MS = 3600_000;
 
 /** One isolated check, with bounded execution and no credentials in argv/logs. */
 export function startCheck({ dir=SYNC_DIR, timeoutMs=CHECK_TIMEOUT_MS, spawn=fork, onProgress=()=>{},
@@ -30,16 +32,28 @@ export function startCheck({ dir=SYNC_DIR, timeoutMs=CHECK_TIMEOUT_MS, spawn=for
   return {done,cancel(){cancelled=true;stop();}};
 }
 
-/** Independent liveness loop. A stuck reader cannot block heartbeat or recovery. */
-export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_TIMEOUT_MS,
-  check=startCheck,heartbeat=sendHeartbeat,log=()=>{},now=Date.now,onIdle=()=>{}}={}) {
-  let stopped=false, running=null, cycleTask=null, beatTask=null, connection=null;
-  let status={state:'starting'};
+/** Independent liveness loop. A stuck reader cannot block heartbeat or recovery.
+ * Heartbeats go out on a state change, on a check still running after slowMs, and otherwise once per keep-alive
+ * period (default two check intervals; the server may set another one). The server marks a device unreachable after
+ * 15 minutes, so an unchanged result does not need a request every cycle. */
+export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_TIMEOUT_MS,slowMs=SLOW_CHECK_MS,
+  keepAliveMs=2*intervalMs,check=startCheck,heartbeat=sendHeartbeat,log=()=>{},now=Date.now,onIdle=()=>{}}={}) {
+  let stopped=false, running=null, cycleTask=null, beatTask=null, connection=null, slowTimer=null;
+  let status={state:'starting'}, sent=null, keepAlive=keepAliveMs;
   const current=()=>{try{return readConfig(dir);}catch{return null;}};
-  const beat=()=>{
+  const key=s=>JSON.stringify([s.state,s.error_code||null,s.source_day||null]);
+  const onAck=ack=>{
+    const ms=Number(ack?.heartbeat_ms);
+    if(Number.isSafeInteger(ms) && ms>0)keepAlive=Math.min(Math.max(ms,intervalMs),MAX_KEEP_ALIVE_MS);
+  };
+  // The keep-alive is due when waiting for the next timer would exceed it.
+  const due=()=>!sent || sent.key!==key(status) || now()-sent.at+intervalMs>keepAlive;
+  const beat=(force=false)=>{
     if(stopped || beatTask || !connection || !canContact(connection) || !sameConnection(connection,current()))return beatTask || Promise.resolve(false);
-    const snapshot={...status};
-    beatTask=Promise.resolve(heartbeat({dir,config:connection,status:snapshot,now:now()})).catch(()=>false)
+    if(!force && !due())return Promise.resolve(false);
+    const snapshot={...status},at=now();
+    beatTask=Promise.resolve(heartbeat({dir,config:connection,status:snapshot,now:at,onAck}))
+      .then(ok=>{if(ok)sent={key:key(snapshot),at};return ok;}).catch(()=>false)
       .finally(()=>{beatTask=null;});
     return beatTask;
   };
@@ -51,19 +65,20 @@ export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_
       if(!canContact(config))return;
       const changed=!sameConnection(connection,config);
       connection=config;
-      status={...(changed?{}:status),state:'checking',error_code:null,check_started_at:now()};
-      await beat(); if(stopped || !sameConnection(config,current()))return;
+      const started=now(), checking=()=>{status={...status,state:'checking',error_code:null,check_started_at:started};};
+      if(changed){status={};checking();sent=null;await beat();if(stopped || !sameConnection(config,current()))return;}
+      else slowTimer=setTimeout(()=>{if(stopped || !running)return;checking();beat();},slowMs);
       running=check({dir,timeoutMs,onProgress:p=>{if('source_day' in p)status.source_day=p.source_day;}});
-      const message=await running.done;running=null;
+      const message=await running.done;running=null;clearTimeout(slowTimer);
       if(stopped || !sameConnection(config,current()))return;
       if(message.result?.skipped==='sync-running') {
-        status={...status,state:'checking'};
+        checking();
       } else if(message.result?.skipped && message.result.skipped!=='collector-outdated') {
         return;
       } else {
         const failure=message.error_code || (message.result?.skipped==='collector-outdated'?'COLLECTOR_OUTDATED':null);
         status={...status,state:failure?'error':message.result?.accepted>0?'uploaded':'idle',
-          error_code:failure,checked_at:now(),source_day:'source_day' in message?message.source_day:status.source_day||null};
+          error_code:failure,check_started_at:started,checked_at:now(),source_day:'source_day' in message?message.source_day:status.source_day||null};
         log(failure?`同步检查失败：${failure}`:message.result?.accepted>0?`已同步 ${message.result.accepted} 天用量`:'检查完成，无新增用量');
       }
       // Wait for an older in-flight heartbeat before publishing the outcome.
@@ -71,14 +86,14 @@ export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_
       await beat();
       await onIdle();
     })().catch(()=>{status={...status,state:'error',error_code:'PROCESS_EXIT',checked_at:now()};return beat();})
-      .finally(()=>{cycleTask=null;});
+      .finally(()=>{clearTimeout(slowTimer);cycleTask=null;});
     return cycleTask;
   };
   const checkTimer=setInterval(tick,intervalMs);
-  const heartbeatTimer=setInterval(beat,intervalMs);
+  const heartbeatTimer=setInterval(()=>beat(),intervalMs);
   const first=tick();
   return {first,tick,beat,getStatus:()=>({...status}),async stop(){
-    stopped=true;clearInterval(checkTimer);clearInterval(heartbeatTimer);running?.cancel();
+    stopped=true;clearInterval(checkTimer);clearInterval(heartbeatTimer);clearTimeout(slowTimer);running?.cancel();
     await cycleTask;await beatTask;
   }};
 }

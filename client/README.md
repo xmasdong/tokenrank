@@ -1,6 +1,6 @@
 # TokenRank 独立同步器
 
-v0.2.20 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
+v0.2.21 为独立只读适配器，接入原版 [luwill/token-watcher](https://github.com/luwill/token-watcher)。Node.js 22.13+，无第三方运行依赖。
 
 更换服务器、接入码或统计库后，会重新全量上传本机保留的历史用量，包含注销后重新接入的情况。上传中断可分批续传；重复执行同一账号的接入命令不会重传未变化的日期。
 
@@ -153,3 +153,7 @@ Windows 上的原版采集计划任务 `TokenWatcherForTokenRank` 被手动或�
 ## Windows 自动准备 zstd（0.2.20）
 
 Windows 上存在 dsh 会话（`~/.dsh/sessions`）而找不到 `zstd` 时，接入和更新会从 TokenRank 服务器下载官方 zstd 1.5.7 Windows 版（facebook/zstd 发布的 `zstd-v1.5.7-win64.zip` 中的 `zstd.exe`，BSD 许可），按固定 SHA-256 校验后只放在 `~/.tokenrank/bin`：不需要管理员权限，不改系统 PATH，不调用 winget。原版的首次扫描、更新重算和 `TokenWatcherForTokenRank` 采集任务都把这个目录放在 PATH 最前；已接入用户的采集启动脚本会在下次接入或更新时改写并重启一次。下载失败或校验不符时不使用该文件，并给出手动安装命令。macOS 与 Linux 仍只提示 `brew install zstd` 或用包管理器安装。删除 `~/.tokenrank/bin/zstd.exe` 即可移除。
+
+## 心跳节流（0.2.21）
+
+每 5 分钟的检查照常进行，但心跳只在状态变化时发送（如从无新增变成已上传、出现或恢复错误、数据日期变化）；检查超过 60 秒仍未结束才上报「检查中」；状态不变时每 10 分钟发一次保活。服务端在心跳回执里给出保活周期（`heartbeat_ms`），以后可只改服务端调整，客户端限制在 5 至 60 分钟之间。服务端 15 分钟未收到心跳才判为未联系，保活周期必须短于它。一台常开电脑的心跳从每天约 576 次降到 150 次左右，榜单更新频率不变。

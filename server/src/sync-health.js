@@ -12,6 +12,9 @@ export function olderThan(version, target = LATEST_CLIENT) {
   return false;
 }
 
+// Clients since 0.2.21 read HEARTBEAT_MS from the reply and send an unchanged heartbeat at most that far apart
+// (older clients send one every 5 minutes). STALE_AFTER_MS must stay above HEARTBEAT_MS.
+export const HEARTBEAT_MS = 10 * 60_000;
 export const STALE_AFTER_MS = 15 * 60_000;
 const STATES = new Set(['starting', 'checking', 'idle', 'uploaded', 'error', 'stopped']);
 const ERRORS = new Set(['SOURCE_READ_FAILED', 'COLLECTOR_OUTDATED', 'UPLOAD_FAILED', 'AUTH_INVALID',
@@ -74,7 +77,7 @@ export async function heartbeat(request, env, now = Date.now()) {
     try { await trackReminderFailure(env,conn.user_id,b.device_id); }
     catch { console.error('REMINDER_TRACK_FAILED'); } // A reminder failure must not fail an accepted heartbeat.
   }
-  return Response.json({ ok:true, accepted:!!result.meta?.changes, server_time:now });
+  return Response.json({ ok:true, accepted:!!result.meta?.changes, server_time:now, heartbeat_ms:HEARTBEAT_MS });
 }
 
 export function presentAgent(row, now = Date.now()) {

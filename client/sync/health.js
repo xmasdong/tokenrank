@@ -27,7 +27,7 @@ export function errorCode(error, stage = 'source') {
 
 /** Only allowlisted metadata leaves the computer. Never upload raw errors/paths. */
 export async function sendHeartbeat({ dir=SYNC_DIR, config=readConfig(dir), status, fetcher=fetch,
-  detached=false, now=Date.now(), platform=process.platform } = {}) {
+  detached=false, now=Date.now(), platform=process.platform, onAck=()=>{} } = {}) {
   try {
     if (!canContact(config) || (!detached && !sameConnection(config,readConfig(dir)))) return false;
     const payload = { v:1, device_id:config.device_id, client_version:CLIENT_VERSION,
@@ -41,6 +41,7 @@ export async function sendHeartbeat({ dir=SYNC_DIR, config=readConfig(dir), stat
     if (!res.ok) return false;
     const ack = await res.json();
     if (ack.ok!==true || ack.accepted!==true) return false;
+    onAck(ack);
     const latest = readConfig(dir);
     // Separate from upload checkpoints: the worker and supervisor write concurrently.
     if (sameConnection(config,latest)) writeConfig({ identity:identity(config),status:{...payload,last_seen_at:ack.server_time} },join(dir,'health'));

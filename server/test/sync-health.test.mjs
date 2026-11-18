@@ -56,7 +56,8 @@ test('认证、白名单、尺寸、状态与时间校验拒绝不合法或敏�
 test('主动关闭仅凭明确事件；迟到心跳不能覆盖关闭，重新连接可恢复',async t=>{
   const f=fixture(t);await f.send();
   await f.send({...f.body,state:'stopped',error_code:'USER_DISABLED',event_at:f.now+1},'connect-1',f.now+1);
-  const rejected=await f.send(f.body,'connect-1',f.now+2);assert.equal((await rejected.json()).accepted,false);
+  const rejected=await f.send(f.body,'connect-1',f.now+2);const ack=await rejected.json();assert.equal(ack.accepted,false);
+  assert.ok(ack.heartbeat_ms<STALE_AFTER_MS,'保活周期必须短于离线判定');
   await f.send({...f.body,event_at:f.now+1},'connect-1',f.now+2);
   assert.equal((await syncHealth(f.env,1,f.now+86400000)).state,'stopped');
   await f.send({...f.body,event_at:f.now+3},'connect-1',f.now+3);
