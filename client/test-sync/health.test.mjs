@@ -73,6 +73,19 @@ test('结果不变时按保活周期发心跳，状态变化立即发，服务�
   clock+=301_000;await watcher.beat();assert.equal(beats.length,6);
 });
 
+test('检查进行中的进度不触发额外心跳，也不把数据日期清空',async t=>{
+  const f=fixture(t),beats=[];let clock=1_000_000,resolve,progress;
+  const watcher=startWatch({dir:f.dir,intervalMs:300_000,now:()=>clock,heartbeat:async({status})=>{beats.push(status);return true;},
+    check:({onProgress})=>{progress=onProgress;return {done:new Promise(r=>resolve=r),cancel(){resolve({result:{skipped:'cancelled'}});}};}});
+  t.after(()=>watcher.stop());
+  await until(()=>resolve);progress({stage:'upload',source_day:'2026-11-18'});resolve({type:'result',result:{accepted:1},source_day:'2026-11-18'});await watcher.first;
+  assert.equal(beats.length,2);
+  clock+=300_000;resolve=null;const next=watcher.tick();await until(()=>resolve);
+  progress({stage:'source',source_day:null});await watcher.beat();assert.equal(beats.length,2);
+  assert.equal(watcher.getStatus().source_day,'2026-11-18');
+  resolve({type:'result',result:{accepted:1},source_day:'2026-11-18'});await next;assert.equal(beats.length,2);
+});
+
 test('检查超过慢检查阈值才上报检查中',async t=>{
   const f=fixture(t),beats=[];let resolve;
   const watcher=startWatch({dir:f.dir,intervalMs:300_000,slowMs:20,heartbeat:async({status})=>{beats.push(status.state);return true;},

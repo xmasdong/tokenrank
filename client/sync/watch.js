@@ -68,7 +68,8 @@ export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_
       const started=now(), checking=()=>{status={...status,state:'checking',error_code:null,check_started_at:started};};
       if(changed){status={};checking();sent=null;await beat();if(stopped || !sameConnection(config,current()))return;}
       else slowTimer=setTimeout(()=>{if(stopped || !running)return;checking();beat();},slowMs);
-      running=check({dir,timeoutMs,onProgress:p=>{if('source_day' in p)status.source_day=p.source_day;}});
+      // A reader resets source_day to null while it starts; publishing that would send a heartbeat every check.
+      running=check({dir,timeoutMs,onProgress:p=>{if(p.source_day)status.source_day=p.source_day;}});
       const message=await running.done;running=null;clearTimeout(slowTimer);
       if(stopped || !sameConnection(config,current()))return;
       if(message.result?.skipped==='sync-running') {
