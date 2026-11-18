@@ -46,8 +46,9 @@ export function startWatch({dir=SYNC_DIR,intervalMs=INTERVAL_MS,timeoutMs=CHECK_
     const ms=Number(ack?.heartbeat_ms);
     if(Number.isSafeInteger(ms) && ms>0)keepAlive=Math.min(Math.max(ms,intervalMs),MAX_KEEP_ALIVE_MS);
   };
-  // The keep-alive is due when waiting for the next timer would exceed it.
-  const due=()=>!sent || sent.key!==key(status) || now()-sent.at+intervalMs>keepAlive;
+  // Due from half a cycle before the keep-alive, so a timer firing a few ms late cannot make it fire every cycle;
+  // the gap stays at most one keep-alive period.
+  const due=()=>!sent || sent.key!==key(status) || now()-sent.at>=keepAlive-intervalMs/2;
   const beat=(force=false)=>{
     if(stopped || beatTask || !connection || !canContact(connection) || !sameConnection(connection,current()))return beatTask || Promise.resolve(false);
     if(!force && !due())return Promise.resolve(false);

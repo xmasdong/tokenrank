@@ -67,10 +67,13 @@ test('结果不变时按保活周期发心跳，状态变化立即发，服务�
   assert.deepEqual(beats,['checking','idle']);
   clock+=300_000;await watcher.tick();assert.equal(beats.length,2);
   clock+=299_000;await watcher.tick();assert.deepEqual(beats.slice(2),['idle']);
-  result={accepted:1};clock+=1000;await watcher.tick();assert.deepEqual(beats.slice(3),['uploaded']);
-  ack={heartbeat_ms:1_200_000};result={accepted:0};clock+=300_000;await watcher.tick();assert.equal(beats.length,5);
-  clock+=600_000;await watcher.beat();assert.equal(beats.length,5);
-  clock+=301_000;await watcher.beat();assert.equal(beats.length,6);
+  // Timers fire a few ms late; that must not turn the 10-minute keep-alive into one heartbeat per cycle.
+  clock+=300_004;await watcher.beat();assert.equal(beats.length,3);
+  clock+=300_004;await watcher.beat();assert.equal(beats.length,4);
+  result={accepted:1};clock+=1000;await watcher.tick();assert.deepEqual(beats.slice(4),['uploaded']);
+  ack={heartbeat_ms:1_200_000};result={accepted:0};clock+=300_000;await watcher.tick();assert.equal(beats.length,6);
+  clock+=900_000;await watcher.beat();assert.equal(beats.length,6);
+  clock+=300_000;await watcher.beat();assert.equal(beats.length,7);
 });
 
 test('检查进行中的进度不触发额外心跳，也不把数据日期清空',async t=>{
